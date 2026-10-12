@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "105420484110",
+    "project_id": "gedfa-connect-dev",
+    "storage_bucket": "gedfa-connect-dev.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:105420484110:android:bb84437547c7cb6053965f",
+        "android_client_info": {
+          "package_name": "com.isaaccodes.gedfa_connect"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD0y7uzHF_IEfOQhJWa2GYoWHZoszNiCzA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
