@@ -30,8 +30,9 @@ class Phase0TestScreen extends StatefulWidget {
 }
 
 class _Phase0TestScreenState extends State<Phase0TestScreen> {
-  String _message = 'Press the button to test Firestore';
+  String _message = 'Press a button to test Firestore';
 
+  // TASK 1: write a tray, then read it back
   Future<void> _runTest() async {
     setState(() {
       _message = 'Working...';
@@ -60,6 +61,29 @@ class _Phase0TestScreenState extends State<Phase0TestScreen> {
     }
   }
 
+  // TASK 2: only look at the shelf, write nothing
+  Future<void> _readTest() async {
+    setState(() {
+      _message = 'Reading...';
+    });
+
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('phase0Test')
+          .doc('hello')
+          .get();
+      final data = snapshot.data();
+
+      setState(() {
+        _message = 'Read only:\n${data?['text']}';
+      });
+    } catch (e) {
+      setState(() {
+        _message = 'Error: $e';
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -67,7 +91,17 @@ class _Phase0TestScreenState extends State<Phase0TestScreen> {
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: Text(_message, textAlign: TextAlign.center),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(_message, textAlign: TextAlign.center),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: _readTest,
+                child: const Text('Read only'),
+              ),
+            ],
+          ),
         ),
       ),
       floatingActionButton: FloatingActionButton(

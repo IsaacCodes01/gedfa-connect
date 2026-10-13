@@ -27,7 +27,17 @@
 |---|---|
 | `role` | `faAdmin`, `teamAdmin`, `referee` |
 | `status` (requests, players) | `pending`, `approved`, `rejected` |
-| `position` | `GK`, `DEF`, `MID`, `FWD` |
+| `position` | `GK`, `RCB`, `LCB`, `RB`, `LB`, `LWB`, `RWB`, `DM`, `RDM`, `LDM`, `CM`, `AMF`, `LW`, `RW`, `CF`, `ST` |
+| `positionGroup` | `GK`, `DEF`, `MID`, `FWD` (derived from `position`, never typed by a user) |
+
+### Position → group
+
+| Group | Positions |
+|---|---|
+| `GK` | GK |
+| `DEF` | RCB, LCB, RB, LB, LWB, RWB |
+| `MID` | DM, RDM, LDM, CM, AMF |
+| `FWD` | LW, RW, CF, ST |
 
 ---
 
@@ -114,7 +124,8 @@ One collection for the whole district. Team admins see only their own team's pla
 | `fullName` | string | Entered once, reused everywhere |
 | `fullNameLower` | string | |
 | `dob` | timestamp | From the date picker |
-| `position` | string | `GK` / `DEF` / `MID` / `FWD` |
+| `position` | string | Detailed position, e.g. `RCB`, `AMF` (see allowed values) |
+| `positionGroup` | string | `GK` / `DEF` / `MID` / `FWD`, set by the app from `position` |
 | `jerseyNo` | number | 1–99 |
 | `photoUrl` | string | ~400px passport photo |
 | `thumbUrl` | string | ~100px thumbnail for lists |
@@ -232,3 +243,4 @@ Images are compressed in the app before upload. Storage rules mirror the Firesto
 | Date | Change |
 |---|---|
 | 13 Oct 2026 | v1 agreed: Phase 1 collections, reservation docs for jerseys and duplicate players, `adminUids` as a list, single `players` collection. |
+| 13 Oct 2026 | Positions: 16 detailed GEDFA positions in `position`, plus derived `positionGroup` (GK/DEF/MID/FWD). |
