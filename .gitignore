@@ -45,3 +45,8 @@ app.*.map.json
 .project
 .classpath
 .settings/
+
+# AI agent tool files (personal, not part of the app)
+.agents/
+.claude/
+skills-lock.json
