@@ -3,6 +3,7 @@ import 'package:gedfa_connect/app/theme.dart';
 import 'package:gedfa_connect/core/constants/approval_status.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/core/widgets/status_badge.dart';
+import 'package:gedfa_connect/core/widgets/app_toast.dart';
 
 class ThemePreviewScreen extends StatelessWidget {
   const ThemePreviewScreen({super.key});
@@ -34,6 +35,35 @@ class ThemePreviewScreen extends StatelessWidget {
           const SizedBox(height: 24),
           FilledButton(onPressed: () {}, child: const Text('Log in')),
           const SizedBox(height: 32),
+          const SizedBox(height: 24),
+          Text('Toasts', style: textTheme.titleLarge),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton(
+                onPressed: () =>
+                    AppToast.success(context, 'Team request sent to the FA'),
+                child: const Text('Success'),
+              ),
+              OutlinedButton(
+                onPressed: () =>
+                    AppToast.error(context, 'Wrong email or password'),
+                child: const Text('Error'),
+              ),
+              OutlinedButton(
+                onPressed: () => AppToast.warning(
+                    context, "You're offline. Changes can't be sent yet."),
+                child: const Text('Warning'),
+              ),
+              OutlinedButton(
+                onPressed: () => AppToast.info(
+                    context, 'Check your email to reset your password'),
+                child: const Text('Info'),
+              ),
+            ],
+          ),
           Text('Status badges', style: textTheme.titleLarge),
           const SizedBox(height: 12),
           const Wrap(
