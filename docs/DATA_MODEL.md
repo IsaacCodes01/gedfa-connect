@@ -225,6 +225,26 @@ Images are compressed in the app before upload. Storage rules mirror the Firesto
 | `matchReports/{reportId}` | 4 | fixtureId, homeScore, awayScore, scorers[], cards[], notes, signedSheetPhoto, status |
 | `matchEvents/{eventId}` | 7 | fixtureId, minute, type, teamId, playerId |
 | `standings/{teamId}` | 5 | Calculated from approved reports only, updated when a report is approved |
+| `invites/{email}` | 2.6 | role (`faAdmin` / `referee`), teamId?, invitedBy, createdAt. Created only by FA admins; used once when the invited person signs up with that confirmed email, then deleted |
+| `roleLog/{logId}` | 2.6 | action, targetUid, role, byUid, createdAt — history of role changes |
+| `feedPosts/{postId}` | 2.7 / 5.5 | type, title, body, teamIds[], fixtureId?, playerIds[]?, imageUrl?, source (`auto` / `fa` / `team`), createdBy, createdAt, hidden (bool), hiddenBy? |
+
+### Feed post types (Phase 5.5)
+
+| `type` | Source | Created when |
+|---|---|---|
+| `announcement` | FA | An FA admin posts it |
+| `teamNews` | Team | A team admin posts about their own team |
+| `fixtures` | Auto | The FA publishes a matchday's fixtures |
+| `lineup` | Auto | A team sheet is locked at kick-off |
+| `result` | Auto | The FA approves a match report |
+| `tableUpdate` | Auto | Standings change after approved results |
+| `transfer` | Auto | The FA approves a player's move |
+| `suspension` | Auto | A player reaches the card limit |
+| `newTeam` | Auto | A team is approved |
+| `milestone` | Auto | Top scorer, hat-trick, clean-sheet streak |
+
+Feed rules: never include dates of birth; player photos only if agreed with GEDFA; FA admins can hide any post; team admins post only for their own team.
 
 ---
 
@@ -244,3 +264,4 @@ Images are compressed in the app before upload. Storage rules mirror the Firesto
 |---|---|
 | 13 Oct 2026 | v1 agreed: Phase 1 collections, reservation docs for jerseys and duplicate players, `adminUids` as a list, single `players` collection. |
 | 13 Oct 2026 | Positions: 16 detailed GEDFA positions in `position`, plus derived `positionGroup` (GK/DEF/MID/FWD). |
+| 13 Oct 2026 | Planned shapes added: `invites` and `roleLog` (Phase 2.6), `feedPosts` with post types (Phases 2.7 and 5.5). |
