@@ -100,11 +100,20 @@ class _ToastCardState extends State<_ToastCard>
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     final (icon, accent) = switch (widget.type) {
-      ToastType.success => (Icons.check_circle_rounded, AppColors.ghanaGreen),
-      ToastType.error => (Icons.error_rounded, AppColors.ghanaRed),
-      ToastType.warning => (Icons.warning_rounded, AppColors.pendingText),
-      ToastType.info => (Icons.info_rounded, AppColors.deepBlue),
+      ToastType.success => (
+          Icons.check_circle_rounded,
+          isDark ? AppColors.darkGreen : AppColors.ghanaGreen,
+        ),
+      ToastType.error => (Icons.error_rounded, scheme.error),
+      ToastType.warning => (
+          Icons.warning_rounded,
+          isDark ? AppColors.ghanaGold : AppColors.pendingText,
+        ),
+      ToastType.info => (Icons.info_rounded, scheme.primary),
     };
 
     return Align(
@@ -126,7 +135,7 @@ class _ToastCardState extends State<_ToastCard>
                 child: Semantics(
                   liveRegion: true,
                   child: Material(
-                    color: Colors.white,
+                    color: scheme.surface,
                     elevation: 8,
                     shadowColor: Colors.black26,
                     borderRadius: BorderRadius.circular(16),
@@ -138,7 +147,7 @@ class _ToastCardState extends State<_ToastCard>
                             width: 36,
                             height: 36,
                             decoration: BoxDecoration(
-                              color: accent.withValues(alpha: 0.12),
+                              color: accent.withValues(alpha: 0.14),
                               shape: BoxShape.circle,
                             ),
                             child: Icon(icon, color: accent, size: 22),
@@ -151,7 +160,7 @@ class _ToastCardState extends State<_ToastCard>
                                   .textTheme
                                   .bodyMedium
                                   ?.copyWith(
-                                    color: AppColors.ink,
+                                    color: scheme.onSurface,
                                     fontWeight: FontWeight.w500,
                                   ),
                             ),
@@ -159,7 +168,7 @@ class _ToastCardState extends State<_ToastCard>
                           IconButton(
                             onPressed: _close,
                             icon: const Icon(Icons.close_rounded),
-                            color: AppColors.muted,
+                            color: scheme.onSurfaceVariant,
                             tooltip: 'Close',
                           ),
                         ],

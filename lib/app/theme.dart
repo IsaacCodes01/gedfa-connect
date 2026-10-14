@@ -1,20 +1,36 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppColors {
   AppColors._();
 
+  // Brand
   static const brandBlue = Color(0xFF1E88E5);
   static const deepBlue = Color(0xFF1259A8);
+  static const heroDark = Color(0xFF0F2A4A);
   static const ghanaRed = Color(0xFFCE1126);
   static const ghanaGold = Color(0xFFFCD116);
   static const ghanaGreen = Color(0xFF006B3F);
 
+  // Light mode
   static const ink = Color(0xFF0F1B2D);
   static const muted = Color(0xFF4A5A70);
-  static const background = Color(0xFFF4F7FB);
-  static const border = Color(0xFFC3CFDC);
+  static const background = Color(0xFFEEF3F9);
+  static const border = Color(0xFFC9D5E2);
 
+  // Dark mode
+  static const darkBackground = Color(0xFF0B1626);
+  static const darkSurface = Color(0xFF13233A);
+  static const darkField = Color(0xFF0F1D31);
+  static const darkInk = Color(0xFFE8EEF6);
+  static const darkMuted = Color(0xFF9FB0C4);
+  static const darkBorder = Color(0xFF2A3F5C);
+  static const darkPrimary = Color(0xFF4FA3F7);
+  static const darkGreen = Color(0xFF5BD39A);
+
+  // Status badges
   static const approvedBg = Color(0xFFE3F2EA);
   static const approvedText = Color(0xFF00502F);
   static const pendingBg = Color(0xFFFFF6CC);
@@ -26,62 +42,120 @@ class AppColors {
 class AppTheme {
   AppTheme._();
 
-  static ThemeData light() {
-    final colorScheme = ColorScheme.fromSeed(
+  static ThemeData light() => _build(Brightness.light);
+  static ThemeData dark() => _build(Brightness.dark);
+
+  static ThemeData _build(Brightness brightness) {
+    final isDark = brightness == Brightness.dark;
+
+    final scheme = ColorScheme.fromSeed(
       seedColor: AppColors.brandBlue,
-      primary: AppColors.deepBlue,
-      error: AppColors.ghanaRed,
-      surface: Colors.white,
+      brightness: brightness,
+    ).copyWith(
+      primary: isDark ? AppColors.darkPrimary : AppColors.deepBlue,
+      onPrimary: isDark ? const Color(0xFF06121F) : Colors.white,
+      surface: isDark ? AppColors.darkSurface : Colors.white,
+      onSurface: isDark ? AppColors.darkInk : AppColors.ink,
+      onSurfaceVariant: isDark ? AppColors.darkMuted : AppColors.muted,
+      outline: isDark ? AppColors.darkBorder : AppColors.border,
+      error: isDark ? const Color(0xFFFF8A94) : const Color(0xFFB3122A),
     );
 
     final base = ThemeData(
       useMaterial3: true,
-      colorScheme: colorScheme,
-      scaffoldBackgroundColor: AppColors.background,
+      brightness: brightness,
+      colorScheme: scheme,
+      scaffoldBackgroundColor:
+          isDark ? AppColors.darkBackground : AppColors.background,
     );
 
-    final textTheme = GoogleFonts.barlowTextTheme(base.textTheme).copyWith(
-      headlineMedium: GoogleFonts.barlowCondensed(
-        fontWeight: FontWeight.w700,
-        fontSize: 28,
-        color: AppColors.ink,
-      ),
-      titleLarge: GoogleFonts.barlowCondensed(
-        fontWeight: FontWeight.w700,
-        fontSize: 24,
-        color: AppColors.ink,
-      ),
+    final textTheme = GoogleFonts.poppinsTextTheme(base.textTheme).apply(
+      bodyColor: scheme.onSurface,
+      displayColor: scheme.onSurface,
     );
 
     OutlineInputBorder outline(Color color, double width) {
       return OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         borderSide: BorderSide(color: color, width: width),
       );
     }
 
     return base.copyWith(
-      textTheme: textTheme,
+      textTheme: textTheme.copyWith(
+        headlineMedium: textTheme.headlineMedium
+            ?.copyWith(fontSize: 24, fontWeight: FontWeight.w600),
+        titleLarge: textTheme.titleLarge
+            ?.copyWith(fontSize: 20, fontWeight: FontWeight.w600),
+      ),
+      appBarTheme: AppBarTheme(
+        backgroundColor: isDark ? AppColors.heroDark : AppColors.brandBlue,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        centerTitle: false,
+        titleTextStyle: GoogleFonts.poppins(
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+          color: Colors.white,
+        ),
+        systemOverlayStyle: SystemUiOverlayStyle.light,
+      ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        enabledBorder: outline(AppColors.border, 1.5),
-        focusedBorder: outline(AppColors.deepBlue, 2),
-        errorBorder: outline(AppColors.ghanaRed, 2),
-        focusedErrorBorder: outline(AppColors.ghanaRed, 2),
+        fillColor: isDark ? AppColors.darkField : Colors.white,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        enabledBorder: outline(scheme.outline, 1.5),
+        disabledBorder: outline(scheme.outline.withValues(alpha: 0.5), 1.5),
+        focusedBorder: outline(scheme.primary, 2),
+        errorBorder: outline(scheme.error, 2),
+        focusedErrorBorder: outline(scheme.error, 2),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          minimumSize: const Size.fromHeight(54),
+          minimumSize: const Size.fromHeight(52),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
-          textStyle: GoogleFonts.barlow(
+          textStyle: GoogleFonts.poppins(
+            fontSize: 16,
             fontWeight: FontWeight.w600,
-            fontSize: 17,
           ),
         ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size.fromHeight(50),
+          foregroundColor: scheme.onSurface,
+          side: BorderSide(color: scheme.outline, width: 1.5),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          textStyle: GoogleFonts.poppins(
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor:
+              isDark ? const Color(0xFF7DBBFA) : AppColors.deepBlue,
+          textStyle: GoogleFonts.poppins(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
+        pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.windows: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.linux: CupertinoPageTransitionsBuilder(),
+        },
       ),
     );
   }
