@@ -50,3 +50,6 @@ app.*.map.json
 .agents/
 .claude/
 skills-lock.json
+
+#emulator data
+emulator-data/

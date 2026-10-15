@@ -3,6 +3,26 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ---------- Helpers ----------
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // ---------- districts/{districtId}/users/{uid} ----------
+    // A person may read ONLY their own user document.
+    // Nobody may write from the app yet (FA admin rules come in 1.7).
+
+    match /districts/{districtId}/users/{uid} {
+      allow get: if isOwner(uid);
+    }
+
+    // ---------- Everything else ----------
+    // Denied unless a rule above allows it.
 
     match /{document=**} {
       allow read, write: if false;
