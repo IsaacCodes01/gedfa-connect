@@ -5,6 +5,7 @@ import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/widgets/flag_stripe.dart';
 import 'package:gedfa_connect/core/widgets/pitch_lines_painter.dart';
 import 'package:gedfa_connect/core/widgets/theme_toggle_button.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class AuthScaffold extends StatelessWidget {
   const AuthScaffold({
@@ -155,36 +156,63 @@ class OrDivider extends StatelessWidget {
 }
 
 class GoogleSignInButton extends StatelessWidget {
-  const GoogleSignInButton({super.key, required this.onPressed});
+  const GoogleSignInButton({
+    super.key,
+    required this.onPressed,
+    this.isLoading = false,
+  });
 
   final VoidCallback? onPressed;
+  final bool isLoading;
+
+  // Colours required by Google's branding rules
+  static const _lightFill = Color(0xFFFFFFFF);
+  static const _lightBorder = Color(0xFF747775);
+  static const _lightText = Color(0xFF1F1F1F);
+  static const _darkFill = Color(0xFF131314);
+  static const _darkBorder = Color(0xFF8E918F);
+  static const _darkText = Color(0xFFE3E3E3);
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fill = isDark ? _darkFill : _lightFill;
+    final border = isDark ? _darkBorder : _lightBorder;
+    final text = isDark ? _darkText : _lightText;
 
     return OutlinedButton(
-      onPressed: onPressed,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 24,
-            height: 24,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: scheme.outline, width: 1.5),
-            ),
-            child: const Text(
-              'G',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-            ),
-          ),
-          const SizedBox(width: 10),
-          const Text('Continue with Google'),
-        ],
+      onPressed: isLoading ? null : onPressed,
+      style: OutlinedButton.styleFrom(
+        backgroundColor: fill,
+        foregroundColor: text,
+        disabledBackgroundColor: fill,
+        disabledForegroundColor: text.withValues(alpha: 0.5),
+        side: BorderSide(color: border),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        textStyle: GoogleFonts.roboto(
+          fontSize: 15,
+          fontWeight: FontWeight.w500,
+        ),
       ),
+      child: isLoading
+          ? SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2.5, color: text),
+            )
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  'assets/images/google_g.png',
+                  width: 20,
+                  height: 20,
+                  excludeFromSemantics: true,
+                ),
+                const SizedBox(width: 10),
+                const Text('Continue with Google'),
+              ],
+            ),
     );
   }
 }

@@ -23,7 +23,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   bool _obscurePassword = true;
   bool _isLoading = false;
+  bool _isGoogleLoading = false;
   AutovalidateMode _autovalidateMode = AutovalidateMode.disabled;
+
+  bool get _isBusy => _isLoading || _isGoogleLoading;
 
   @override
   void dispose() {
@@ -67,6 +70,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       AppToast.error(context, authErrorMessage(error));
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    FocusScope.of(context).unfocus();
+
+    if (!_isOnline) {
+      AppToast.warning(
+        context,
+        "You're offline. Connect to the internet to continue with Google.",
+      );
+      return;
+    }
+
+    setState(() => _isGoogleLoading = true);
+
+    try {
+      await ref.read(authRepositoryProvider).signInWithGoogle();
+      if (!mounted) return;
+      AppToast.success(context, 'Welcome!');
+    } catch (error) {
+      if (!mounted) return;
+      if (isInfoAuthError(error)) {
+        AppToast.info(context, authErrorMessage(error));
+      } else {
+        AppToast.error(context, authErrorMessage(error));
+      }
+    } finally {
+      if (mounted) setState(() => _isGoogleLoading = false);
     }
   }
 
@@ -118,7 +150,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               const SizedBox(height: 24),
               TextFormField(
                 controller: _emailController,
-                enabled: !_isLoading,
+                enabled: !_isBusy,
                 decoration: const InputDecoration(labelText: 'Email'),
                 keyboardType: TextInputType.emailAddress,
                 textInputAction: TextInputAction.next,
@@ -128,7 +160,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               const SizedBox(height: 14),
               TextFormField(
                 controller: _passwordController,
-                enabled: !_isLoading,
+                enabled: !_isBusy,
                 obscureText: _obscurePassword,
                 decoration: InputDecoration(
                   labelText: 'Password',
@@ -154,13 +186,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: _isLoading ? null : _openForgotPassword,
+                  onPressed: _isBusy ? null : _openForgotPassword,
                   child: const Text('Forgot password?'),
                 ),
               ),
               const SizedBox(height: 4),
               FilledButton(
-                onPressed: _isLoading ? null : _submit,
+                onPressed: _isBusy ? null : _submit,
                 child: _isLoading
                     ? SizedBox(
                         width: 22,
@@ -176,12 +208,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               const OrDivider(),
               const SizedBox(height: 16),
               GoogleSignInButton(
-                onPressed: _isLoading
-                    ? null
-                    : () => AppToast.info(
-                          context,
-                          'Google sign-in is coming soon.',
-                        ),
+                isLoading: _isGoogleLoading,
+                onPressed: _isBusy ? null : _signInWithGoogle,
               ),
             ],
           ),
@@ -197,7 +225,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ?.copyWith(color: scheme.onSurfaceVariant),
           ),
           TextButton(
-            onPressed: _isLoading ? null : _openSignUp,
+            onPressed: _isBusy ? null : _openSignUp,
             child: const Text('Create an account'),
           ),
         ],

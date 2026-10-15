@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 const _timeout = Duration(seconds: 15);
 
@@ -44,6 +45,17 @@ class AuthRepository {
     return _auth
         .sendPasswordResetEmail(email: email.trim().toLowerCase())
         .timeout(_timeout);
+  }
+
+    Future<void> signInWithGoogle() async {
+    if (!kIsWeb) {
+      throw UnsupportedError('Google sign-in is web-only for now.');
+    }
+
+    final provider = GoogleAuthProvider()
+      ..setCustomParameters({'prompt': 'select_account'});
+
+    await _auth.signInWithPopup(provider);
   }
 
   Future<void> signOut() => _auth.signOut();

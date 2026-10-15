@@ -23,7 +23,10 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
   bool _obscurePassword = true;
   bool _isLoading = false;
+  bool _isGoogleLoading = false;
   AutovalidateMode _autovalidateMode = AutovalidateMode.disabled;
+
+  bool get _isBusy => _isLoading || _isGoogleLoading;
 
   @override
   void dispose() {
@@ -83,6 +86,36 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     }
   }
 
+  Future<void> _signInWithGoogle() async {
+    FocusScope.of(context).unfocus();
+
+    if (!_isOnline) {
+      AppToast.warning(
+        context,
+        "You're offline. Connect to the internet to continue with Google.",
+      );
+      return;
+    }
+
+    setState(() => _isGoogleLoading = true);
+
+    try {
+      await ref.read(authRepositoryProvider).signInWithGoogle();
+      if (!mounted) return;
+      AppToast.success(context, 'Welcome to GEDFA Connect!');
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } catch (error) {
+      if (!mounted) return;
+      if (isInfoAuthError(error)) {
+        AppToast.info(context, authErrorMessage(error));
+      } else {
+        AppToast.error(context, authErrorMessage(error));
+      }
+    } finally {
+      if (mounted) setState(() => _isGoogleLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -114,7 +147,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
               const SizedBox(height: 20),
               TextFormField(
                 controller: _nameController,
-                enabled: !_isLoading,
+                enabled: !_isBusy,
                 decoration: const InputDecoration(labelText: 'Full name'),
                 textCapitalization: TextCapitalization.words,
                 textInputAction: TextInputAction.next,
@@ -125,7 +158,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
               const SizedBox(height: 14),
               TextFormField(
                 controller: _emailController,
-                enabled: !_isLoading,
+                enabled: !_isBusy,
                 decoration: const InputDecoration(labelText: 'Email'),
                 keyboardType: TextInputType.emailAddress,
                 textInputAction: TextInputAction.next,
@@ -135,7 +168,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
               const SizedBox(height: 14),
               TextFormField(
                 controller: _passwordController,
-                enabled: !_isLoading,
+                enabled: !_isBusy,
                 obscureText: _obscurePassword,
                 decoration: InputDecoration(
                   labelText: 'Password',
@@ -160,7 +193,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
               const SizedBox(height: 14),
               TextFormField(
                 controller: _confirmController,
-                enabled: !_isLoading,
+                enabled: !_isBusy,
                 obscureText: _obscurePassword,
                 decoration:
                     const InputDecoration(labelText: 'Confirm password'),
@@ -170,7 +203,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
               ),
               const SizedBox(height: 24),
               FilledButton(
-                onPressed: _isLoading ? null : _submit,
+                onPressed: _isBusy ? null : _submit,
                 child: _isLoading
                     ? SizedBox(
                         width: 22,
@@ -186,12 +219,8 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
               const OrDivider(),
               const SizedBox(height: 16),
               GoogleSignInButton(
-                onPressed: _isLoading
-                    ? null
-                    : () => AppToast.info(
-                          context,
-                          'Google sign-in is coming soon.',
-                        ),
+                isLoading: _isGoogleLoading,
+                onPressed: _isBusy ? null : _signInWithGoogle,
               ),
             ],
           ),
@@ -207,7 +236,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                 ?.copyWith(color: scheme.onSurfaceVariant),
           ),
           TextButton(
-            onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+            onPressed: _isBusy ? null : () => Navigator.of(context).pop(),
             child: const Text('Log in'),
           ),
         ],
