@@ -5,8 +5,8 @@ import 'package:gedfa_connect/core/utils/validators.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
 import 'package:gedfa_connect/features/auth/data/auth_error_messages.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
-import 'package:gedfa_connect/features/auth/presentation/forgot_password_screen.dart';
-import 'package:gedfa_connect/features/auth/presentation/sign_up_screen.dart';
+import 'package:go_router/go_router.dart';
+import 'package:gedfa_connect/app/routes.dart';
 import 'package:gedfa_connect/features/auth/presentation/widgets/auth_widgets.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -102,20 +102,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
-  void _openForgotPassword() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => ForgotPasswordScreen(
-          initialEmail: _emailController.text.trim(),
-        ),
-      ),
+   void _openForgotPassword() {
+    context.go(
+      Routes.forgotPassword,
+      extra: _emailController.text.trim(),
     );
   }
 
   void _openSignUp() {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const SignUpScreen()),
-    );
+    context.go(Routes.signUp);
   }
 
   @override

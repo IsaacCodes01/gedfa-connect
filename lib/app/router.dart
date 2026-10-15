@@ -9,6 +9,8 @@ import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/auth/presentation/login_screen.dart';
 import 'package:gedfa_connect/features/home/presentation/placeholder_home.dart';
 import 'package:gedfa_connect/features/auth/presentation/verify_email_screen.dart';
+import 'package:gedfa_connect/features/auth/presentation/forgot_password_screen.dart';
+import 'package:gedfa_connect/features/auth/presentation/sign_up_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final refresh = ValueNotifier<int>(0);
@@ -27,6 +29,18 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.login,
         builder: (_, _) => const LoginScreen(),
+        routes: [
+          GoRoute(
+            path: 'signup',
+            builder: (_, _) => const SignUpScreen(),
+          ),
+          GoRoute(
+            path: 'forgot',
+            builder: (_, state) => ForgotPasswordScreen(
+              initialEmail: state.extra as String? ?? '',
+            ),
+          ),
+        ],
       ),
       GoRoute(
         path: Routes.verifyEmail,
@@ -82,7 +96,9 @@ String? _redirect(Ref ref, String location) {
 
   // 2. Nobody signed in
   final authUser = auth.value;
-  if (authUser == null) return goTo(Routes.login);
+  if (authUser == null) {
+    return location.startsWith(Routes.login) ? null : Routes.login;
+  }
 
   // 3. Email account not confirmed yet
   if (!authUser.emailVerified) return goTo(Routes.verifyEmail);

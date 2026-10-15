@@ -6,6 +6,7 @@ import 'package:gedfa_connect/core/widgets/app_toast.dart';
 import 'package:gedfa_connect/features/auth/data/auth_error_messages.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/auth/presentation/widgets/auth_widgets.dart';
+import 'package:go_router/go_router.dart';
 
 class SignUpScreen extends ConsumerStatefulWidget {
   const SignUpScreen({super.key});
@@ -77,7 +78,6 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         context,
         'Account created! We sent you a link to confirm your email.',
       );
-      Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (error) {
       if (!mounted) return;
       AppToast.error(context, authErrorMessage(error));
@@ -103,7 +103,6 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
       await ref.read(authRepositoryProvider).signInWithGoogle();
       if (!mounted) return;
       AppToast.success(context, 'Welcome to GEDFA Connect!');
-      Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (error) {
       if (!mounted) return;
       if (isInfoAuthError(error)) {
@@ -236,7 +235,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                 ?.copyWith(color: scheme.onSurfaceVariant),
           ),
           TextButton(
-            onPressed: _isBusy ? null : () => Navigator.of(context).pop(),
+            onPressed: _isBusy ? null : () => context.pop(),
             child: const Text('Log in'),
           ),
         ],
