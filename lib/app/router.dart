@@ -8,6 +8,7 @@ import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/auth/presentation/login_screen.dart';
 import 'package:gedfa_connect/features/home/presentation/placeholder_home.dart';
+import 'package:gedfa_connect/features/auth/presentation/verify_email_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final refresh = ValueNotifier<int>(0);
@@ -29,10 +30,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: Routes.verifyEmail,
-        builder: (_, _) => const PlaceholderHome(
-          title: 'Confirm your email',
-          message: 'Open the link we emailed you, then log in again.',
-        ),
+        builder: (_, _) => const VerifyEmailScreen(),
       ),
       GoRoute(
         path: Routes.welcome,

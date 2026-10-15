@@ -58,6 +58,19 @@ class AuthRepository {
     await _auth.signInWithPopup(provider);
   }
 
+    Future<void> resendVerificationEmail() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+    await user.sendEmailVerification().timeout(_timeout);
+  }
+
+  Future<bool> reloadAndCheckVerified() async {
+    final user = _auth.currentUser;
+    if (user == null) return false;
+    await user.reload().timeout(_timeout);
+    return _auth.currentUser?.emailVerified ?? false;
+  }
+
   Future<void> signOut() => _auth.signOut();
 }
 
