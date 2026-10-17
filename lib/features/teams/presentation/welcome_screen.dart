@@ -12,6 +12,7 @@ import 'package:gedfa_connect/features/auth/presentation/widgets/auth_widgets.da
 import 'package:gedfa_connect/features/teams/data/team_request_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/team_request.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/team_logo.dart';
+import 'package:gedfa_connect/features/teams/presentation/widgets/competition_picker.dart';
 
 class WelcomeScreen extends ConsumerWidget {
   const WelcomeScreen({super.key});
@@ -319,6 +320,12 @@ class _StatusCard extends StatelessWidget {
           '${request.shortName} · ${request.town}',
           textAlign: TextAlign.center,
           style: textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: 10),
+        CompetitionChips(
+          competitions: request.categories,
+          compact: true,
+          center: true,
         ),
         const SizedBox(height: 12),
         Center(child: _StatusPill(status: status)),

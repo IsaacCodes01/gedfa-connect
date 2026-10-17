@@ -25,6 +25,7 @@ import 'package:gedfa_connect/features/teams/presentation/steps/kits_step.dart';
 import 'package:gedfa_connect/features/teams/presentation/steps/officials_step.dart';
 import 'package:gedfa_connect/features/teams/presentation/steps/review_step.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/officials_editor.dart';
+import 'package:gedfa_connect/features/teams/domain/competition.dart';
 
 
 const _stepTitles = ['Club details', 'Kits', 'Officials', 'Review & submit'];
@@ -72,6 +73,9 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
   // Step 4: declaration
   bool _agreed = false;
 
+    // Competitions (step 1)
+  Set<Competition> _competitions = {Competition.division};
+
     // Editing an existing request
   TeamRequest? _existing;
   String? _existingLogoUrl;
@@ -93,6 +97,7 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
       _email.text = existing.email ?? '';
       _shortNameEdited = true;
       _existingLogoUrl = existing.logoUrl;
+      _competitions = {...existing.categories};
       _kits[KitSlot.home] = existing.homeKit;
       _kits[KitSlot.away] = existing.awayKit;
       _kits[KitSlot.goalkeeper] = existing.goalkeeperKit;
@@ -273,6 +278,7 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
       yearFounded: int.tryParse(_yearFounded.text.trim()),
       email: _email.text,
       logoUrl: logoUrl,
+      categories: _competitions,
       homeKit: _kits[KitSlot.home]!,
       awayKit: _kits[KitSlot.away]!,
       goalkeeperKit: _kits[KitSlot.goalkeeper]!,
@@ -377,6 +383,9 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
             _logoBytes = null;
             _existingLogoUrl = null;
           }),
+          competitions: _competitions,
+          onCompetitionsChanged: (value) =>
+              setState(() => _competitions = value),
         ),
       1 => KitsStep(
           kits: _kits,
@@ -404,6 +413,7 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
           kits: _kits,
           officials: _officials,
           logoUrl: _existingLogoUrl,
+          competitions: _competitions,
           agreed: _agreed,
           directions: _directions.text.trim(),
           email: _email.text.trim(),

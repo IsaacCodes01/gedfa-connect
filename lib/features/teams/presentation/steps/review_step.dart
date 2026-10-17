@@ -8,6 +8,8 @@ import 'package:gedfa_connect/features/teams/domain/kit_slot.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/kit_preview.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/officials_editor.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/team_logo.dart';
+import 'package:gedfa_connect/features/teams/domain/competition.dart';
+import 'package:gedfa_connect/features/teams/presentation/widgets/competition_picker.dart';
 
 class ReviewStep extends StatelessWidget {
   const ReviewStep({
@@ -28,6 +30,7 @@ class ReviewStep extends StatelessWidget {
     required this.directions,
     required this.email,
     this.logoUrl,
+    required this.competitions,
   });
 
   final String teamName;
@@ -46,11 +49,14 @@ class ReviewStep extends StatelessWidget {
   final String directions;
   final String email;
   final String? logoUrl;
+  final Set<Competition> competitions;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
+    final hasLogo =
+        logoBytes != null || (logoUrl != null && logoUrl!.isNotEmpty);
     final setKits = [
       for (final slot in KitSlot.values)
         if (kits[slot] != null) (slot, kits[slot]!),
@@ -81,6 +87,7 @@ class ReviewStep extends StatelessWidget {
                           label: initialsFor(teamName),
                           color: logoColor,
                           bytes: logoBytes,
+                          url: logoUrl,
                           size: 52,
                         ),
                         const SizedBox(width: 12),
@@ -94,9 +101,7 @@ class ReviewStep extends StatelessWidget {
                                     ?.copyWith(fontWeight: FontWeight.w600),
                               ),
                               Text(
-                                logoBytes == null
-                                    ? '$shortName · no logo yet'
-                                    : shortName,
+                                shortName,
                                 style: textTheme.bodySmall
                                     ?.copyWith(color: scheme.onSurfaceVariant),
                               ),
@@ -105,17 +110,23 @@ class ReviewStep extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    _ReviewRow(label: 'Town', value: town),
-                     _ReviewRow(label: 'Short name', value: shortName),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Competitions',
+                      style: textTheme.bodySmall
+                          ?.copyWith(color: scheme.onSurfaceVariant),
+                    ),
+                    const SizedBox(height: 6),
+                    CompetitionChips(competitions: competitions),
+                    const SizedBox(height: 12),
+                    _ReviewRow(label: 'Team name', value: teamName),
+                    _ReviewRow(label: 'Short name', value: shortName),
+                    _ReviewRow(label: 'Logo', value: hasLogo ? 'Added' : ''),
                     _ReviewRow(label: 'Town', value: town),
                     _ReviewRow(label: 'Home ground', value: homeGround),
-                    if (directions.isNotEmpty)
-                      _ReviewRow(label: 'Directions', value: directions),
-                    if (yearFounded.isNotEmpty)
-                      _ReviewRow(label: 'Founded', value: yearFounded),
-                    if (email.isNotEmpty)
-                      _ReviewRow(label: 'Team email', value: email),
+                    _ReviewRow(label: 'Directions', value: directions),
+                    _ReviewRow(label: 'Founded', value: yearFounded),
+                    _ReviewRow(label: 'Team email', value: email),
                   ],
                 ),
               ),
@@ -248,6 +259,7 @@ class _ReviewRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
+    final missing = value.trim().isEmpty;
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -268,9 +280,15 @@ class _ReviewRow extends StatelessWidget {
           Expanded(
             flex: 3,
             child: Text(
-              value,
+              missing ? 'Not added' : value,
               textAlign: TextAlign.right,
-              style: textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
+              style: missing
+                  ? textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                      fontStyle: FontStyle.italic,
+                    )
+                  : textTheme.bodySmall
+                      ?.copyWith(fontWeight: FontWeight.w500),
             ),
           ),
         ],

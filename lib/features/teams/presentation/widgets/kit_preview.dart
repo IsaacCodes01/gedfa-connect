@@ -42,7 +42,7 @@ class KitPreview extends StatelessWidget {
                   alignment: Alignment.center,
                   children: [
                     ...previous,
-                    if (current != null) current,
+                    ?current,
                   ],
                 ),
                 transitionBuilder: (child, animation) {

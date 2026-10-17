@@ -46,7 +46,7 @@ service cloud.firestore {
       function isValidTeamRequest(data, uid) {
         return data.keys().hasOnly([
             'teamName', 'teamNameLower', 'nameKey', 'shortName', 'town',
-            'homeGround', 'homeGroundDirections', 'yearFounded', 'email',
+            'homeGround', 'categories', 'homeGroundDirections', 'yearFounded', 'email',
             'logoUrl', 'kits', 'officials', 'agreedToRules', 'status',
             'rejectionReason', 'createdAt', 'updatedAt'
           ])
@@ -61,6 +61,11 @@ service cloud.firestore {
           && isOptionalText(data, 'homeGroundDirections', 300)
           && isOptionalText(data, 'email', 120)
           && isOptionalText(data, 'logoUrl', 2000)
+          && data.categories is list
+          && data.categories.size() >= 1
+          && data.categories.size() <= 2
+          && data.categories.hasOnly(['division', 'juvenile'])
+          && data.categories.toSet().size() == data.categories.size()
           && (!('yearFounded' in data) || data.yearFounded == null
               || (data.yearFounded is int
                   && data.yearFounded >= 1900 && data.yearFounded <= 2100))

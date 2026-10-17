@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:gedfa_connect/core/constants/approval_status.dart';
 import 'package:gedfa_connect/features/teams/domain/kit.dart';
 import 'package:gedfa_connect/features/teams/domain/official.dart';
+import 'package:gedfa_connect/features/teams/domain/competition.dart';
 
 class TeamRequest {
   const TeamRequest({
@@ -17,6 +18,7 @@ class TeamRequest {
     required this.officials,
     required this.status,
     this.homeGroundDirections,
+    required this.categories,
     this.yearFounded,
     this.email,
     this.logoUrl,
@@ -37,6 +39,8 @@ class TeamRequest {
   final int? yearFounded;
   final String? email;
   final String? logoUrl;
+    // Competitions: division, juvenile, or both
+  final Set<Competition> categories;
 
   // Section 2: kits
   final Kit homeKit;
@@ -79,6 +83,7 @@ class TeamRequest {
       'yearFounded': yearFounded,
       'email': blankToNull(email),
       'logoUrl': logoUrl,
+      'categories': Competition.toList(categories),
       'kits': {
         'home': homeKit.toMap(),
         'away': awayKit.toMap(),
@@ -117,6 +122,7 @@ class TeamRequest {
       yearFounded: data['yearFounded'] as int?,
       email: data['email'] as String?,
       logoUrl: data['logoUrl'] as String?,
+      categories: Competition.fromList(data['categories'] as List<dynamic>?),
       homeKit: kitOrWhite('home'),
       awayKit: kitOrWhite('away'),
       thirdKit: Kit.fromMap(kits?['third'] as Map<String, dynamic>?),

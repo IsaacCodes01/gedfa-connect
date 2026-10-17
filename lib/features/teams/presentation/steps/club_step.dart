@@ -4,6 +4,8 @@ import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/initials.dart';
 import 'package:gedfa_connect/core/utils/validators.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/logo_picker.dart';
+import 'package:gedfa_connect/features/teams/domain/competition.dart';
+import 'package:gedfa_connect/features/teams/presentation/widgets/competition_picker.dart';
 
 class ClubStep extends StatelessWidget {
   const ClubStep({
@@ -15,6 +17,8 @@ class ClubStep extends StatelessWidget {
     required this.shortName,
     required this.town,
     required this.homeGround,
+    required this.competitions,
+    required this.onCompetitionsChanged,
     required this.directions,
     required this.yearFounded,
     required this.email,
@@ -35,6 +39,8 @@ class ClubStep extends StatelessWidget {
   final TextEditingController shortName;
   final TextEditingController town;
   final TextEditingController homeGround;
+  final Set<Competition> competitions;
+  final ValueChanged<Set<Competition>> onCompetitionsChanged;
   final TextEditingController directions;
   final TextEditingController yearFounded;
   final TextEditingController email;
@@ -97,6 +103,12 @@ class ClubStep extends StatelessWidget {
                   textInputAction: TextInputAction.next,
                   onChanged: onTeamNameChanged,
                   validator: teamNameValidator,
+                ),
+                gap,
+                  CompetitionPicker(
+                  initialValue: competitions,
+                  onChanged: onCompetitionsChanged,
+                  enabled: enabled,
                 ),
                 gap,
                 Container(
