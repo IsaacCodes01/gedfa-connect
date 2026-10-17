@@ -4,7 +4,7 @@
 **Platforms:** Flutter app (Android first, iOS later, web build available); separate React website by a colleague
 **Backend:** Firebase (Auth, Firestore, Cloud Storage) on the Blaze plan
 **Projects:** `gedfa-connect-dev` (building/testing) and `gedfa-connect-prod` (real GEDFA data)
-**Status:** Phase 0 complete · Phase 1 in progress (13 Oct 2026)
+**Status:** Phase 0 complete · Phase 1 in progress (17 Oct 2026)
 
 See also: `docs/DATA_MODEL.md` (the data contract).
 
@@ -141,13 +141,14 @@ Time estimates assume part-time work and are rough guides.
 ### Phase 1 — Auth, roles, team and player registration *(in progress)*
 - [x] 1.0 Firebase Emulator Suite; app uses emulators in debug
 - [x] 1.1a `AppToast`, offline/back-online banner, responsive helpers
-- [ ] 1.1b Log in, sign up, log out, password reset; Firebase error translator; submission time limits
-- [ ] 1.2 Role-based router: no role → registration/status; team admin → team dashboard; referee → fixtures; FA admin → FA dashboard
-- [ ] 1.3 Team registration request form and status screen
-- [ ] 1.4 Add/edit player form: name, DOB picker, position (16 positions, grouped), jersey number, passport photo
+- [x] 1.1b Log in, sign up, log out, password reset; Firebase error translator; submission time limits
+- [x] 1.2 Role-based router: no role → registration/status; team admin → team dashboard; referee → fixtures; FA admin → FA dashboard
+- [x] 1.3 Team registration request form and status screen (club details, logo, 5 kits with trims, officials, review, edit and resubmit, Google sign-in)
+- [ ] 1.3b Competitions: Division and/or Juvenile (U13, U15, U17) chosen at registration; shown on Review and Status
+- [ ] 1.4 Add/edit player form: name, DOB picker, position (16 positions, grouped), jersey number, passport photo; Division first, Juvenile extras (age group from DOB, birth certificate, guardian) after GEDFA answers
 - [ ] 1.5 Validation: jersey and duplicate-player reservations, name entered once; first unit tests (player-key function)
 - [ ] 1.6 Photo compression and upload
-- [ ] 1.7 Security rules v1 (written by Isaac, reviewed), tested in the emulator
+- [ ] 1.7 Security rules v1, tested in the emulator (users, teamRequests, teamNames and logo storage done; teams, players, FA admin still to do)
 
 **Done when:** a test team admin can register a team request and add players, and a role-less user can't read or write anything beyond their own request.
 
@@ -252,3 +253,4 @@ Work backwards from the GEDFA season start date to decide what the pilot must co
 |---|---|
 | 12 Oct 2026 | Renamed to GEDFA Connect; dev/prod projects created |
 | 13 Oct 2026 | Phase 0 complete; added 0.8 design foundation, 1.0 emulators, 1.1a toasts/connectivity/responsive; invite-only roles (2.6); FA announcements (2.7); new Phase 5.5 League feed; navigation, connectivity and responsive standards; pre-pilot checklist |
+| 17 Oct 2026 | 1.1b, 1.2, 1.3 done; new 1.3b Competitions (Division / Juvenile, one registration per club); 1.4 split into Division first, Juvenile after GEDFA answers |
