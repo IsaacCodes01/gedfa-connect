@@ -8,9 +8,10 @@ class FlagStripe extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+        return SizedBox(
       height: height,
       child: const Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(child: ColoredBox(color: AppColors.ghanaRed)),
           Expanded(child: ColoredBox(color: AppColors.ghanaGold)),
