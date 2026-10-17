@@ -11,6 +11,8 @@ import 'package:gedfa_connect/features/home/presentation/placeholder_home.dart';
 import 'package:gedfa_connect/features/auth/presentation/verify_email_screen.dart';
 import 'package:gedfa_connect/features/auth/presentation/forgot_password_screen.dart';
 import 'package:gedfa_connect/features/auth/presentation/sign_up_screen.dart';
+import 'package:gedfa_connect/features/teams/presentation/welcome_screen.dart';
+import 'package:gedfa_connect/features/teams/presentation/register_team_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final refresh = ValueNotifier<int>(0);
@@ -46,12 +48,15 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.verifyEmail,
         builder: (_, _) => const VerifyEmailScreen(),
       ),
-      GoRoute(
+            GoRoute(
         path: Routes.welcome,
-        builder: (_, _) => const PlaceholderHome(
-          title: 'Welcome',
-          message: 'Register your team to get started. (Coming in 1.3)',
-        ),
+        builder: (_, _) => const WelcomeScreen(),
+        routes: [
+          GoRoute(
+            path: 'register',
+            builder: (_, _) => const RegisterTeamScreen(),
+          ),
+        ],
       ),
       GoRoute(
         path: Routes.admin,

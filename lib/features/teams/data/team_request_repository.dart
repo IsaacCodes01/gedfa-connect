@@ -1,0 +1,131 @@
+import 'dart:typed_data';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:gedfa_connect/core/constants/approval_status.dart';
+import 'package:gedfa_connect/core/constants/firestore_paths.dart';
+import 'package:gedfa_connect/core/errors/app_error_messages.dart';
+import 'package:gedfa_connect/core/utils/team_name_key.dart';
+import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
+import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
+import 'package:gedfa_connect/features/teams/domain/team_request.dart';
+
+const _timeout = Duration(seconds: 15);
+const _uploadTimeout = Duration(seconds: 60);
+
+class TeamRequestRepository {
+  TeamRequestRepository(this._db, this._storage);
+
+  final FirebaseFirestore _db;
+  final FirebaseStorage _storage;
+
+  DocumentReference<Map<String, dynamic>> _requestRef(String uid) =>
+      _db.doc(FirestorePaths.teamRequest(uid));
+
+  DocumentReference<Map<String, dynamic>> _nameRef(String key) =>
+      _db.doc(FirestorePaths.teamName(key));
+
+  Stream<TeamRequest?> watch(String uid) {
+    return _requestRef(uid).snapshots().map((snapshot) {
+      final data = snapshot.data();
+      if (!snapshot.exists || data == null) return null;
+      return TeamRequest.fromMap(snapshot.id, data);
+    });
+  }
+
+  Future<bool> isNameAvailable(String teamName, {required String uid}) async {
+    final snapshot =
+        await _nameRef(teamNameKey(teamName)).get().timeout(_timeout);
+    if (!snapshot.exists) return true;
+    return snapshot.data()?['uid'] == uid;
+  }
+
+  Future<String> uploadLogo({
+    required String uid,
+    required Uint8List bytes,
+    String contentType = 'image/jpeg',
+  }) async {
+    final ref = _storage.ref(StoragePaths.teamRequestLogo(uid));
+    await ref
+        .putData(bytes, SettableMetadata(contentType: contentType))
+        .timeout(_uploadTimeout);
+    return ref.getDownloadURL();
+  }
+
+  Map<String, dynamic> _buildData(TeamRequest request) {
+    return {
+      ...request.toEditableMap(),
+      'teamNameLower': request.teamName.trim().toLowerCase(),
+      'nameKey': teamNameKey(request.teamName),
+      'agreedToRules': true,
+      'status': ApprovalStatus.pending.name,
+      'rejectionReason': null,
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+  }
+
+  Map<String, dynamic> _reservation(String uid) => {
+        'uid': uid,
+        'createdAt': FieldValue.serverTimestamp(),
+      };
+
+  Future<void> create(TeamRequest request) async {
+    final uid = request.uid;
+    if (!await isNameAvailable(request.teamName, uid: uid)) {
+      throw const TeamNameTakenException();
+    }
+
+    final key = teamNameKey(request.teamName);
+    final batch = _db.batch()
+      ..set(_requestRef(uid), {
+        ..._buildData(request),
+        'createdAt': FieldValue.serverTimestamp(),
+      })
+      ..set(_nameRef(key), _reservation(uid));
+
+    await batch.commit().timeout(_timeout);
+  }
+
+  Future<void> update(
+    TeamRequest request, {
+    required String previousNameKey,
+  }) async {
+    final uid = request.uid;
+    final key = teamNameKey(request.teamName);
+    final renamed = key != previousNameKey;
+
+    if (renamed && !await isNameAvailable(request.teamName, uid: uid)) {
+      throw const TeamNameTakenException();
+    }
+
+    final batch = _db.batch()..update(_requestRef(uid), _buildData(request));
+    if (renamed) {
+      batch
+        ..delete(_nameRef(previousNameKey))
+        ..set(_nameRef(key), _reservation(uid));
+    }
+
+    await batch.commit().timeout(_timeout);
+  }
+}
+
+final firebaseStorageProvider = Provider<FirebaseStorage>((ref) {
+  return FirebaseStorage.instance;
+});
+
+final teamRequestRepositoryProvider = Provider<TeamRequestRepository>((ref) {
+  return TeamRequestRepository(
+    ref.watch(firestoreProvider),
+    ref.watch(firebaseStorageProvider),
+  );
+});
+
+final myTeamRequestProvider = StreamProvider<TeamRequest?>((ref) async* {
+  final authUser = await ref.watch(authStateProvider.future);
+  if (authUser == null) {
+    yield null;
+    return;
+  }
+  yield* ref.watch(teamRequestRepositoryProvider).watch(authUser.uid);
+});

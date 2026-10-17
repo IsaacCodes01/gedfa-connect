@@ -1,10 +1,25 @@
 rules_version = '2';
 
-// Craft rules based on data in your Firestore database
-// allow write: if firestore.get(
-//    /databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin;
 service firebase.storage {
   match /b/{bucket}/o {
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function isSmallImage() {
+      return request.resource.size < 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // Team request logo
+    match /districts/{districtId}/teamRequests/{uid}/logo.jpg {
+      allow read: if isOwner(uid);
+      allow create, update: if isOwner(uid) && isSmallImage();
+      allow delete: if isOwner(uid);
+    }
+
+    // Everything else
     match /{allPaths=**} {
       allow read, write: if false;
     }

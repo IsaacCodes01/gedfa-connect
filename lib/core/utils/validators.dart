@@ -1,3 +1,6 @@
+import 'package:gedfa_connect/core/utils/phone.dart';
+
+
 class Validators {
   Validators._();
 
@@ -21,6 +24,16 @@ class Validators {
 
   static String? requiredField(String? value, String label) {
     if (value == null || value.trim().isEmpty) return 'Enter $label';
+    return null;
+  }
+
+    static String? ghanaPhone(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Enter a phone number';
+    }
+    if (normalizeGhanaPhone(value) == null) {
+      return 'Enter a valid Ghana number, e.g. 024 123 4567';
+    }
     return null;
   }
 }

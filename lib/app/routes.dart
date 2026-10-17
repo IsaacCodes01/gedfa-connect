@@ -7,6 +7,7 @@ class Routes {
   static const forgotPassword = '/login/forgot';
   static const verifyEmail = '/verify-email';
   static const welcome = '/welcome';
+  static const registerTeam = '/welcome/register';
   static const admin = '/admin';
   static const team = '/team';
   static const referee = '/referee';

@@ -68,7 +68,9 @@ class AuthRepository {
     final user = _auth.currentUser;
     if (user == null) return false;
     await user.reload().timeout(_timeout);
-    return _auth.currentUser?.emailVerified ?? false;
+    final verified = _auth.currentUser?.emailVerified ?? false;
+    if (verified) await _auth.currentUser?.getIdToken(true);
+    return verified;
   }
 
   Future<void> signOut() => _auth.signOut();
