@@ -14,6 +14,11 @@ class FirestorePaths {
   static const players = '$district/players';
   static String player(String playerId) => '$district/players/$playerId';
 
+  static String jersey(String teamId, String jerseyId) =>
+    '${team(teamId)}/jerseys/$jerseyId';
+
+  static String playerKey(String key) => '$district/playerKeys/$key';
+
   static const leagueSettings = '$district/settings/league';
 }
 

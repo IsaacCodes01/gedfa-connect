@@ -7,9 +7,32 @@ class TeamNameTakenException implements Exception {
   const TeamNameTakenException();
 }
 
+/// Another player in this squad already wears this number.
+class JerseyTakenException implements Exception {
+  const JerseyTakenException(this.number);
+  final int number;
+}
+
+/// A player with the same name and date of birth is already registered
+/// (with this team or another one).
+class DuplicatePlayerException implements Exception {
+  const DuplicatePlayerException({required this.sameTeam});
+  final bool sameTeam;
+}
+
 String appErrorMessage(Object error) {
   if (error is TeamNameTakenException) {
     return 'Another team already uses this name. Please choose a different one.';
+  }
+  if (error is JerseyTakenException) {
+    return '#${error.number} is already taken in your squad. '
+        'Choose another number.';
+  }
+  if (error is DuplicatePlayerException) {
+    return error.sameTeam
+        ? 'This player is already in your squad.'
+        : 'A player with this name and date of birth is already registered '
+            'with another team. Contact the FA if this is a transfer.';
   }
   if (error is FirebaseAuthException || error is TimeoutException) {
     return authErrorMessage(error);

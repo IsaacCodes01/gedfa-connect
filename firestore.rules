@@ -43,6 +43,23 @@ service cloud.firestore {
         return /databases/$(database)/documents/districts/$(districtId)/users/$(uid);
       }
 
+      function playerDoc(playerId) {
+        return /databases/$(database)/documents/districts/$(districtId)/players/$(playerId);
+      }
+
+      function jerseyDoc(teamId, jerseyId) {
+        return /databases/$(database)/documents/districts/$(districtId)/teams/$(teamId)/jerseys/$(jerseyId);
+      }
+
+      function playerKeyDoc(key) {
+        return /databases/$(database)/documents/districts/$(districtId)/playerKeys/$(key);
+      }
+
+      // 'division-10' for a player's data
+      function jerseyIdOf(data) {
+        return data.category + '-' + string(data.jerseyNo);
+      }
+
       // ---------- Roles ----------
 
       // True if the signed-in person is the team admin of this team
@@ -76,12 +93,14 @@ service cloud.firestore {
             'teamId', 'teamName', 'category', 'fullName', 'fullNameLower',
             'searchKeys', 'dob', 'position', 'positionGroup', 'jerseyNo',
             'photoUrl', 'thumbUrl', 'status', 'playerCode', 'rejectionReason',
-            'createdAt', 'updatedAt', 'approvedAt', 'approvedBy'
+            'createdAt', 'updatedAt', 'approvedAt', 'approvedBy', 'playerKey'
           ])
           && isText(data.fullName, 3, 80)
           && data.fullNameLower == data.fullName.lower()
           && data.searchKeys is list
           && data.searchKeys.size() <= 80
+          && data.playerKey is string
+          && data.playerKey.size() <= 120
           && data.teamName is string
           && data.category in ['division', 'juvenile']
           && data.dob is timestamp
@@ -93,6 +112,19 @@ service cloud.firestore {
           && data.jerseyNo <= 99
           && isOptionalText(data, 'photoUrl', 2000)
           && isOptionalText(data, 'thumbUrl', 2000);
+      }
+
+            // Any team admin (of any team)
+      function isTeamAdmin() {
+        return isSignedIn()
+          && exists(userDoc(request.auth.uid))
+          && get(userDoc(request.auth.uid)).data.get('role', '') == 'teamAdmin';
+      }
+
+      // The player's reservations exist and point back to this player
+      function hasReservations(data, playerId) {
+        return getAfter(jerseyDoc(data.teamId, jerseyIdOf(data))).data.playerId == playerId
+          && getAfter(playerKeyDoc(data.playerKey)).data.playerId == playerId;
       }
 
       // ---------- users/{uid} ----------
@@ -169,17 +201,50 @@ service cloud.firestore {
               || getAfter(teamRequestDoc(request.auth.uid)).data.nameKey != nameKey);
       }
 
-      // ---------- teams/{teamId} ----------
+            // ---------- teams/{teamId} ----------
       match /teams/{teamId} {
         allow get: if isTeamAdminOf(teamId);
+
+        // ---------- teams/{teamId}/jerseys/{jerseyId} ----------
+        match /jerseys/{jerseyId} {
+          allow get: if isTeamAdminOf(teamId);
+
+          allow create: if isTeamAdminOf(teamId)
+            && request.resource.data.keys().hasOnly(['playerId', 'createdAt'])
+            && request.resource.data.createdAt == request.time
+            && getAfter(playerDoc(request.resource.data.playerId)).data.teamId == teamId
+            && jerseyIdOf(getAfter(playerDoc(request.resource.data.playerId)).data) == jerseyId;
+
+          allow delete: if isTeamAdminOf(teamId)
+            && (!existsAfter(playerDoc(resource.data.playerId))
+                || jerseyIdOf(getAfter(playerDoc(resource.data.playerId)).data) != jerseyId);
+        }
+      }
+
+      // ---------- playerKeys/{key} ----------
+      match /playerKeys/{key} {
+        allow get: if isTeamAdmin();
+
+        allow create: if isTeamAdminOf(request.resource.data.teamId)
+          && request.resource.data.keys().hasOnly(['playerId', 'teamId', 'createdAt'])
+          && request.resource.data.createdAt == request.time
+          && getAfter(playerDoc(request.resource.data.playerId)).data.playerKey == key
+          && getAfter(playerDoc(request.resource.data.playerId)).data.teamId
+               == request.resource.data.teamId;
+
+        allow delete: if isTeamAdminOf(resource.data.teamId)
+          && (!existsAfter(playerDoc(resource.data.playerId))
+              || getAfter(playerDoc(resource.data.playerId)).data.playerKey != key);
       }
 
             // ---------- players/{playerId} ----------
       match /players/{playerId} {
         allow read: if isTeamAdminOf(resource.data.teamId);
+      
 
         allow create: if isTeamAdminOf(request.resource.data.teamId)
           && isValidPlayer(request.resource.data)
+          && hasReservations(request.resource.data, playerId)
           && request.resource.data.category == 'division'
           && get(teamDoc(request.resource.data.teamId)).data.categories
                .hasAny([request.resource.data.category])
@@ -192,6 +257,7 @@ service cloud.firestore {
 
         allow update: if isTeamAdminOf(resource.data.teamId)
           && isValidPlayer(request.resource.data)
+          && hasReservations(request.resource.data, playerId)
           && request.resource.data.teamId == resource.data.teamId
           && request.resource.data.category == resource.data.category
           && request.resource.data.get('playerCode', null) == resource.data.get('playerCode', null)

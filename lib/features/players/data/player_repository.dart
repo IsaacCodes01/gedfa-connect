@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gedfa_connect/core/constants/firestore_paths.dart';
+import 'package:gedfa_connect/core/errors/app_error_messages.dart';
+import 'package:gedfa_connect/core/utils/player_key.dart';
 import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/features/players/domain/player.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
@@ -33,6 +35,19 @@ class PlayerRepository {
   CollectionReference<Map<String, dynamic>> get _players =>
       _db.collection(FirestorePaths.players);
 
+  /// `teams/{teamId}/jerseys/{category-number}` for this player.
+  DocumentReference<Map<String, dynamic>> _jerseyRef(Player player) =>
+      _db.doc(FirestorePaths.jersey(
+        player.teamId,
+        jerseyIdFor(player.category.name, player.jerseyNo),
+      ));
+
+  /// `playerKeys/{name_dob}` for this player.
+  DocumentReference<Map<String, dynamic>> _keyRef(Player player) =>
+      _db.doc(FirestorePaths.playerKey(player.playerKey));
+
+  // ---------- Reading ----------
+
   /// All players of one team, live, sorted by jersey number.
   /// Sorting happens in the app, so Firestore needs no extra index.
   Stream<List<Player>> watchTeam(String teamId) {
@@ -59,29 +74,120 @@ class PlayerRepository {
     );
   }
 
-  /// Adds a new player as Pending. Returns the new document ID.
+  // ---------- Checks ----------
+
+  /// Throws a friendly error if the number or the person is already taken
+  /// by someone other than [exceptPlayerId].
+  Future<void> _checkFree(
+    Player player, {
+    String? exceptPlayerId,
+    bool checkJersey = true,
+    bool checkKey = true,
+  }) async {
+    if (checkJersey) {
+      final jersey = await _jerseyRef(player).get().timeout(_timeout);
+      if (jersey.exists && jersey.data()?['playerId'] != exceptPlayerId) {
+        throw JerseyTakenException(player.jerseyNo);
+      }
+    }
+    if (checkKey) {
+      final key = await _keyRef(player).get().timeout(_timeout);
+      if (key.exists && key.data()?['playerId'] != exceptPlayerId) {
+        throw DuplicatePlayerException(
+          sameTeam: key.data()?['teamId'] == player.teamId,
+        );
+      }
+    }
+  }
+
+  /// Commits a batch. If the server refuses it, checks again whether
+  /// someone took the number or the player meanwhile, to show a clear
+  /// message instead of "not allowed".
+  Future<void> _commit(
+    WriteBatch batch,
+    Future<void> Function() recheck,
+  ) async {
+    try {
+      await batch.commit().timeout(_timeout);
+    } on FirebaseException catch (error) {
+      if (error.code == 'permission-denied') await recheck();
+      rethrow;
+    }
+  }
+
+  // ---------- Writing ----------
+
+  /// Adds a new player as Pending, together with their jersey and
+  /// player-key reservations (all three or none).
+  /// Returns the new document ID.
   Future<String> create(Player player) async {
+    await _checkFree(player);
+
     final ref = _players.doc(); // Firestore makes the ID
-    await ref.set({
-      ...player.toEditableMap(),
-      'status': 'pending',
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    }).timeout(_timeout);
+    final batch = _db.batch()
+      ..set(ref, {
+        ...player.toEditableMap(),
+        'status': 'pending',
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      })
+      ..set(_jerseyRef(player), {
+        'playerId': ref.id,
+        'createdAt': FieldValue.serverTimestamp(),
+      })
+      ..set(_keyRef(player), {
+        'playerId': ref.id,
+        'teamId': player.teamId,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+    await _commit(batch, () => _checkFree(player));
     return ref.id;
   }
 
-  /// Saves changes. An approved player stays approved only if
-  /// nothing important changed (see [needsReapproval]).
-  Future<void> update(Player before, Player after) {
+  /// Saves changes. Moves the jersey and player-key reservations if the
+  /// number, name or date of birth changed. An approved player stays
+  /// approved only if nothing important changed.
+  Future<void> update(Player before, Player after) async {
+    final jerseyChanged = before.jerseyNo != after.jerseyNo;
+    final keyChanged = before.playerKey != after.playerKey;
     final keepApproved = before.isApproved && !needsReapproval(before, after);
 
-    return _db.doc(FirestorePaths.player(before.id)).update({
-      ...after.toEditableMap(),
-      'status': keepApproved ? 'approved' : 'pending',
-      if (!keepApproved) 'rejectionReason': null,
-      'updatedAt': FieldValue.serverTimestamp(),
-    }).timeout(_timeout);
+    Future<void> check() => _checkFree(
+          after,
+          exceptPlayerId: before.id,
+          checkJersey: jerseyChanged,
+          checkKey: keyChanged,
+        );
+    await check();
+
+    final batch = _db.batch()
+      ..update(_db.doc(FirestorePaths.player(before.id)), {
+        ...after.toEditableMap(),
+        'status': keepApproved ? 'approved' : 'pending',
+        if (!keepApproved) 'rejectionReason': null,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+    if (jerseyChanged) {
+      batch
+        ..delete(_jerseyRef(before))
+        ..set(_jerseyRef(after), {
+          'playerId': before.id,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+    }
+    if (keyChanged) {
+      batch
+        ..delete(_keyRef(before))
+        ..set(_keyRef(after), {
+          'playerId': before.id,
+          'teamId': after.teamId,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+    }
+
+    await _commit(batch, check);
   }
 }
 

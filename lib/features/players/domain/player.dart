@@ -3,6 +3,7 @@ import 'package:gedfa_connect/core/constants/approval_status.dart';
 import 'package:gedfa_connect/core/utils/search_keys.dart';
 import 'package:gedfa_connect/features/players/domain/position.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
+import 'package:gedfa_connect/core/utils/player_key.dart';
 
 class Player {
   const Player({
@@ -52,6 +53,9 @@ class Player {
 
   bool get isApproved => status == ApprovalStatus.approved;
 
+    /// The duplicate-check key, e.g. 'kwame-asante_2004-03-15'.
+  String get playerKey => playerKeyFor(fullName, dob);
+
   /// Age today, in full years.
   int get age {
     final now = DateTime.now();
@@ -83,6 +87,7 @@ class Player {
       'fullName': name,
       'fullNameLower': name.toLowerCase(),
       'searchKeys': searchKeysFor(name),
+      'playerKey': playerKeyFor(name, dob),
       // Midnight UTC, so the date never shifts with time zones
       'dob': Timestamp.fromDate(DateTime.utc(dob.year, dob.month, dob.day)),
       'position': position.code,
