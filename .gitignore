@@ -53,3 +53,5 @@ skills-lock.json
 
 #emulator data
 emulator-data/
+
+test/rules/node_modules/
