@@ -7,6 +7,7 @@ import 'package:gedfa_connect/core/constants/approval_status.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
+import 'package:gedfa_connect/core/utils/passport_photo.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
@@ -42,12 +43,17 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
 
   DateTime? _dob;
   Position? _position;
+  ProcessedPhoto? _newPhoto; // picked in this visit, not uploaded yet
   Player? _existing; // the player being edited
   bool _prefilled = false;
   bool _showErrors = false;
   bool _busy = false;
 
   bool get _isEdit => widget.playerId != null;
+
+  /// True if there is a photo: a new one, or one already saved.
+  bool get _hasPhoto =>
+      _newPhoto != null || (_existing?.photoUrl?.isNotEmpty ?? false);
 
   @override
   void dispose() {
@@ -112,20 +118,21 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
 
   // ---------- Save ----------
 
-    Future<bool> _confirmReapproval(List<String> changes) async {
-    // 'date of birth' / 'name and date of birth' / 'name, photo and jersey number'
-    final list = changes.length == 1
-        ? changes.first
-        : '${changes.sublist(0, changes.length - 1).join(', ')} '
-            'and ${changes.last}';
+  /// "name", "name and photo", "name, jersey number and photo"
+  static String _joinChanges(List<String> changes) {
+    if (changes.length == 1) return changes.first;
+    final allButLast = changes.sublist(0, changes.length - 1).join(', ');
+    return '$allButLast and ${changes.last}';
+  }
 
+  Future<bool> _confirmReapproval(List<String> changes) async {
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Send back to the FA?'),
         content: Text(
-          'You changed the $list. '
-          'The player will be Pending until the FA approves the change. '
+          'You changed the ${_joinChanges(changes)}. '
+          'The player will be Pending until the FA approves them again. '
           'Their player ID stays the same.',
         ),
         actions: [
@@ -146,7 +153,8 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
   Future<void> _save(Team team, List<Player> squad) async {
     FocusScope.of(context).unfocus();
     setState(() => _showErrors = true);
-    if (!_formKey.currentState!.validate()) {
+    final formOk = _formKey.currentState!.validate();
+    if (!formOk || !_hasPhoto) {
       AppToast.warning(context, 'Please fix the highlighted fields.');
       return;
     }
@@ -174,8 +182,13 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
       );
       return;
     }
-        if (existing != null && existing.isApproved) {
-      final changes = reapprovalChanges(existing, draft);
+    final newPhoto = _newPhoto;
+    if (existing != null && existing.isApproved) {
+      final changes = reapprovalChanges(
+        existing,
+        draft,
+        photoChanged: newPhoto != null,
+      );
       if (changes.isNotEmpty) {
         if (!await _confirmReapproval(changes) || !mounted) return;
       }
@@ -185,12 +198,13 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
     try {
       final repository = ref.read(playerRepositoryProvider);
       if (existing == null) {
-        await repository.create(draft);
+        // _hasPhoto was checked above, so a new player always has one
+        await repository.create(draft, photo: newPhoto!);
         if (!mounted) return;
         AppToast.success(context, '${draft.fullName} sent to the FA.');
         context.go(Routes.team);
       } else {
-        await repository.update(existing, draft);
+        await repository.update(existing, draft, newPhoto: newPhoto);
         if (!mounted) return;
         AppToast.success(context, 'Changes saved.');
         context.go(Routes.player(existing.id));
@@ -306,40 +320,15 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
       ),
       const SizedBox(height: 8),
 
-      // Photo (upload comes in step 1.6)
-      Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: scheme.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: scheme.outline),
-        ),
-        child: Row(
-          children: [
-            PassportPhoto(
-              name: _name.text,
-              url: _existing?.photoUrl,
-              width: 66,
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Passport photo',
-                      style: textTheme.titleSmall
-                          ?.copyWith(fontWeight: FontWeight.w600)),
-                  Text(
-                    'Photo upload is coming soon. You can add it later '
-                    'by editing the player.',
-                    style: textTheme.bodySmall
-                        ?.copyWith(color: scheme.onSurfaceVariant),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+      // Passport photo (required)
+      PassportPhotoPicker(
+        name: _name.text,
+        bytes: _newPhoto?.full,
+        url: _existing?.photoUrl,
+        enabled: !_busy,
+        errorText:
+            _showErrors && !_hasPhoto ? 'Add a passport photo' : null,
+        onPicked: (photo) => setState(() => _newPhoto = photo),
       ),
       gap,
 

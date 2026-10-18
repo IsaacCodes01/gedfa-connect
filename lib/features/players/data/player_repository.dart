@@ -1,17 +1,26 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gedfa_connect/core/constants/firestore_paths.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
+import 'package:gedfa_connect/core/utils/passport_photo.dart';
 import 'package:gedfa_connect/core/utils/player_key.dart';
 import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/features/players/domain/player.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
+import 'package:gedfa_connect/features/teams/data/team_request_repository.dart'
+    show firebaseStorageProvider;
 
 const _timeout = Duration(seconds: 15);
+const _uploadTimeout = Duration(seconds: 60);
 
 /// The important things that changed, in plain words.
 /// Empty list = nothing that needs the FA again.
-List<String> reapprovalChanges(Player before, Player after) {
+List<String> reapprovalChanges(
+  Player before,
+  Player after, {
+  bool photoChanged = false,
+}) {
   String clean(String name) =>
       name.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
 
@@ -19,18 +28,23 @@ List<String> reapprovalChanges(Player before, Player after) {
     if (clean(before.fullName) != clean(after.fullName)) 'name',
     if (before.dob != after.dob) 'date of birth',
     if (before.jerseyNo != after.jerseyNo) 'jersey number',
-    if (before.photoUrl != after.photoUrl) 'photo',
+    if (photoChanged) 'photo',
   ];
 }
 
 /// True if a change to an approved player must go back to the FA.
-bool needsReapproval(Player before, Player after) =>
-    reapprovalChanges(before, after).isNotEmpty;
+bool needsReapproval(
+  Player before,
+  Player after, {
+  bool photoChanged = false,
+}) =>
+    reapprovalChanges(before, after, photoChanged: photoChanged).isNotEmpty;
 
 class PlayerRepository {
-  PlayerRepository(this._db);
+  PlayerRepository(this._db, this._storage);
 
   final FirebaseFirestore _db;
+  final FirebaseStorage _storage;
 
   CollectionReference<Map<String, dynamic>> get _players =>
       _db.collection(FirestorePaths.players);
@@ -72,6 +86,45 @@ class PlayerRepository {
         return Player.fromMap(snapshot.id, data);
       },
     );
+  }
+
+  // ---------- Photos ----------
+
+  /// Uploads the photo and thumbnail with a fresh file name each time
+  /// (photo-<time>.jpg), so a new photo always gets a new link.
+  Future<({String photoUrl, String thumbUrl})> _uploadPhoto({
+    required String teamId,
+    required String playerId,
+    required ProcessedPhoto photo,
+  }) async {
+    final stamp = DateTime.now().millisecondsSinceEpoch;
+    final photoRef = _storage
+        .ref(StoragePaths.playerFile(teamId, playerId, 'photo-$stamp.jpg'));
+    final thumbRef = _storage
+        .ref(StoragePaths.playerFile(teamId, playerId, 'thumb-$stamp.jpg'));
+    final metadata = SettableMetadata(contentType: 'image/jpeg');
+
+    await Future.wait([
+      photoRef.putData(photo.full, metadata),
+      thumbRef.putData(photo.thumb, metadata),
+    ]).timeout(_uploadTimeout);
+
+    return (
+      photoUrl: await photoRef.getDownloadURL(),
+      thumbUrl: await thumbRef.getDownloadURL(),
+    );
+  }
+
+  /// Deletes old photo files. Best effort: a leftover file is harmless.
+  Future<void> _deleteFiles(List<String?> urls) async {
+    for (final url in urls) {
+      if (url == null || url.isEmpty) continue;
+      try {
+        await _storage.refFromURL(url).delete();
+      } catch (_) {
+        // Already gone, or not ours to delete. Ignore.
+      }
+    }
   }
 
   // ---------- Checks ----------
@@ -117,16 +170,24 @@ class PlayerRepository {
 
   // ---------- Writing ----------
 
-  /// Adds a new player as Pending, together with their jersey and
-  /// player-key reservations (all three or none).
+  /// Adds a new player as Pending: uploads the photo, then saves the
+  /// player with their jersey and player-key reservations (all or none).
   /// Returns the new document ID.
-  Future<String> create(Player player) async {
+  Future<String> create(Player player, {required ProcessedPhoto photo}) async {
     await _checkFree(player);
 
-    final ref = _players.doc(); // Firestore makes the ID
+    final ref = _players.doc(); // Firestore makes the ID now
+    final urls = await _uploadPhoto(
+      teamId: player.teamId,
+      playerId: ref.id,
+      photo: photo,
+    );
+
     final batch = _db.batch()
       ..set(ref, {
         ...player.toEditableMap(),
+        'photoUrl': urls.photoUrl,
+        'thumbUrl': urls.thumbUrl,
         'status': 'pending',
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
@@ -141,17 +202,29 @@ class PlayerRepository {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-    await _commit(batch, () => _checkFree(player));
+    try {
+      await _commit(batch, () => _checkFree(player));
+    } catch (_) {
+      // The player wasn't saved, so remove the photo we just uploaded
+      await _deleteFiles([urls.photoUrl, urls.thumbUrl]);
+      rethrow;
+    }
     return ref.id;
   }
 
-  /// Saves changes. Moves the jersey and player-key reservations if the
-  /// number, name or date of birth changed. An approved player stays
-  /// approved only if nothing important changed.
-  Future<void> update(Player before, Player after) async {
+  /// Saves changes. Uploads [newPhoto] if given. Moves the jersey and
+  /// player-key reservations if the number, name or date of birth changed.
+  /// An approved player stays approved only if nothing important changed.
+  Future<void> update(
+    Player before,
+    Player after, {
+    ProcessedPhoto? newPhoto,
+  }) async {
+    final photoChanged = newPhoto != null;
     final jerseyChanged = before.jerseyNo != after.jerseyNo;
     final keyChanged = before.playerKey != after.playerKey;
-    final keepApproved = before.isApproved && !needsReapproval(before, after);
+    final keepApproved = before.isApproved &&
+        !needsReapproval(before, after, photoChanged: photoChanged);
 
     Future<void> check() => _checkFree(
           after,
@@ -161,9 +234,19 @@ class PlayerRepository {
         );
     await check();
 
+    final urls = newPhoto == null
+        ? null
+        : await _uploadPhoto(
+            teamId: before.teamId,
+            playerId: before.id,
+            photo: newPhoto,
+          );
+
     final batch = _db.batch()
       ..update(_db.doc(FirestorePaths.player(before.id)), {
         ...after.toEditableMap(),
+        if (urls != null) 'photoUrl': urls.photoUrl,
+        if (urls != null) 'thumbUrl': urls.thumbUrl,
         'status': keepApproved ? 'approved' : 'pending',
         if (!keepApproved) 'rejectionReason': null,
         'updatedAt': FieldValue.serverTimestamp(),
@@ -187,12 +270,23 @@ class PlayerRepository {
         });
     }
 
-    await _commit(batch, check);
+    try {
+      await _commit(batch, check);
+    } catch (_) {
+      if (urls != null) await _deleteFiles([urls.photoUrl, urls.thumbUrl]);
+      rethrow;
+    }
+
+    // Saved: the old photo files are no longer used
+    if (urls != null) await _deleteFiles([before.photoUrl, before.thumbUrl]);
   }
 }
 
 final playerRepositoryProvider = Provider<PlayerRepository>((ref) {
-  return PlayerRepository(ref.watch(firestoreProvider));
+  return PlayerRepository(
+    ref.watch(firestoreProvider),
+    ref.watch(firebaseStorageProvider),
+  );
 });
 
 /// Every player of my team (both competitions). Screens filter by

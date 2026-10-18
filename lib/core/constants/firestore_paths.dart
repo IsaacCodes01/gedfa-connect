@@ -27,4 +27,7 @@ class StoragePaths {
 
   static String teamRequestLogo(String uid) =>
   '${FirestorePaths.district}/teamRequests/$uid/logo.jpg';
+
+    static String playerFile(String teamId, String playerId, String fileName) =>
+    '${FirestorePaths.district}/teams/$teamId/players/$playerId/$fileName';
 }

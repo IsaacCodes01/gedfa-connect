@@ -12,11 +12,31 @@ service firebase.storage {
         && request.resource.contentType.matches('image/.*');
     }
 
+    // Storage can't see Firestore by itself. firestore.get() reads the
+    // user's document so we can check their role and team.
+    function isTeamAdminOf(districtId, teamId) {
+      let user = firestore.get(
+        /databases/(default)/documents/districts/$(districtId)/users/$(request.auth.uid));
+      return request.auth != null
+        && user != null
+        && user.data.role == 'teamAdmin'
+        && user.data.teamId == teamId;
+    }
+
     // Team request logo
     match /districts/{districtId}/teamRequests/{uid}/logo.jpg {
       allow read: if isOwner(uid);
       allow create, update: if isOwner(uid) && isSmallImage();
       allow delete: if isOwner(uid);
+    }
+
+    // Player passport photos: photo-<time>.jpg and thumb-<time>.jpg
+    match /districts/{districtId}/teams/{teamId}/players/{playerId}/{fileName} {
+      allow read, delete: if isTeamAdminOf(districtId, teamId);
+      allow create: if isTeamAdminOf(districtId, teamId)
+        && fileName.matches('(photo|thumb)-[0-9]+[.]jpg')
+        && request.resource.size < 1024 * 1024
+        && request.resource.contentType == 'image/jpeg';
     }
 
     // Everything else

@@ -110,8 +110,8 @@ service cloud.firestore {
           && data.jerseyNo is int
           && data.jerseyNo >= 1
           && data.jerseyNo <= 99
-          && isOptionalText(data, 'photoUrl', 2000)
-          && isOptionalText(data, 'thumbUrl', 2000);
+          && isText(data.photoUrl, 10, 2000)
+          && isText(data.thumbUrl, 10, 2000)
       }
 
             // Any team admin (of any team)
