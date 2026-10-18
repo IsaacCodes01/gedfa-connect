@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v1.3, players: player ID and search (18 Oct 2026)
+**Status:** v1.4, matches security rules v1 and the Phase 1 app (18 Oct 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -27,16 +27,12 @@
 | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `role`                        | `faAdmin`, `teamAdmin`, `referee`                                                                                                                                 |
 | `status` (requests, players)  | `pending`, `approved`, `rejected`                                                                                                                                 |
-| `position`                    | `GK`, CB, `RCB`, `LCB`, `RB`, `LB`, `LWB`, `RWB`, LFB, RFB, `DM`, `RDM`, `LDM`, `CM`, RM, LM, `AMF`, `LW`, `RW`,LWF, RWF, `CF`, `ST` |
+| `position`                    | 23 codes: `GK`, `CB`, `RCB`, `LCB`, `RB`, `LB`, `RWB`, `LWB`, `RFB`, `LFB`, `DM`, `RDM`, `LDM`, `CM`, `RM`, `LM`, `AMF`, `LW`, `RW`, `LWF`, `RWF`, `CF`, `ST` |
 | `positionGroup`               | `GK`, `DEF`, `MID`, `FWD` (derived from `position`, never typed by a user)                                                                                    |
 | Kit`pattern`                  | `plain`, `stripes`, `hoops`, `halves`, `sash`                                                                                                                 |
 | `categories` (teams)          | `division` (Third Division, senior), `juvenile` (youth: U13, U15, U17)                                                                                              |
 | `ageGroup` (juvenile players) | `U13`, `U15`, `U17` (derived from date of birth, never typed by a user)                                                                                           |
 | Official`role`                | `teamManager`, `headCoach`, `assistantCoach`, `chairman`, `secretary`, `kitManager`, `medicalOfficer`                                                     |
-
-### Change log 
-
-`| 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF). |`
 
 ### Kit shape
 
@@ -64,12 +60,14 @@ Used for every kit (home, away, third, goalkeeper, goalkeeper 2). Colours come f
 
 ### Position → group
 
-| Group   | Positions                  |
-| ------- | -------------------------- |
-| `GK`  | GK                         |
-| `DEF` | RCB, LCB, RB, LB, LWB, RWB |
-| `MID` | DM, RDM, LDM, CM, AMF      |
-| `FWD` | LW, RW, CF, ST             |
+| Group   | Positions                                      |
+| ------- | ---------------------------------------------- |
+| `GK`  | GK                                             |
+| `DEF` | CB, RCB, LCB, RB, LB, RWB, LWB, RFB, LFB       |
+| `MID` | DM, RDM, LDM, CM, RM, LM, AMF                  |
+| `FWD` | LW, RW, LWF, RWF, CF, ST                       |
+
+The same table is in `position.dart` and in `positionGroups()` in `firestore.rules`. Change all three together.
 
 ---
 
@@ -173,18 +171,22 @@ Created by an FA admin when approving a request.
 | `createdAt`            | timestamp        | Approval time                                              |
 | `updatedAt`            | timestamp        |                                                            |
 
-#### Subcollection `teams/{teamId}/jerseys/{number}` — jersey reservations
+- **Phase 1 (testing):** teams on dev are created by hand in the console with the same fields as the request. From Phase 2 the FA's Approve button creates them.
 
-One document per jersey number in use **within this team**. `{number}` is the jersey number as a string (`"9"`). Other teams have their own jersey subcollection, so every team can use any number once.
+#### Subcollection `teams/{teamId}/jerseys/{category}-{number}` — jersey reservations
+
+One document per jersey number in use **within this team and competition**. The document ID is the competition and the number, e.g. `division-9`, so a club's Division and Juvenile sides can both use #9. Other teams have their own jersey subcollection.
 
 | Field          | Type      | Notes                      |
 | -------------- | --------- | -------------------------- |
 | `playerId`   | string    | Player holding this number |
-| `playerName` | string    | For display                |
 | `createdAt`  | timestamp |                            |
 
+- Only these two fields are allowed (the rules refuse anything else).
 - Can only be **created if it doesn't exist**; that is what blocks a duplicate number.
+- The rules check that the player in the same batch really has this team, competition and number.
 - Created, moved or deleted **in the same batch** as the player change.
+- Readable by the team's own admins (for the live "#10 is free" check).
 
 ### 2.4 `players/{playerId}` — all players in the league
 
@@ -197,14 +199,15 @@ One collection for the whole district. Team admins see only their own team's pla
 | `category`        | string           | `division` or `juvenile`; must be one of the team's `categories`                                                                                                                                                             |
 | `fullName`        | string           | Entered once, reused everywhere                                                                                                                                                                                                    |
 | `fullNameLower`   | string           |                                                                                                                                                                                                                                    |
-| `searchKeys`      | array of strings | Set by the app from`fullName`: every word and its beginnings (2+ letters), lowercase. `Kwame Asante` → `kw, kwa, kwam, kwame, as, asa, asan, asant, asante`. Lets the FA and referees find a player by any part of the name |
+| `searchKeys`      | array of strings | Set by the app from`fullName`: every word and its beginnings (2+ letters), lowercase. `Kwame Asante` → `kw, kwa, kwam, kwame, as, asa, asan, asant, asante`. Lets the FA and referees find a player by any part of the name. At most 80 items |
+| `playerKey`       | string           | The ID of this player's `playerKeys` reservation, e.g. `kwame-asante_2004-03-15` (see 2.5). Set by the app from `fullName` and `dob` |
 | `playerCode`      | string?          | The**player ID**, e.g. `GE26-0042`. Set **only by the FA at approval**, never changed afterwards (see 2.4a). `null` until approved                                                                                 |
 | `dob`             | timestamp        | From the date picker                                                                                                                                                                                                               |
 | `position`        | string           | Detailed position, e.g.`RCB`, `AMF` (see allowed values)                                                                                                                                                                       |
 | `positionGroup`   | string           | `GK` / `DEF` / `MID` / `FWD`, set by the app from `position`                                                                                                                                                             |
 | `jerseyNo`        | number           | 1–99 (agreed 18 Oct 2026)                                                                                                                                                                                                         |
-| `photoUrl`        | string?          | ~400px passport photo (required once 1.6 photo upload is built)                                                                                                                                                                    |
-| `thumbUrl`        | string?          | ~100px thumbnail for lists                                                                                                                                                                                                         |
+| `photoUrl`        | string           | **Required.** Download link of the 300×400 passport photo (3:4, JPEG). 10–2000 characters                                                                                                                                         |
+| `thumbUrl`        | string           | **Required.** Download link of the 96×128 thumbnail for lists                                                                                                                                                                      |
 | `status`          | string           | `pending` / `approved` / `rejected`                                                                                                                                                                                          |
 | `rejectionReason` | string?          |                                                                                                                                                                                                                                    |
 | `createdAt`       | timestamp        |                                                                                                                                                                                                                                    |
@@ -213,7 +216,11 @@ One collection for the whole district. Team admins see only their own team's pla
 | `approvedBy`      | string?          | FA admin`uid`                                                                                                                                                                                                                    |
 
 - After approval, changing `fullName`, `dob`, `jerseyNo` or the photo sets `status` back to `pending` (FA re-approval). Changing only `position` keeps it approved. `playerCode` never changes.
-- Created by the team admin with `status: pending`. A team may hold at most `settings/league.maxSquadSize` players per competition.
+- Created by the team admin with `status: pending` and no `playerCode`, `approvedAt` or `approvedBy`. A team may hold at most `settings/league.maxSquadSize` players per competition (checked in the app; 30 for now).
+- **No passport photo, no player:** the rules refuse a player without `photoUrl` and `thumbUrl`.
+- An approved player stays approved only if the edit changes nothing but `position` (and `positionGroup`). Any other change must set `status` back to `pending`.
+- A team admin can't change `teamId`, `category`, `playerCode`, `approvedAt`, `approvedBy` or `createdAt`, and can't delete a player (removing players comes later).
+- Only Division players can be added for now; Juvenile waits for GEDFA's answers.
 - **Juvenile players:** the age group (U13 / U15 / U17) is **calculated** from `dob` and the season's cut-off date, never stored as typed input. Extra fields planned, pending GEDFA: birth certificate photo, parent or guardian name and phone, consent. Juvenile player photos are **never shown publicly**.
 - Only an FA admin may set `status` to `approved` or `rejected`.
 
@@ -251,6 +258,8 @@ Stops the same person being registered twice, with any team.
 
 - Created only if it doesn't exist, in the same batch as the player.
 - If a player's name or date of birth is corrected, the old key is deleted and the new one created in the same batch.
+- Any team admin may `get` a single key, so the app can say "already registered with your team" or "already registered with another team" before saving. Listing keys is never allowed.
+- Same name with a **different** date of birth is allowed (two different people). Same name **and** same date of birth is blocked; an FA override for real namesakes is an open question (Section 7).
 
 ### 2.6 `settings/league` — configurable league rules
 
@@ -278,18 +287,22 @@ Readable and writable only by FA admins, and only changed inside the approval tr
 
 ## 3. Who can do what (summary)
 
-The security rules (Phase 1.7) enforce this table. Screens hiding a button is **not** security.
+The security rules enforce this table. Screens hiding a button is **not** security.
 
-| Collection          | No role                                                             | Team admin                                   | Referee                                       | FA admin             |
-| ------------------- | ------------------------------------------------------------------- | -------------------------------------------- | --------------------------------------------- | -------------------- |
-| `users`           | Get own (none exists)                                               | Get own                                      | Get own                                       | Read / write all     |
-| `teamRequests`    | Create (confirmed email) / get / edit own while pending or rejected | Get own                                      | —                                            | Read all, set status |
-| `teamNames`       | Get any key; create / delete own                                    | Get any key                                  | Get any key                                   | Read / delete all    |
-| `teams`           | —                                                                  | Read / edit own team (not`adminUids`)      | Read                                          | Read / write all     |
-| `teams/*/jerseys` | —                                                                  | Create / delete for own team                 | —                                            | Read / write all     |
-| `players`         | —                                                                  | Create / read / edit own team's (not status) | Read players in assigned matches*(Phase 4)* | Read all, set status |
-| `playerKeys`      | —                                                                  | Create / delete for own team's players       | —                                            | Read / write all     |
-| `settings/league` | Read                                                                | Read                                         | Read                                          | Read / write         |
+**Rules v1 (Phase 1, live on dev)** cover the *No role* and *Team admin* columns and are proven by 49 automated tests in `test/rules/`. The *Referee* and *FA admin* columns are the plan; their rules come with Phases 2 and 4. Until then anything not listed is refused.
+
+| Collection          | No role                                                             | Team admin                                                                 | Referee                                       | FA admin *(Phase 2)* |
+| ------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------- | -------------------- |
+| `users`           | Get own (none exists)                                               | Get own                                                                    | Get own                                       | Read / write all     |
+| `teamRequests`    | Create (confirmed email) / get / edit own while pending or rejected | Get own                                                                    | —                                            | Read all, set status |
+| `teamNames`       | Get any key; create / delete own                                    | Get any key                                                                | Get any key                                   | Read / delete all    |
+| `teams`           | —                                                                  | Get own team *(editing later)*                                             | Read                                          | Read / write all     |
+| `teams/*/jerseys` | —                                                                  | Get / create / delete for own team                                         | —                                            | Read / write all     |
+| `players`         | —                                                                  | Create / read / edit own team's (never status, player ID or team); no delete yet | Read players in assigned matches*(Phase 4)* | Read all, set status |
+| `playerKeys`      | —                                                                  | Get any key; create / delete for own team's players                        | —                                            | Read / write all     |
+| `settings/league` | Read *(rule to add)*                                                | Read *(rule to add)*                                                       | Read                                          | Read / write         |
+| Storage: request logo | Write / read own (image < 1 MB)                                  | —                                                                          | —                                            | Read all             |
+| Storage: player photos | —                                                                | Create / read / delete for own team (JPEG < 1 MB, `photo-` / `thumb-` names) | —                                          | Read all             |
 
 ---
 
@@ -299,26 +312,37 @@ These changes always happen together in **one batch** (all succeed or none do):
 
 | Action                                | Writes in the batch                                                                           |
 | ------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Add player                            | create`players/{id}` + create `teams/{teamId}/jerseys/{no}` + create `playerKeys/{key}` |
+| Add player                            | create`players/{id}` + create `teams/{teamId}/jerseys/{category}-{no}` + create `playerKeys/{key}` |
 | Change jersey number                  | update player + delete old jersey doc + create new jersey doc                                 |
 | Correct name or DOB                   | update player (back to`pending`) + delete old player key + create new player key            |
-| Remove player                         | delete player + delete jersey doc + delete player key                                         |
+| Remove player *(later)*               | delete player + delete jersey doc + delete player key                                         |
 | Submit team request                   | create`teamRequests/{uid}` + create `teamNames/{nameKey}`                                 |
 | Rename team while pending or rejected | update request + delete old`teamNames` doc + create new one                                 |
 | Approve team request                  | update request`status` + create `teams/{teamId}` + create/update `users/{uid}`          |
+
+**Photos and batches.** Storage files can't be part of a Firestore batch, so a player's photo is handled around it:
+
+1. The app picks the player's ID first (`players.doc()`), then uploads `photo-<time>.jpg` and `thumb-<time>.jpg`.
+2. It runs the batch above with the two download links.
+3. If the batch fails, the files just uploaded are deleted. If it succeeds after a photo change, the **old** files are deleted.
+
+A leftover file is harmless; a player without a photo can't exist.
 
 ---
 
 ## 5. Cloud Storage paths
 
-| Path                                                  | Contents                 |
-| ----------------------------------------------------- | ------------------------ |
-| `districts/gomoa-east/teamRequests/{uid}/logo.jpg`  | Logo sent with a request |
-| `districts/gomoa-east/teams/{teamId}/logo.jpg`      | Approved team logo       |
-| `districts/gomoa-east/players/{playerId}/photo.jpg` | Passport photo, ~400px   |
-| `districts/gomoa-east/players/{playerId}/thumb.jpg` | Thumbnail, ~100px        |
+| Path                                                                        | Contents                                  |
+| --------------------------------------------------------------------------- | ----------------------------------------- |
+| `districts/gomoa-east/teamRequests/{uid}/logo.jpg`                        | Logo sent with a request                  |
+| `districts/gomoa-east/teams/{teamId}/logo.jpg`                            | Approved team logo *(Phase 2)*            |
+| `districts/gomoa-east/teams/{teamId}/players/{playerId}/photo-<millis>.jpg` | Passport photo, 300×400, JPEG quality 85  |
+| `districts/gomoa-east/teams/{teamId}/players/{playerId}/thumb-<millis>.jpg` | Thumbnail, 96×128, JPEG quality 80        |
 
-Images are compressed in the app before upload (logos at most 512 px wide, JPEG). Uploads must be images under 1 MB. Storage rules mirror the Firestore access table: a requester may write and read only their own request logo; FA admins read all.
+- Images are processed in the app before upload: logos at most 512 px wide; passport photos turned upright, centre-cropped to 3:4 and resized. All JPEG, under 1 MB.
+- Player photos sit under the **team** folder, so the storage rules can check "is this the team's admin?" by reading `users/{uid}` (`role == teamAdmin` and `teamId` matches). Only file names `photo-<digits>.jpg` and `thumb-<digits>.jpg` are allowed, and files are never overwritten: a new photo gets a new name (`<millis>` = upload time), which also stops phones showing an old cached picture.
+- Storage rules: a requester may write and read only their own request logo; a team admin may create, read and delete only their own team's player photos; FA admins read all *(Phase 2)*.
+- **Web build:** the bucket needs a CORS setting that allows the Hosting addresses, or photos and logos won't load in browsers (set on dev, 18 Oct 2026; to do on prod).
 
 ---
 
@@ -367,6 +391,7 @@ Feed rules: never include dates of birth; player photos only if agreed with GEDF
 - One team admin or several per team
 - Player transfers between teams during a season
 - Retention rules for player data
+- Two real players with the same name **and** the same date of birth: should the FA be able to override the duplicate check?
 
 ---
 
@@ -383,3 +408,5 @@ Feed rules: never include dates of birth; player photos only if agreed with GEDF
 | 17 Oct 2026 | v1.2: Kit shape gains optional trims (`trim`, `shoulderStripes`, `collarAndCuffs`, `shortsStripe`).                                                                                                                                                                                                                      |
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
+| 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 18 Oct 2026 | v1.4: matches security rules v1. Jersey reservation ID is now `{category}-{number}` (e.g. `division-9`) with only `playerId` and `createdAt` (`playerName` dropped). Players gain `playerKey`; `photoUrl` and `thumbUrl` are now **required** (300×400 and 96×128). Player photos moved to `teams/{teamId}/players/{playerId}/photo-<millis>.jpg` / `thumb-<millis>.jpg`. Team admins may `get` any `playerKeys` key. Section 3 marks what rules v1 cover; Storage rows added. Photo-and-batch order added to Section 4. Storage CORS for the web build. |

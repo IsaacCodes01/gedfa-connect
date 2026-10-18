@@ -1,10 +1,10 @@
 # GEDFA Connect — Project Roadmap
 
 **App name:** GEDFA Connect (repo `gedfa-connect`, package `gedfa_connect`)
-**Platforms:** Flutter app (Android first, iOS later, web build available); separate React website by a colleague
-**Backend:** Firebase (Auth, Firestore, Cloud Storage) on the Blaze plan
+**Platforms:** Flutter app: Android (APK) and web (iPhone users via "Add to Home Screen"); native iOS later (see Section 4, Distribution); separate React website by a colleague
+**Backend:** Firebase (Auth, Firestore, Cloud Storage, Hosting) on the Blaze plan
 **Projects:** `gedfa-connect-dev` (building/testing) and `gedfa-connect-prod` (real GEDFA data)
-**Status:** Phase 0 complete · Phase 1 in progress (17 Oct 2026)
+**Status:** Phase 0 and Phase 1 complete · web test link live on dev · Phase 2 next (18 Oct 2026)
 
 See also: `docs/DATA_MODEL.md` (the data contract).
 
@@ -79,7 +79,26 @@ A single system that lets the GEDFA third-division league run digitally, from pl
 - **PDF:** `pdf` and `printing` packages.
 - **Local testing:** Firebase Emulator Suite (Auth 9099, Firestore 8080, Storage 9199, UI 4000). Debug builds use the emulators by default; `--dart-define=USE_EMULATORS=false` switches to the real dev project.
 - **Rules as files:** `firestore.rules` and `storage.rules` live in the repo and are deployed with the CLI; never edited in the console.
+- **Rules tests:** `test/rules/` (Node, `@firebase/rules-unit-testing`). Run `npm test` there while the emulators run. Uses its own project ID (`demo-gedfa-rules`), so app data in the emulator is untouched. Every rules change must keep all tests passing.
+- **Unit tests:** `test/` (`flutter test`), e.g. player-key and jersey-ID functions.
+- **Emulator data:** start with `firebase emulators:start --import=./emulator-data --export-on-exit=./emulator-data`; stop with Ctrl+C so the data is saved. `emulator-data/` is not committed.
 - **Cost control:** budget alerts, pagination, few realtime listeners, no backups/PITR on dev.
+
+### Distribution *(decided 18 Oct 2026)*
+
+| Users | How they get the app |
+|---|---|
+| Android | APK through **Firebase App Distribution** (testers get an install link by email) |
+| iPhone | The **web build** on Firebase Hosting, opened in Safari and added with **Share → Add to Home Screen** |
+| iPhone, native app | **Later**, only if GEDFA funds an Apple Developer account (US$99/year) |
+
+- **Dev web link:** https://gedfa-connect-dev.web.app (tested on an iPhone 8, 18 Oct 2026).
+- **Deploy the web build:**
+  1. `flutter build web --release --dart-define=USE_EMULATORS=false`
+  2. `firebase deploy --only hosting --project gedfa-connect-dev`
+  Always name the project with `--project`.
+- **Storage CORS:** the web build loads photos and logos from the Storage bucket, so the bucket must allow the Hosting addresses (set once per project with `gcloud storage buckets update gs://<bucket> --cors-file=cors.json`; done on dev).
+- **Rules deploy:** `firebase deploy --only firestore:rules,storage --project gedfa-connect-dev`.
 
 ---
 
@@ -94,6 +113,7 @@ A single system that lets the GEDFA third-division league run digitally, from pl
 
 ### Navigation
 - **No hamburger menu.** Phones use a bottom navigation bar (≤ 5 tabs, different per role); large screens use a side navigation rail. Rarely used items (profile, settings, log out, help) sit under a "More"/profile tab.
+- **App bar** (agreed 18 Oct 2026): team logo and name on the left; on the right only frequent actions (search, and the activity bell once it has real content). **Log out and dark mode are not in the app bar**; they live on the More / Settings screen. Log out always asks "Are you sure?".
 
 ### Feedback
 - **Top toasts** (`AppToast`) for every completed or failed action, with a message specific to the action (e.g. "Welcome back!", "Team request sent to the FA").
@@ -138,33 +158,39 @@ Time estimates assume part-time work and are rough guides.
 - [x] 0.7 First FA Admin created on dev
 - [x] 0.8 Design foundation: theme, reusable widgets, mockups
 
-### Phase 1 — Auth, roles, team and player registration *(in progress)*
+### Phase 1 — Auth, roles, team and player registration ✅ *(done 18 Oct 2026)*
 - [x] 1.0 Firebase Emulator Suite; app uses emulators in debug
 - [x] 1.1a `AppToast`, offline/back-online banner, responsive helpers
 - [x] 1.1b Log in, sign up, log out, password reset; Firebase error translator; submission time limits
 - [x] 1.2 Role-based router: no role → registration/status; team admin → team dashboard; referee → fixtures; FA admin → FA dashboard
 - [x] 1.3 Team registration request form and status screen (club details, logo, 5 kits with trims, officials, review, edit and resubmit, Google sign-in)
-- [ ] 1.3b Competitions: Division and/or Juvenile (U13, U15, U17) chosen at registration; shown on Review and Status
-- [ ] 1.4 Add/edit player form: name, DOB picker, position (16 positions, grouped), jersey number, passport photo; Division first, Juvenile extras (age group from DOB, birth certificate, guardian) after GEDFA answers
-- [ ] 1.5 Validation: jersey and duplicate-player reservations, name entered once; first unit tests (player-key function)
-- [ ] 1.6 Photo compression and upload
-- [ ] 1.7 Security rules v1, tested in the emulator (users, teamRequests, teamNames and logo storage done; teams, players, FA admin still to do)
+- [x] 1.3b Competitions: Division and/or Juvenile (U13, U15, U17) chosen at registration; shown on Review and Status
+- [x] 1.4 Team home (squad list with counts, search by name or ID, position filters, Division / Juvenile switch), player details screen, add/edit player form: name, DOB picker, 23 positions in 4 groups, jersey number 1–99 with live check, squad limit 30. *Juvenile extras (age group from DOB, birth certificate, guardian) wait for GEDFA's answers.*
+- [x] 1.5 Validation: jersey reservations (`teams/{teamId}/jerseys/{category}-{number}`) and duplicate-player reservations (`playerKeys`); friendly messages; changing name, DOB, jersey or photo of an approved player asks before sending it back to the FA; first unit tests (player-key and jersey-ID functions)
+- [x] 1.6 Passport photo, required: cropped to 3:4 on the phone, 300×400 photo + 96×128 thumbnail (JPEG), uploaded to Storage; old files deleted after a change; storage rules check the team admin through Firestore
+- [x] 1.7 Security rules v1 for users, teamRequests, teamNames, teams, jerseys, playerKeys, players and storage; **49 automated rules tests passing** (`test/rules/`)
+- [x] 1.8 Web build on Firebase Hosting (dev), Storage CORS, rules deployed to dev; tested end to end on an iPhone 8 (sign up, register team, hand-approved team, add player with camera photo)
 
-**Done when:** a test team admin can register a team request and add players, and a role-less user can't read or write anything beyond their own request.
+**Done when:** a test team admin can register a team request and add players, and a role-less user can't read or write anything beyond their own request. ✅ Proven by the rules tests and on the live dev link.
+
+> **FA admin rules** (reading all requests and players, approving) were moved to Phase 2, where the FA screens that need them are built.
 
 ### Phase 2 — FA approval dashboard
+- [ ] 2.0 App bar clean-up and **More / Settings** screen: account details, appearance (light / dark / system), help, app version, log out with confirmation. Log out and dark mode leave the app bar *(mockups done 18 Oct 2026)*
 - [ ] 2.1 Queue of pending team requests
-- [ ] 2.2 Approve a team: create team, assign Team Admin role
-- [ ] 2.3 Pending players queue: approve/reject with reason
+- [ ] 2.2 Approve a team: create the team from the request (all fields, logo copied to `teams/{teamId}/logo.jpg`), assign Team Admin role (replaces the hand-made console approval used for testing)
+- [ ] 2.3 Pending players queue: approve/reject with reason; approval transaction gives the player ID (`GE26-0042`) from `settings/playerCounter`
 - [ ] 2.4 Status filters and search
-- [ ] 2.5 Lock approved players (changes to name, DOB or jersey need re-approval)
+- [x] 2.5 Lock approved players (changes to name, DOB, jersey or photo need re-approval) *(done early, in 1.5 and 1.6)*
 - [ ] 2.6 Role management by **invitation**: invite FA admins and referees by email; last-admin protection; role change history
 - [ ] 2.7 **FA announcements** (first part of the league feed)
+- [ ] 2.8 **Activity list** behind the app-bar bell: "Player approved", "Player rejected: reason", "Team approved", FA announcements. The bell appears only when this exists
+- [ ] 2.9 FA admin security rules, with rules tests added to `test/rules/`
 
 ### Phase 3 — Team sheet builder and PDF
 - [ ] 3.1–3.7 As before: select fixture, pick approved players within limits, captain/GK, formation, PDF, print/share, FA can view
 
-> **Before the pilot:** bundle fonts in the app (offline-safe), set up dev/prod switching (flavors), enable App Check, create the first FA Admin on prod, deploy rules to prod, consider weekly Firestore backups on prod.
+> **Before the pilot:** bundle fonts in the app (offline-safe), set up dev/prod switching (flavors), enable App Check, create the first FA Admin on prod, deploy rules to prod, set Storage CORS and Hosting on prod, set up Firebase App Distribution for the Android APK, consider weekly Firestore backups on prod.
 
 > **PILOT MILESTONE:** registration, approval, team sheets and FA announcements usable. Pilot with the FA and one or two teams.
 
@@ -244,6 +270,8 @@ Work backwards from the GEDFA season start date to decide what the pilot must co
 | Web and mobile diverging | Shared data model, shared rules, one source of business logic |
 | Wrong or premature news in the feed | Results/transfers posted only after FA approval; line-ups only at kick-off; FA moderation |
 | Minors' personal data exposed | No DOB publicly; photos only with agreement |
+| iPhone users without a native app | Web build with Add to Home Screen; tested on an iPhone 8; native iOS only if funded |
+| Pilot data typed on dev by mistake | Dev link is for testing only; real GEDFA data goes only to prod; every deploy names `--project` |
 
 ---
 
@@ -254,3 +282,4 @@ Work backwards from the GEDFA season start date to decide what the pilot must co
 | 12 Oct 2026 | Renamed to GEDFA Connect; dev/prod projects created |
 | 13 Oct 2026 | Phase 0 complete; added 0.8 design foundation, 1.0 emulators, 1.1a toasts/connectivity/responsive; invite-only roles (2.6); FA announcements (2.7); new Phase 5.5 League feed; navigation, connectivity and responsive standards; pre-pilot checklist |
 | 17 Oct 2026 | 1.1b, 1.2, 1.3 done; new 1.3b Competitions (Division / Juvenile, one registration per club); 1.4 split into Division first, Juvenile after GEDFA answers |
+| 18 Oct 2026 | **Phase 1 complete:** 1.3b–1.7 done; new 1.8 web link on Firebase Hosting (dev), tested on iPhone 8. Distribution decided (Android APK via App Distribution; iPhone via web + Add to Home Screen; native iOS later if funded). 23 positions; squad 30; jersey 1–99. FA admin rules moved to Phase 2 (2.9). New 2.0 Settings screen and app-bar clean-up; new 2.8 activity list (bell). 2.5 done early. Rules tests and emulator-data workflow added to Section 4 |
