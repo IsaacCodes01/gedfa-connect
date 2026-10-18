@@ -11,4 +11,8 @@ class Routes {
   static const admin = '/admin';
   static const team = '/team';
   static const referee = '/referee';
+  static const teamPlayer = '/team/player';
+  static String player(String playerId) => '$teamPlayer/$playerId';
+  static const addPlayer = '/team/add';
+  static String editPlayer(String playerId) => '/team/player/$playerId/edit';
 }

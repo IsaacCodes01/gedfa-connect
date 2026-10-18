@@ -29,12 +29,70 @@ service cloud.firestore {
 
     match /districts/{districtId} {
 
+      // ---------- Paths ----------
+
       function teamNameDoc(key) {
         return /databases/$(database)/documents/districts/$(districtId)/teamNames/$(key);
       }
 
       function teamRequestDoc(uid) {
         return /databases/$(database)/documents/districts/$(districtId)/teamRequests/$(uid);
+      }
+
+      function userDoc(uid) {
+        return /databases/$(database)/documents/districts/$(districtId)/users/$(uid);
+      }
+
+      // ---------- Roles ----------
+
+      // True if the signed-in person is the team admin of this team
+      function isTeamAdminOf(teamId) {
+        return isSignedIn()
+          && exists(userDoc(request.auth.uid))
+          && get(userDoc(request.auth.uid)).data.get('role', '') == 'teamAdmin'
+          && get(userDoc(request.auth.uid)).data.get('teamId', '') == teamId;
+      }
+
+            function teamDoc(teamId) {
+        return /databases/$(database)/documents/districts/$(districtId)/teams/$(teamId);
+      }
+
+      // Position code → group. Must match position.dart
+      function positionGroups() {
+        return {
+          'GK': 'GK',
+          'CB': 'DEF', 'RCB': 'DEF', 'LCB': 'DEF', 'RB': 'DEF', 'LB': 'DEF',
+          'RWB': 'DEF', 'LWB': 'DEF', 'RFB': 'DEF', 'LFB': 'DEF',
+          'DM': 'MID', 'RDM': 'MID', 'LDM': 'MID', 'CM': 'MID',
+          'RM': 'MID', 'LM': 'MID', 'AMF': 'MID',
+          'LW': 'FWD', 'RW': 'FWD', 'LWF': 'FWD', 'RWF': 'FWD',
+          'CF': 'FWD', 'ST': 'FWD'
+        };
+      }
+
+      // The fields a team admin may write on a player
+      function isValidPlayer(data) {
+        return data.keys().hasOnly([
+            'teamId', 'teamName', 'category', 'fullName', 'fullNameLower',
+            'searchKeys', 'dob', 'position', 'positionGroup', 'jerseyNo',
+            'photoUrl', 'thumbUrl', 'status', 'playerCode', 'rejectionReason',
+            'createdAt', 'updatedAt', 'approvedAt', 'approvedBy'
+          ])
+          && isText(data.fullName, 3, 80)
+          && data.fullNameLower == data.fullName.lower()
+          && data.searchKeys is list
+          && data.searchKeys.size() <= 80
+          && data.teamName is string
+          && data.category in ['division', 'juvenile']
+          && data.dob is timestamp
+          && data.dob < request.time
+          && data.position in positionGroups()
+          && positionGroups()[data.position] == data.positionGroup
+          && data.jerseyNo is int
+          && data.jerseyNo >= 1
+          && data.jerseyNo <= 99
+          && isOptionalText(data, 'photoUrl', 2000)
+          && isOptionalText(data, 'thumbUrl', 2000);
       }
 
       // ---------- users/{uid} ----------
@@ -110,7 +168,44 @@ service cloud.firestore {
           && (!existsAfter(teamRequestDoc(request.auth.uid))
               || getAfter(teamRequestDoc(request.auth.uid)).data.nameKey != nameKey);
       }
-    }
+
+      // ---------- teams/{teamId} ----------
+      match /teams/{teamId} {
+        allow get: if isTeamAdminOf(teamId);
+      }
+
+            // ---------- players/{playerId} ----------
+      match /players/{playerId} {
+        allow read: if isTeamAdminOf(resource.data.teamId);
+
+        allow create: if isTeamAdminOf(request.resource.data.teamId)
+          && isValidPlayer(request.resource.data)
+          && request.resource.data.category == 'division'
+          && get(teamDoc(request.resource.data.teamId)).data.categories
+               .hasAny([request.resource.data.category])
+          && request.resource.data.status == 'pending'
+          && !('playerCode' in request.resource.data)
+          && !('approvedAt' in request.resource.data)
+          && !('approvedBy' in request.resource.data)
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.updatedAt == request.time;
+
+        allow update: if isTeamAdminOf(resource.data.teamId)
+          && isValidPlayer(request.resource.data)
+          && request.resource.data.teamId == resource.data.teamId
+          && request.resource.data.category == resource.data.category
+          && request.resource.data.get('playerCode', null) == resource.data.get('playerCode', null)
+          && request.resource.data.get('approvedAt', null) == resource.data.get('approvedAt', null)
+          && request.resource.data.get('approvedBy', null) == resource.data.get('approvedBy', null)
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.updatedAt == request.time
+          && (request.resource.data.status == 'pending'
+              || (resource.data.status == 'approved'
+                  && request.resource.data.status == 'approved'
+                  && request.resource.data.diff(resource.data).affectedKeys()
+                       .hasOnly(['position', 'positionGroup', 'updatedAt'])));
+      }
+    } // end of districts/{districtId}
 
     // ---------- Everything else ----------
     match /{document=**} {

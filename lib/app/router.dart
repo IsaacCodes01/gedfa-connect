@@ -13,6 +13,9 @@ import 'package:gedfa_connect/features/auth/presentation/forgot_password_screen.
 import 'package:gedfa_connect/features/auth/presentation/sign_up_screen.dart';
 import 'package:gedfa_connect/features/teams/presentation/welcome_screen.dart';
 import 'package:gedfa_connect/features/teams/presentation/register_team_screen.dart';
+import 'package:gedfa_connect/features/teams/presentation/team_home_screen.dart';
+import 'package:gedfa_connect/features/players/presentation/player_details_screen.dart';
+import 'package:gedfa_connect/features/players/presentation/player_form_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final refresh = ValueNotifier<int>(0);
@@ -67,10 +70,27 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: Routes.team,
-        builder: (_, _) => const PlaceholderHome(
-          title: 'My Team',
-          message: 'Team Admin home. (Coming soon)',
-        ),
+        builder: (_, _) => const TeamHomeScreen(),
+                routes: [
+          GoRoute(
+            path: 'add',
+            builder: (_, _) => const PlayerFormScreen(),
+          ),
+          GoRoute(
+            path: 'player/:playerId',
+            builder: (_, state) => PlayerDetailsScreen(
+              playerId: state.pathParameters['playerId']!,
+            ),
+            routes: [
+              GoRoute(
+                path: 'edit',
+                builder: (_, state) => PlayerFormScreen(
+                  playerId: state.pathParameters['playerId']!,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
       GoRoute(
         path: Routes.referee,

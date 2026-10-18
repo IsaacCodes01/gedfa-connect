@@ -8,6 +8,13 @@ class FirestorePaths {
 
   static String teamRequest(String uid) => '$district/teamRequests/$uid';
   static String teamName(String key) => '$district/teamNames/$key';
+  static const teams = '$district/teams';
+  static String team(String teamId) => '$district/teams/$teamId';
+
+  static const players = '$district/players';
+  static String player(String playerId) => '$district/players/$playerId';
+
+  static const leagueSettings = '$district/settings/league';
 }
 
 class StoragePaths {
