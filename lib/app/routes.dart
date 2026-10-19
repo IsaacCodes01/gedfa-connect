@@ -10,6 +10,7 @@ class Routes {
   static const registerTeam = '/welcome/register';
   static const admin = '/admin';
   static const team = '/team';
+  static const teamMore = '/team/more';
   static const referee = '/referee';
   static const teamPlayer = '/team/player';
   static String player(String playerId) => '$teamPlayer/$playerId';

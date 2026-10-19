@@ -4,7 +4,6 @@ import 'package:gedfa_connect/app/theme.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/widgets/flag_stripe.dart';
 import 'package:gedfa_connect/core/widgets/pitch_lines_painter.dart';
-import 'package:gedfa_connect/core/widgets/theme_toggle_button.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AuthScaffold extends StatelessWidget {
@@ -86,11 +85,7 @@ class AuthScaffold extends StatelessWidget {
                               child: Row(
                                 children: [
                                   if (showBack)
-                                    const BackButton(color: Colors.white)
-                                  else
-                                    const SizedBox(width: 48),
-                                  const Spacer(),
-                                  const ThemeToggleButton(onHero: true),
+                                    const BackButton(color: Colors.white),
                                 ],
                               ),
                             ),

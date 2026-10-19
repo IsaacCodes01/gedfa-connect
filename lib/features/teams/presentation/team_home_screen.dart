@@ -10,7 +10,6 @@ import 'package:gedfa_connect/core/utils/initials.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/core/widgets/status_badge.dart';
-import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/players/data/player_repository.dart';
 import 'package:gedfa_connect/features/players/domain/player.dart';
 import 'package:gedfa_connect/features/players/domain/position.dart';
@@ -38,7 +37,7 @@ class _TeamHomeScreenState extends ConsumerState<TeamHomeScreen> {
     super.dispose();
   }
 
-    void _addPlayer() => context.go(Routes.addPlayer);
+  void _addPlayer() => context.go(Routes.addPlayer);
 
   @override
   Widget build(BuildContext context) {
@@ -77,7 +76,7 @@ class _TeamHomeScreenState extends ConsumerState<TeamHomeScreen> {
         : Competition.values.firstWhere(team.categories.contains);
     final isDivision = competition == Competition.division;
 
-        final squadCount = ref
+    final squadCount = ref
             .watch(teamPlayersProvider)
             .value
             ?.where((p) => p.category == competition)
@@ -87,6 +86,9 @@ class _TeamHomeScreenState extends ConsumerState<TeamHomeScreen> {
     return Scaffold(
       appBar: GedfaAppBar(
         title: team.name,
+        subtitle: [team.shortName, team.town]
+            .where((part) => part.isNotEmpty)
+            .join(' · '),
         leading: Padding(
           padding: const EdgeInsets.only(left: 12),
           child: Center(
@@ -98,13 +100,6 @@ class _TeamHomeScreenState extends ConsumerState<TeamHomeScreen> {
             ),
           ),
         ),
-        actions: [
-          IconButton(
-            tooltip: 'Log out',
-            icon: const Icon(Icons.logout_rounded),
-            onPressed: () => ref.read(authRepositoryProvider).signOut(),
-          ),
-        ],
       ),
       floatingActionButton: isDivision && squadCount > 0
           ? FloatingActionButton.extended(

@@ -29,6 +29,11 @@ class AppColors {
   static const darkBorder = Color(0xFF2A3F5C);
   static const darkPrimary = Color(0xFF4FA3F7);
   static const darkGreen = Color(0xFF5BD39A);
+  static const darkLink = Color(0xFF7DBBFA);
+
+  // Navigation (bottom bar / rail): pill behind the selected tab
+  static const navPill = Color(0xFFDCEAF9);
+  static const darkNavPill = Color(0xFF1E3A5F);
 
   // Status badges
   static const approvedBg = Color(0xFFE3F2EA);
@@ -60,6 +65,9 @@ class AppTheme {
       outline: isDark ? AppColors.darkBorder : AppColors.border,
       error: isDark ? const Color(0xFFFF8A94) : const Color(0xFFB3122A),
     );
+
+    final navActive = isDark ? AppColors.darkLink : AppColors.deepBlue;
+    final navPill = isDark ? AppColors.darkNavPill : AppColors.navPill;
 
     final base = ThemeData(
       useMaterial3: true,
@@ -140,15 +148,67 @@ class AppTheme {
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor:
-              isDark ? const Color(0xFF7DBBFA) : AppColors.deepBlue,
+          foregroundColor: isDark ? AppColors.darkLink : AppColors.deepBlue,
           textStyle: GoogleFonts.poppins(
             fontSize: 14,
             fontWeight: FontWeight.w500,
           ),
         ),
       ),
-        pageTransitionsTheme: const PageTransitionsTheme(
+      // "Add player" and other main actions: filled deep blue, white text
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: scheme.primary,
+        foregroundColor: scheme.onPrimary,
+        elevation: 4,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+        ),
+        extendedTextStyle: GoogleFonts.poppins(
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: scheme.surface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        height: 72,
+        indicatorColor: navPill,
+        iconTheme: WidgetStateProperty.resolveWith(
+          (states) => IconThemeData(
+            color: states.contains(WidgetState.selected)
+                ? navActive
+                : scheme.onSurfaceVariant,
+          ),
+        ),
+        labelTextStyle: WidgetStateProperty.resolveWith(
+          (states) {
+            final selected = states.contains(WidgetState.selected);
+            return GoogleFonts.poppins(
+              fontSize: 12,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+              color: selected ? navActive : scheme.onSurfaceVariant,
+            );
+          },
+        ),
+      ),
+      navigationRailTheme: NavigationRailThemeData(
+        backgroundColor: scheme.surface,
+        indicatorColor: navPill,
+        selectedIconTheme: IconThemeData(color: navActive),
+        unselectedIconTheme: IconThemeData(color: scheme.onSurfaceVariant),
+        selectedLabelTextStyle: GoogleFonts.poppins(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: navActive,
+        ),
+        unselectedLabelTextStyle: GoogleFonts.poppins(
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+          color: scheme.onSurfaceVariant,
+        ),
+      ),
+      pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
           TargetPlatform.android: CupertinoPageTransitionsBuilder(),
           TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),

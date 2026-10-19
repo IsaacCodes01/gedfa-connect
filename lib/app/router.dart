@@ -1,6 +1,7 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:gedfa_connect/app/app_shell.dart';
 import 'package:gedfa_connect/app/routes.dart';
 import 'package:gedfa_connect/app/startup_screen.dart';
 import 'package:gedfa_connect/core/constants/user_role.dart';
@@ -16,13 +17,18 @@ import 'package:gedfa_connect/features/teams/presentation/register_team_screen.d
 import 'package:gedfa_connect/features/teams/presentation/team_home_screen.dart';
 import 'package:gedfa_connect/features/players/presentation/player_details_screen.dart';
 import 'package:gedfa_connect/features/players/presentation/player_form_screen.dart';
+import 'package:gedfa_connect/features/settings/presentation/settings_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final refresh = ValueNotifier<int>(0);
   ref.listen(authStateProvider, (_, _) => refresh.value++);
   ref.listen(appUserProvider, (_, _) => refresh.value++);
 
+  // The top-level navigator. Screens given this key open above the tabs.
+  final rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
+
   final router = GoRouter(
+    navigatorKey: rootNavigatorKey,
     initialLocation: Routes.startup,
     refreshListenable: refresh,
     redirect: (context, state) => _redirect(ref, state.matchedLocation),
@@ -51,7 +57,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.verifyEmail,
         builder: (_, _) => const VerifyEmailScreen(),
       ),
-            GoRoute(
+      GoRoute(
         path: Routes.welcome,
         builder: (_, _) => const WelcomeScreen(),
         routes: [
@@ -68,25 +74,52 @@ final routerProvider = Provider<GoRouter>((ref) {
           message: 'FA Admin home. (Coming soon)',
         ),
       ),
-      GoRoute(
-        path: Routes.team,
-        builder: (_, _) => const TeamHomeScreen(),
-                routes: [
-          GoRoute(
-            path: 'add',
-            builder: (_, _) => const PlayerFormScreen(),
-          ),
-          GoRoute(
-            path: 'player/:playerId',
-            builder: (_, state) => PlayerDetailsScreen(
-              playerId: state.pathParameters['playerId']!,
-            ),
+      // Team admin area: a shell with tabs (Squad, More).
+      StatefulShellRoute.indexedStack(
+        builder: (_, _, navigationShell) => AppShell(
+          navigationShell: navigationShell,
+          destinations: teamDestinations,
+        ),
+        branches: [
+          // Tab 0: Squad
+          StatefulShellBranch(
             routes: [
               GoRoute(
-                path: 'edit',
-                builder: (_, state) => PlayerFormScreen(
-                  playerId: state.pathParameters['playerId']!,
-                ),
+                path: Routes.team,
+                builder: (_, _) => const TeamHomeScreen(),
+                routes: [
+                  // Player screens open full-screen, above the tabs.
+                  GoRoute(
+                    path: 'add',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (_, _) => const PlayerFormScreen(),
+                  ),
+                  GoRoute(
+                    path: 'player/:playerId',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (_, state) => PlayerDetailsScreen(
+                      playerId: state.pathParameters['playerId']!,
+                    ),
+                    routes: [
+                      GoRoute(
+                        path: 'edit',
+                        parentNavigatorKey: rootNavigatorKey,
+                        builder: (_, state) => PlayerFormScreen(
+                          playerId: state.pathParameters['playerId']!,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+          // Tab 1: More (Settings)
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: Routes.teamMore,
+                builder: (_, _) => const SettingsScreen(),
               ),
             ],
           ),
