@@ -2,13 +2,16 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gedfa_connect/core/utils/initials.dart';
 import 'package:gedfa_connect/core/utils/passport_photo.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
+import 'package:gedfa_connect/features/settings/data/data_saver_provider.dart';
 import 'package:image_picker/image_picker.dart';
 
 /// Small round picture for lists: the thumbnail, or the initials.
-class PlayerAvatar extends StatelessWidget {
+/// With data saver on, it always shows the initials and downloads nothing.
+class PlayerAvatar extends ConsumerWidget {
   const PlayerAvatar({
     super.key,
     required this.name,
@@ -21,7 +24,7 @@ class PlayerAvatar extends StatelessWidget {
   final double size;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
     final initials = Container(
       color: scheme.primary.withValues(alpha: 0.12),
@@ -36,7 +39,7 @@ class PlayerAvatar extends StatelessWidget {
       ),
     );
 
-    final link = url;
+    final link = ref.watch(dataSaverProvider) ? null : url;
     return SizedBox(
       width: size,
       height: size,

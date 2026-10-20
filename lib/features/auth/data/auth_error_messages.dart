@@ -36,6 +36,11 @@ String authErrorMessage(Object error) {
         'This email already has an account. Log in with your email and password.',
       'operation-not-allowed' =>
         'Google sign-in is not available right now. Contact the GEDFA office.',
+      'requires-recent-login' =>
+        'For your safety, log out and log in again, then try once more.',
+      'no-current-user' || 'user-token-expired' =>
+        'You have been logged out. Please log in again.',
+      'missing-email' => 'This account has no email address.',
       _ => 'Something went wrong. Please try again.',
     };
   }

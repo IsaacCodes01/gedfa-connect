@@ -74,6 +74,62 @@ class AuthRepository {
   }
 
   Future<void> signOut() => _auth.signOut();
+
+  // ---------- My profile ----------
+
+  /// Like [authStateChanges], but also fires when the name or email of the
+  /// signed-in user changes. Used by the profile screens.
+  Stream<User?> userChanges() => _auth.userChanges();
+
+  /// True if this account logs in with an email and password.
+  /// False for Google-only accounts: Google manages their email and password.
+  bool get hasPassword =>
+      _auth.currentUser?.providerData
+          .any((info) => info.providerId == EmailAuthProvider.PROVIDER_ID) ??
+      false;
+
+  User _requireUser() {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw FirebaseAuthException(code: 'no-current-user');
+    }
+    return user;
+  }
+
+  /// Saves a new full name on the account.
+  Future<void> updateName(String name) async {
+    final user = _requireUser();
+    await user.updateDisplayName(name.trim()).timeout(_timeout);
+    // Reload so userChanges() sends the new name to every screen.
+    await user.reload().timeout(_timeout);
+  }
+
+  /// Emails the signed-in user a link to choose a new password.
+  Future<void> sendPasswordResetToMe() async {
+    final email = _requireUser().email;
+    if (email == null) throw FirebaseAuthException(code: 'missing-email');
+    await sendPasswordReset(email);
+  }
+
+  /// Checks the current password, then emails a confirmation link to
+  /// [newEmail]. The email only changes when the link is opened.
+  Future<void> changeEmail({
+    required String currentPassword,
+    required String newEmail,
+  }) async {
+    final user = _requireUser();
+    final email = user.email;
+    if (email == null) throw FirebaseAuthException(code: 'missing-email');
+
+    final credential = EmailAuthProvider.credential(
+      email: email,
+      password: currentPassword,
+    );
+    await user.reauthenticateWithCredential(credential).timeout(_timeout);
+    await user
+        .verifyBeforeUpdateEmail(newEmail.trim().toLowerCase())
+        .timeout(_timeout);
+  }
 }
 
 final firebaseAuthProvider = Provider<FirebaseAuth>((ref) {
@@ -86,4 +142,10 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 
 final authStateProvider = StreamProvider<User?>((ref) {
   return ref.watch(authRepositoryProvider).authStateChanges();
+});
+
+/// The signed-in user, updated live when their name or email changes.
+/// Screens use this; the router keeps using [authStateProvider].
+final currentUserProvider = StreamProvider<User?>((ref) {
+  return ref.watch(authRepositoryProvider).userChanges();
 });

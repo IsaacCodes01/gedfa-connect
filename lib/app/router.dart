@@ -17,6 +17,9 @@ import 'package:gedfa_connect/features/teams/presentation/register_team_screen.d
 import 'package:gedfa_connect/features/teams/presentation/team_home_screen.dart';
 import 'package:gedfa_connect/features/players/presentation/player_details_screen.dart';
 import 'package:gedfa_connect/features/players/presentation/player_form_screen.dart';
+import 'package:gedfa_connect/features/settings/presentation/change_email_screen.dart';
+import 'package:gedfa_connect/features/settings/presentation/more_screen.dart';
+import 'package:gedfa_connect/features/settings/presentation/my_profile_screen.dart';
 import 'package:gedfa_connect/features/settings/presentation/settings_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -119,7 +122,24 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: Routes.teamMore,
-                builder: (_, _) => const SettingsScreen(),
+                builder: (_, _) => const MoreScreen(),
+                routes: [
+                  // These open inside the More tab, so the bottom bar stays.
+                  GoRoute(
+                    path: 'profile',
+                    builder: (_, _) => const MyProfileScreen(),
+                    routes: [
+                      GoRoute(
+                        path: 'email',
+                        builder: (_, _) => const ChangeEmailScreen(),
+                      ),
+                    ],
+                  ),
+                  GoRoute(
+                    path: 'settings',
+                    builder: (_, _) => const SettingsScreen(),
+                  ),
+                ],
               ),
             ],
           ),
