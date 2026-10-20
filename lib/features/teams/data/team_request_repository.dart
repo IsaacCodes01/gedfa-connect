@@ -34,6 +34,25 @@ class TeamRequestRepository {
     });
   }
 
+  /// Every team request in the district, live. FA admins only (rules).
+  /// Sorting happens in the app, so Firestore needs no extra index.
+  Stream<List<TeamRequest>> watchAll() {
+    return _db.collection(FirestorePaths.teamRequests).snapshots().map(
+          (snapshot) => [
+            for (final doc in snapshot.docs)
+              TeamRequest.fromMap(doc.id, doc.data()),
+          ],
+        );
+  }
+
+  /// True if [teamName]'s reservation exists and belongs to [uid].
+  /// The FA checks this before approving.
+  Future<bool> holdsName(String teamName, {required String uid}) async {
+    final snapshot =
+        await _nameRef(teamNameKey(teamName)).get().timeout(_timeout);
+    return snapshot.exists && snapshot.data()?['uid'] == uid;
+  }
+
   Future<bool> isNameAvailable(String teamName, {required String uid}) async {
     final snapshot =
         await _nameRef(teamNameKey(teamName)).get().timeout(_timeout);
@@ -128,4 +147,32 @@ final myTeamRequestProvider = StreamProvider<TeamRequest?>((ref) async* {
     return;
   }
   yield* ref.watch(teamRequestRepositoryProvider).watch(authUser.uid);
+});
+
+/// FA: every team request, live.
+final allTeamRequestsProvider = StreamProvider<List<TeamRequest>>((ref) {
+  return ref.watch(teamRequestRepositoryProvider).watchAll();
+});
+
+/// FA: how many requests are waiting (the gold number on the Teams tab).
+final pendingTeamRequestCountProvider = Provider<int>((ref) {
+  final requests = ref.watch(allTeamRequestsProvider).value ?? const [];
+  return requests
+      .where((request) => request.status == ApprovalStatus.pending)
+      .length;
+});
+
+/// FA: one request by the requester's uid, live.
+final teamRequestByUidProvider =
+    StreamProvider.family<TeamRequest?, String>((ref, uid) {
+  return ref.watch(teamRequestRepositoryProvider).watch(uid);
+});
+
+/// FA: does this request still hold its team-name reservation?
+/// The key is a record, so the same uid + name reuses the same answer.
+final requestHoldsNameProvider =
+    FutureProvider.family<bool, ({String uid, String teamName})>((ref, key) {
+  return ref
+      .watch(teamRequestRepositoryProvider)
+      .holdsName(key.teamName, uid: key.uid);
 });

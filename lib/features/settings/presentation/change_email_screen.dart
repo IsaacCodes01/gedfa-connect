@@ -1,7 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:gedfa_connect/app/routes.dart';
+import 'package:gedfa_connect/app/more_paths.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/validators.dart';
@@ -241,7 +241,7 @@ class _ChangeEmailScreenState extends ConsumerState<ChangeEmailScreen> {
           ),
           const SizedBox(height: 22),
           FilledButton(
-            onPressed: () => context.go(Routes.teamProfile),
+            onPressed: () => context.go(MorePaths.of(context).profile),
             child: const Text('Back to my profile'),
           ),
           const SizedBox(height: 6),

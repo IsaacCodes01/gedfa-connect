@@ -9,6 +9,8 @@ import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/auth/presentation/login_screen.dart';
 import 'package:gedfa_connect/features/home/presentation/placeholder_home.dart';
+import 'package:gedfa_connect/features/fa/presentation/fa_request_review_screen.dart';
+import 'package:gedfa_connect/features/fa/presentation/fa_requests_screen.dart';
 import 'package:gedfa_connect/features/auth/presentation/verify_email_screen.dart';
 import 'package:gedfa_connect/features/auth/presentation/forgot_password_screen.dart';
 import 'package:gedfa_connect/features/auth/presentation/sign_up_screen.dart';
@@ -70,12 +72,43 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
-      GoRoute(
-        path: Routes.admin,
-        builder: (_, _) => const PlaceholderHome(
-          title: 'FA Admin',
-          message: 'FA Admin home. (Coming soon)',
+      // FA admin area: a shell with tabs (Teams, More).
+      StatefulShellRoute.indexedStack(
+        builder: (_, _, navigationShell) => AppShell(
+          navigationShell: navigationShell,
+          destinations: adminDestinations,
         ),
+        branches: [
+          // Tab 0: Teams (team registration requests)
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: Routes.admin,
+                builder: (_, _) => const FaRequestsScreen(),
+                routes: [
+                  // Opens full-screen, above the tabs.
+                  GoRoute(
+                    path: 'request/:uid',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (_, state) => FaRequestReviewScreen(
+                      uid: state.pathParameters['uid']!,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          // Tab 1: More
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: Routes.adminMore,
+                builder: (_, _) => const MoreScreen(),
+                routes: _moreChildren(),
+              ),
+            ],
+          ),
+        ],
       ),
       // Team admin area: a shell with tabs (Squad, More).
       StatefulShellRoute.indexedStack(
@@ -123,23 +156,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: Routes.teamMore,
                 builder: (_, _) => const MoreScreen(),
-                routes: [
-                  // These open inside the More tab, so the bottom bar stays.
-                  GoRoute(
-                    path: 'profile',
-                    builder: (_, _) => const MyProfileScreen(),
-                    routes: [
-                      GoRoute(
-                        path: 'email',
-                        builder: (_, _) => const ChangeEmailScreen(),
-                      ),
-                    ],
-                  ),
-                  GoRoute(
-                    path: 'settings',
-                    builder: (_, _) => const SettingsScreen(),
-                  ),
-                ],
+                routes: _moreChildren(),
               ),
             ],
           ),
@@ -162,6 +179,25 @@ final routerProvider = Provider<GoRouter>((ref) {
 
   return router;
 });
+
+/// My profile, Change email and Settings: the same screens for every role.
+/// They open inside the More tab, so the bottom bar stays.
+List<RouteBase> _moreChildren() => [
+      GoRoute(
+        path: 'profile',
+        builder: (_, _) => const MyProfileScreen(),
+        routes: [
+          GoRoute(
+            path: 'email',
+            builder: (_, _) => const ChangeEmailScreen(),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: 'settings',
+        builder: (_, _) => const SettingsScreen(),
+      ),
+    ];
 
 String? _redirect(Ref ref, String location) {
   String? goTo(String target) => location == target ? null : target;

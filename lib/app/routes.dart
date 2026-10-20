@@ -9,6 +9,8 @@ class Routes {
   static const welcome = '/welcome';
   static const registerTeam = '/welcome/register';
   static const admin = '/admin';
+  static String adminRequest(String uid) => '/admin/request/$uid';
+  static const adminMore = '/admin/more';
   static const team = '/team';
   static const teamMore = '/team/more';
   static const teamProfile = '/team/more/profile';

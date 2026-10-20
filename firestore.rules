@@ -114,7 +114,14 @@ service cloud.firestore {
           && isText(data.thumbUrl, 10, 2000)
       }
 
-            // Any team admin (of any team)
+      // An FA admin of this district (the chairman and the officials he appoints)
+      function isFaAdmin() {
+        return isSignedIn()
+          && exists(userDoc(request.auth.uid))
+          && get(userDoc(request.auth.uid)).data.get('role', '') == 'faAdmin';
+      }
+
+      // Any team admin (of any team)
       function isTeamAdmin() {
         return isSignedIn()
           && exists(userDoc(request.auth.uid))
@@ -173,7 +180,8 @@ service cloud.firestore {
       }
 
       match /teamRequests/{uid} {
-        allow get: if isOwner(uid);
+        allow get: if isOwner(uid) || isFaAdmin();
+        allow list: if isFaAdmin();
 
         allow create: if isOwner(uid)
           && hasConfirmedEmail()
@@ -203,7 +211,8 @@ service cloud.firestore {
 
             // ---------- teams/{teamId} ----------
       match /teams/{teamId} {
-        allow get: if isTeamAdminOf(teamId);
+        allow get: if isTeamAdminOf(teamId) || isFaAdmin();
+        allow list: if isFaAdmin();
 
         // ---------- teams/{teamId}/jerseys/{jerseyId} ----------
         match /jerseys/{jerseyId} {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:gedfa_connect/app/routes.dart';
+import 'package:gedfa_connect/app/more_paths.dart';
+import 'package:gedfa_connect/core/constants/user_role.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/initials.dart';
@@ -14,12 +15,17 @@ import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:go_router/go_router.dart';
 
 /// The "More" tab: a menu. Your account card at the top (opens My profile),
-/// then Team profile, Settings, league and help links, About and Log out.
-class MoreScreen extends StatelessWidget {
+/// then Team profile (team admins only), Settings, league and help links,
+/// About and Log out. Used by team admins and FA admins.
+class MoreScreen extends ConsumerWidget {
   const MoreScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final paths = MorePaths.of(context);
+    final isTeamAdmin =
+        ref.watch(appUserProvider).value?.role == UserRole.teamAdmin;
+
     return Scaffold(
       appBar: const GedfaAppBar(title: 'More'),
       body: ListView(
@@ -31,26 +37,27 @@ class MoreScreen extends StatelessWidget {
               children: [
                 const _AccountCard(),
                 const SizedBox(height: 22),
-                const SectionTitle('Team & app'),
+                SectionTitle(isTeamAdmin ? 'Team & app' : 'App'),
                 TileGroup(
                   children: [
-                    SettingsTile(
-                      icon: Icons.shield_outlined,
-                      title: 'Team profile',
-                      subtitle: 'Name, logo, kits and officials',
-                      onTap: () => openComingSoon(
-                        context,
-                        title: 'Team profile',
+                    if (isTeamAdmin)
+                      SettingsTile(
                         icon: Icons.shield_outlined,
-                        message: 'Soon you will see your team details here '
-                            'and ask the FA to change the name or logo.',
+                        title: 'Team profile',
+                        subtitle: 'Name, logo, kits and officials',
+                        onTap: () => openComingSoon(
+                          context,
+                          title: 'Team profile',
+                          icon: Icons.shield_outlined,
+                          message: 'Soon you will see your team details here '
+                              'and ask the FA to change the name or logo.',
+                        ),
                       ),
-                    ),
                     SettingsTile(
                       icon: Icons.settings_outlined,
                       title: 'Settings',
                       subtitle: 'Appearance, data saver, notifications',
-                      onTap: () => context.go(Routes.teamSettings),
+                      onTap: () => context.go(paths.settings),
                     ),
                   ],
                 ),
@@ -125,7 +132,7 @@ class _AccountCard extends ConsumerWidget {
         side: BorderSide(color: scheme.outline),
       ),
       child: InkWell(
-        onTap: () => context.go(Routes.teamProfile),
+        onTap: () => context.go(MorePaths.of(context).profile),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(

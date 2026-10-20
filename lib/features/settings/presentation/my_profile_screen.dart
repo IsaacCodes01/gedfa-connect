@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:gedfa_connect/app/routes.dart';
+import 'package:gedfa_connect/app/more_paths.dart';
 import 'package:gedfa_connect/core/constants/user_role.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
@@ -310,7 +310,7 @@ class _EmailRow extends StatelessWidget {
           ),
           if (canChange)
             OutlinedButton(
-              onPressed: () => context.go(Routes.teamChangeEmail),
+              onPressed: () => context.go(MorePaths.of(context).changeEmail),
               style: OutlinedButton.styleFrom(minimumSize: const Size(84, 40)),
               child: const Text('Change'),
             ),

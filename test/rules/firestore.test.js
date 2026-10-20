@@ -133,6 +133,7 @@ async function seed() {
     await set(`${D}/users/admin1`, { role: 'teamAdmin', teamId: 'royal' });
     await set(`${D}/users/admin2`, { role: 'teamAdmin', teamId: 'stars' });
     await set(`${D}/users/newbie`, { email: 'newbie@example.com' });
+    await set(`${D}/users/fa1`, { role: 'faAdmin' });
     await set(`${D}/users/other`, { email: 'other@example.com' });
 
     // Teams
@@ -499,5 +500,45 @@ describe('Team admin: editing players', () => {
       position: 'DM',
       updatedAt: serverTimestamp(),
     }));
+  });
+});
+
+// ---------- FA admin: team requests (2.1) ----------
+
+describe('FA admin: team requests', () => {
+  it('can list every team request', async () => {
+    await assertSucceeds(getDocs(collection(dbAs('fa1'), `${D}/teamRequests`)));
+  });
+
+  it('can read one team request', async () => {
+    await assertSucceeds(getDoc(doc(dbAs('fa1'), `${D}/teamRequests/other`)));
+  });
+
+  it('can check a team name reservation', async () => {
+    await assertSucceeds(getDoc(doc(dbAs('fa1'), `${D}/teamNames/test-united`)));
+  });
+
+  it('can read and list teams', async () => {
+    const db = dbAs('fa1');
+    await assertSucceeds(getDoc(doc(db, `${D}/teams/royal`)));
+    await assertSucceeds(getDocs(collection(db, `${D}/teams`)));
+  });
+
+  it('cannot approve a request yet (comes in 2.2)', async () => {
+    await assertFails(updateDoc(doc(dbAs('fa1'), `${D}/teamRequests/other`), {
+      status: 'approved',
+    }));
+  });
+
+  it('a team admin cannot list team requests', async () => {
+    await assertFails(getDocs(collection(dbAs('admin1'), `${D}/teamRequests`)));
+  });
+
+  it('a role-less user cannot list team requests', async () => {
+    await assertFails(getDocs(collection(dbAs('newbie'), `${D}/teamRequests`)));
+  });
+
+  it('a role-less user cannot list teams', async () => {
+    await assertFails(getDocs(collection(dbAs('newbie'), `${D}/teams`)));
   });
 });
