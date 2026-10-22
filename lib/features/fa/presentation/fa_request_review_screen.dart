@@ -8,6 +8,7 @@ import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/core/utils/initials.dart';
+import 'package:gedfa_connect/core/utils/phone_call.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
@@ -22,7 +23,6 @@ import 'package:gedfa_connect/features/teams/presentation/widgets/competition_pi
 import 'package:gedfa_connect/features/teams/presentation/widgets/kit_preview.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/team_logo.dart';
 import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 /// FA: everything a club sent, to check before approving or rejecting.
 /// While the request is pending, Reject and Approve sit at the bottom.
@@ -392,12 +392,10 @@ class _OfficialRow extends StatelessWidget {
 
   final Official official;
 
-  Future<void> _call(BuildContext context) async {
-    final uri = Uri(scheme: 'tel', path: official.phone);
-    final opened = await launchUrl(uri);
-    if (!opened && context.mounted) {
-      AppToast.error(context, "Couldn't start a call on this device.");
-    }
+  /// Copies the number, for when calling isn't possible (e.g. on a laptop).
+  Future<void> _copy(BuildContext context) async {
+    await Clipboard.setData(ClipboardData(text: official.phone));
+    if (context.mounted) AppToast.success(context, 'Number copied.');
   }
 
   @override
@@ -435,12 +433,20 @@ class _OfficialRow extends StatelessWidget {
               ],
             ),
           ),
-          if (official.phone.isNotEmpty)
+          if (official.phone.isNotEmpty) ...[
+            IconButton(
+              tooltip: 'Copy number',
+              onPressed: () => _copy(context),
+              icon: const Icon(Icons.copy_rounded, size: 20),
+            ),
             IconButton.filledTonal(
               tooltip: 'Call ${official.name}',
-              onPressed: () => _call(context),
+              // callPhone runs straight from the tap (no await before it),
+              // which iPhone Safari needs to allow the call.
+              onPressed: () => callPhone(official.phone),
               icon: const Icon(Icons.call_outlined),
             ),
+          ],
         ],
       ),
     );
