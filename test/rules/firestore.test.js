@@ -143,6 +143,18 @@ async function seed() {
     // Another person's team request
     await set(`${D}/teamRequests/other`, { teamName: 'Other FC', status: 'pending' });
 
+    // A pending request from 'applicant' (no role yet, no user document),
+    // with its team-name reservation. The FA approves or rejects it.
+    await set(`${D}/teamRequests/applicant`, {
+      teamName: 'Gomoa United FC',
+      nameKey: 'gomoa-united-fc',
+      status: 'pending',
+      rejectionReason: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await set(`${D}/teamNames/gomoa-united-fc`, { uid: 'applicant', createdAt: now });
+
     // p1: Royal, approved, #10
     await set(`${D}/players/p1`, playerData({
       status: 'approved',
@@ -524,7 +536,7 @@ describe('FA admin: team requests', () => {
     await assertSucceeds(getDocs(collection(db, `${D}/teams`)));
   });
 
-  it('cannot approve a request yet (comes in 2.2)', async () => {
+  it('cannot just flip a status without the review fields', async () => {
     await assertFails(updateDoc(doc(dbAs('fa1'), `${D}/teamRequests/other`), {
       status: 'approved',
     }));
@@ -540,5 +552,126 @@ describe('FA admin: team requests', () => {
 
   it('a role-less user cannot list teams', async () => {
     await assertFails(getDocs(collection(dbAs('newbie'), `${D}/teams`)));
+  });
+});
+
+// ---------- FA admin: approve and reject (2.2) ----------
+
+/**
+ * Approves a request the way the app does: request + team + user role in
+ * one batch. Pass changes to break one part on purpose.
+ */
+function approve(db, { uid = 'applicant', teamId = 'gomoa-united-fc', by = 'fa1',
+  role = 'teamAdmin', skipTeam = false, skipUser = false } = {}) {
+  const batch = writeBatch(db);
+  batch.update(doc(db, `${D}/teamRequests/${uid}`), {
+    status: 'approved',
+    teamId,
+    reviewedBy: by,
+    reviewedAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  if (!skipTeam) {
+    batch.set(doc(db, `${D}/teams/${teamId}`), {
+      name: 'Gomoa United FC',
+      nameKey: teamId,
+      categories: ['division'],
+      adminUids: [uid],
+      requestUid: uid,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  }
+  if (!skipUser) {
+    batch.set(doc(db, `${D}/users/${uid}`), {
+      role,
+      teamId,
+      createdBy: by,
+      createdAt: serverTimestamp(),
+    });
+  }
+  return batch.commit();
+}
+
+/** Rejects a request the way the app does. */
+function reject(db, { uid = 'applicant', reason = 'Logo is unclear. Please fix and send again.', by = 'fa1' } = {}) {
+  return updateDoc(doc(db, `${D}/teamRequests/${uid}`), {
+    status: 'rejected',
+    rejectionReason: reason,
+    reviewedBy: by,
+    reviewedAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+describe('FA admin: approve and reject', () => {
+  it('can approve: creates the team and makes the club its team admin', async () => {
+    await assertSucceeds(approve(dbAs('fa1')));
+  });
+
+  it('after approval, the club can read its new team', async () => {
+    await approve(dbAs('fa1'));
+    await assertSucceeds(getDoc(doc(dbAs('applicant'), `${D}/teams/gomoa-united-fc`)));
+  });
+
+  it('cannot approve without creating the team', async () => {
+    await assertFails(approve(dbAs('fa1'), { skipTeam: true }));
+  });
+
+  it('cannot approve without giving the team admin role', async () => {
+    await assertFails(approve(dbAs('fa1'), { skipUser: true }));
+  });
+
+  it('cannot make the club an FA admin', async () => {
+    await assertFails(approve(dbAs('fa1'), { role: 'faAdmin' }));
+  });
+
+  it('cannot use a team ID other than the reserved name', async () => {
+    await assertFails(approve(dbAs('fa1'), { teamId: 'some-other-name' }));
+  });
+
+  it('cannot sign the review as someone else', async () => {
+    await assertFails(approve(dbAs('fa1'), { by: 'admin1' }));
+  });
+
+  it('cannot approve the same request twice', async () => {
+    await approve(dbAs('fa1'));
+    await assertFails(approve(dbAs('fa1')));
+  });
+
+  it('can reject with a reason', async () => {
+    await assertSucceeds(reject(dbAs('fa1')));
+  });
+
+  it('cannot reject without a real reason', async () => {
+    await assertFails(reject(dbAs('fa1'), { reason: 'No' }));
+  });
+
+  it('a team admin cannot approve', async () => {
+    await assertFails(approve(dbAs('admin1'), { by: 'admin1' }));
+  });
+
+  it('the club cannot approve its own request', async () => {
+    await assertFails(approve(dbAs('applicant'), { by: 'applicant' }));
+  });
+
+  it('the club can fix and resend after a rejection', async () => {
+    // newbie sends a real request, the FA rejects it, newbie edits it
+    await sendTeamRequest(dbAs('newbie'), 'newbie');
+    await assertSucceeds(reject(dbAs('fa1'), { uid: 'newbie' }));
+    await assertSucceeds(updateDoc(doc(dbAs('newbie'), `${D}/teamRequests/newbie`), {
+      town: 'Afransi Junction',
+      status: 'pending',
+      rejectionReason: null,
+      updatedAt: serverTimestamp(),
+    }));
+  });
+
+  it('the club cannot write the review fields itself', async () => {
+    await sendTeamRequest(dbAs('newbie'), 'newbie');
+    await assertFails(updateDoc(doc(dbAs('newbie'), `${D}/teamRequests/newbie`), {
+      reviewedBy: 'fa1',
+      updatedAt: serverTimestamp(),
+    }));
   });
 });

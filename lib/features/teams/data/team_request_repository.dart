@@ -53,6 +53,75 @@ class TeamRequestRepository {
     return snapshot.exists && snapshot.data()?['uid'] == uid;
   }
 
+  // ---------- FA review (2.2) ----------
+
+  /// FA approves [request]. In ONE batch (all or nothing):
+  /// 1. the request becomes 'approved' and remembers its team ID,
+  /// 2. the team is created from the request's details,
+  /// 3. the club's account becomes the team's admin.
+  /// The team ID is the reserved team-name key, e.g. 'gomoa-united-fc'.
+  Future<String> approve(TeamRequest request, {required String faUid}) async {
+    final teamId = teamNameKey(request.teamName);
+    final details = request.toEditableMap();
+    final teamName = details['teamName'] as String;
+
+    final batch = _db.batch()
+      ..update(_requestRef(request.uid), {
+        'status': ApprovalStatus.approved.name,
+        'teamId': teamId,
+        'reviewedBy': faUid,
+        'reviewedAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      })
+      ..set(_db.doc(FirestorePaths.team(teamId)), {
+        'name': teamName,
+        'nameLower': teamName.toLowerCase(),
+        'nameKey': teamId,
+        // Copied as they are from the request
+        for (final key in const [
+          'shortName',
+          'town',
+          'homeGround',
+          'homeGroundDirections',
+          'yearFounded',
+          'email',
+          'logoUrl',
+          'categories',
+          'kits',
+          'officials',
+        ])
+          key: details[key],
+        'adminUids': [request.uid],
+        'requestUid': request.uid,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      })
+      ..set(_db.doc(FirestorePaths.user(request.uid)), {
+        'role': 'teamAdmin',
+        'teamId': teamId,
+        'createdBy': faUid,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+    await batch.commit().timeout(_timeout);
+    return teamId;
+  }
+
+  /// FA rejects a request with a reason the club will see.
+  Future<void> reject(
+    String uid, {
+    required String reason,
+    required String faUid,
+  }) {
+    return _requestRef(uid).update({
+      'status': ApprovalStatus.rejected.name,
+      'rejectionReason': reason.trim(),
+      'reviewedBy': faUid,
+      'reviewedAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }).timeout(_timeout);
+  }
+
   Future<bool> isNameAvailable(String teamName, {required String uid}) async {
     final snapshot =
         await _nameRef(teamNameKey(teamName)).get().timeout(_timeout);

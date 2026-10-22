@@ -136,7 +136,18 @@ service cloud.firestore {
 
       // ---------- users/{uid} ----------
       match /users/{uid} {
-        allow get: if isOwner(uid);
+        allow get: if isOwner(uid) || isFaAdmin();
+
+        // FA approves a team: the club's account becomes its team admin.
+        // Only 'teamAdmin' can be given here (never 'faAdmin'), only to an
+        // admin listed on the team created in the same batch, and only to
+        // someone with no role yet (create, not update).
+        allow create: if isFaAdmin()
+          && request.resource.data.keys().hasOnly(['role', 'teamId', 'createdAt', 'createdBy'])
+          && request.resource.data.role == 'teamAdmin'
+          && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.createdAt == request.time
+          && getAfter(teamDoc(request.resource.data.teamId)).data.adminUids.hasAny([uid]);
       }
 
       // ---------- teamRequests/{uid} ----------
@@ -145,7 +156,8 @@ service cloud.firestore {
             'teamName', 'teamNameLower', 'nameKey', 'shortName', 'town',
             'homeGround', 'categories', 'homeGroundDirections', 'yearFounded', 'email',
             'logoUrl', 'kits', 'officials', 'agreedToRules', 'status',
-            'rejectionReason', 'createdAt', 'updatedAt'
+            'rejectionReason', 'createdAt', 'updatedAt',
+            'reviewedAt', 'reviewedBy', 'teamId'
           ])
           && isText(data.teamName, 2, 60)
           && data.teamNameLower == data.teamName.lower()
@@ -179,6 +191,28 @@ service cloud.firestore {
           && getAfter(teamNameDoc(data.nameKey)).data.uid == uid;
       }
 
+      // FA approves: only the review fields change. In the same batch the
+      // team is created and the club's account becomes its team admin.
+      function isApproval(uid) {
+        let after = request.resource.data;
+        return after.status == 'approved'
+          && after.diff(resource.data).affectedKeys()
+               .hasOnly(['status', 'teamId', 'reviewedAt', 'reviewedBy', 'updatedAt'])
+          && after.teamId == resource.data.nameKey
+          && getAfter(teamDoc(after.teamId)).data.requestUid == uid
+          && getAfter(userDoc(uid)).data.role == 'teamAdmin'
+          && getAfter(userDoc(uid)).data.teamId == after.teamId;
+      }
+
+      // FA rejects: status and a real reason (10 to 500 characters).
+      function isRejection() {
+        let after = request.resource.data;
+        return after.status == 'rejected'
+          && after.diff(resource.data).affectedKeys()
+               .hasOnly(['status', 'rejectionReason', 'reviewedAt', 'reviewedBy', 'updatedAt'])
+          && isText(after.rejectionReason, 10, 500);
+      }
+
       match /teamRequests/{uid} {
         allow get: if isOwner(uid) || isFaAdmin();
         allow list: if isFaAdmin();
@@ -186,13 +220,26 @@ service cloud.firestore {
         allow create: if isOwner(uid)
           && hasConfirmedEmail()
           && isValidTeamRequest(request.resource.data, uid)
+          && !request.resource.data.keys().hasAny(['reviewedAt', 'reviewedBy', 'teamId'])
           && request.resource.data.createdAt == request.time;
 
+        // The club edits its own request (pending or rejected).
+        // It can never touch the FA's review fields.
         allow update: if isOwner(uid)
           && hasConfirmedEmail()
           && resource.data.status in ['pending', 'rejected']
           && isValidTeamRequest(request.resource.data, uid)
+          && !request.resource.data.diff(resource.data).affectedKeys()
+                .hasAny(['reviewedAt', 'reviewedBy', 'teamId'])
           && request.resource.data.createdAt == resource.data.createdAt;
+
+        // The FA approves or rejects a pending request.
+        allow update: if isFaAdmin()
+          && resource.data.status == 'pending'
+          && request.resource.data.reviewedBy == request.auth.uid
+          && request.resource.data.reviewedAt == request.time
+          && request.resource.data.updatedAt == request.time
+          && (isApproval(uid) || isRejection());
       }
 
       // ---------- teamNames/{nameKey} ----------
@@ -213,6 +260,17 @@ service cloud.firestore {
       match /teams/{teamId} {
         allow get: if isTeamAdminOf(teamId) || isFaAdmin();
         allow list: if isFaAdmin();
+
+        // FA approves a request: the team is created from it, in the same
+        // batch as the approval. Its ID is the reserved team-name key.
+        allow create: if isFaAdmin()
+          && request.resource.data.requestUid is string
+          && request.resource.data.nameKey == teamId
+          && request.resource.data.adminUids == [request.resource.data.requestUid]
+          && get(teamNameDoc(teamId)).data.uid == request.resource.data.requestUid
+          && getAfter(teamRequestDoc(request.resource.data.requestUid)).data.status == 'approved'
+          && getAfter(teamRequestDoc(request.resource.data.requestUid)).data.teamId == teamId
+          && request.resource.data.createdAt == request.time;
 
         // ---------- teams/{teamId}/jerseys/{jerseyId} ----------
         match /jerseys/{jerseyId} {
