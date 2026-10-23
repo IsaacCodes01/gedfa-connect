@@ -20,7 +20,17 @@ class DuplicatePlayerException implements Exception {
   final bool sameTeam;
 }
 
+/// The FA tried to review a player who is no longer pending
+/// (someone else reviewed them, or the team changed them meanwhile).
+class PlayerNotPendingException implements Exception {
+  const PlayerNotPendingException();
+}
+
 String appErrorMessage(Object error) {
+  if (error is PlayerNotPendingException) {
+    return 'This player has already been reviewed or changed. '
+        'Go back and open them again.';
+  }
   if (error is TeamNameTakenException) {
     return 'Another team already uses this name. Please choose a different one.';
   }

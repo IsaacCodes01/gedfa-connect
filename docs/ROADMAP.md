@@ -4,7 +4,7 @@
 **Platforms:** Flutter app: Android (APK) and web (iPhone users via "Add to Home Screen"); native iOS later (see Section 4, Distribution); separate React website by a colleague
 **Backend:** Firebase (Auth, Firestore, Cloud Storage, Hosting) on the Blaze plan
 **Projects:** `gedfa-connect-dev` (building/testing) and `gedfa-connect-prod` (real GEDFA data)
-**Status:** Phase 0 and Phase 1 complete · web test link live on dev · Phase 2 next (18 Oct 2026)
+**Status:** Phase 0 and Phase 1 complete · Phase 2 in progress: 2.0–2.3 done · web test link live on dev (22 Oct 2026)
 
 See also: `docs/DATA_MODEL.md` (the data contract).
 
@@ -105,15 +105,18 @@ A single system that lets the GEDFA third-division league run digitally, from pl
 ## 5. Design and UX standards
 
 ### Design system
-- Theme in `lib/app/theme.dart`: logo blue `#1E88E5`, deep blue `#1259A8` for buttons/links, Ghana red/gold/green accents, Barlow / Barlow Condensed fonts.
+- Theme in `lib/app/theme.dart`: logo blue `#1E88E5`, deep blue `#1259A8` for buttons/links, Ghana red/gold/green accents, Poppins font.
 - Status colours: **green = approved, gold = pending, red = rejected**.
-- Reusable widgets in `lib/core/widgets`: `StatusBadge`, `LoadingView`, `EmptyView`, `ErrorView`, `AppToast`.
+- Reusable widgets in `lib/core/widgets`: `StatusBadge`, `LoadingView`, `EmptyView`, `ErrorView`, `AppToast`, `CountTabs` (status tabs with count bubbles: gold = waiting).
 - Every screen has loading, empty, error and offline states. Touch targets ≥ 48dp.
 - Mockups: "GEDFA Connect Screens" design canvas.
 
 ### Navigation
 - **No hamburger menu.** Phones use a bottom navigation bar (≤ 5 tabs, different per role); large screens use a side navigation rail. Rarely used items (profile, settings, log out, help) sit under a "More"/profile tab.
-- **App bar** (agreed 18 Oct 2026): team logo and name on the left; on the right only frequent actions (search, and the activity bell once it has real content). **Log out and dark mode are not in the app bar**; they live on the More / Settings screen. Log out always asks "Are you sure?".
+- Built with a go_router `StatefulShellRoute` (`lib/app/app_shell.dart`); each tab keeps its own history. A tab is added only when its screen exists. Detail screens (player, request review) open full-screen above the tabs.
+- **Team admin tabs:** Squad · More. **FA admin tabs:** Teams (gold badge = requests waiting) · More. Players (2.3), Fixtures and Feed are added when built.
+- **More** is a menu: account card (opens **My profile**), Team profile (team admins), **Settings**, League rules, Help, About, Log out. Rows not built yet open a "Coming soon" page.
+- **App bar** (agreed 18 Oct 2026): logo and name (with short name · town) on the left; on the right only frequent actions (search, and the activity bell once it has real content). **Log out and dark mode are not in the app bar.** The theme is chosen only in Settings (Light / Dark / System, saved on the phone); login and welcome screens follow it. Log out always asks "Log out?".
 
 ### Feedback
 - **Top toasts** (`AppToast`) for every completed or failed action, with a message specific to the action (e.g. "Welcome back!", "Team request sent to the FA").
@@ -176,16 +179,24 @@ Time estimates assume part-time work and are rough guides.
 > **FA admin rules** (reading all requests and players, approving) were moved to Phase 2, where the FA screens that need them are built.
 
 ### Phase 2 — FA approval dashboard
-- [ ] 2.0 App bar clean-up and **More / Settings** screen: account details, appearance (light / dark / system), help, app version, log out with confirmation. Log out and dark mode leave the app bar *(mockups done 18 Oct 2026)*
-- [ ] 2.1 Queue of pending team requests
-- [ ] 2.2 Approve a team: create the team from the request (all fields, logo copied to `teams/{teamId}/logo.jpg`), assign Team Admin role (replaces the hand-made console approval used for testing)
-- [ ] 2.3 Pending players queue: approve/reject with reason; approval transaction gives the player ID (`GE26-0042`) from `settings/playerCounter`
+- [x] 2.0 Tab shell (bottom bar on phones, rail on wide screens); **More** menu; **My profile** (edit full name, change email with a confirmation link to the new address, password reset link, delete account explains to ask the FA); **Settings** (Light / Dark / System, data saver: no photos in lists, notifications placeholder); app bar clean-up; deep-blue Add player button *(done 19 Oct 2026)*
+- [x] 2.1 FA area: Teams tab with a gold badge for waiting requests; team requests list (Pending / Rejected / Approved with counts, search, oldest pending first); review screen (club details, kits, officials with a call button, automatic checks) *(done 20 Oct 2026)*
+- [x] 2.2 Approve or reject a team request. **Approve** = one batch: request approved + team created from it (ID = reserved name key, logo link reused) + club's account made team admin. **Reject** = reason (10–500 characters, quick reasons); the club fixes and resends. 71 rules tests *(done 22 Oct 2026)*
+- [x] 2.3 FA **Players** tab (gold badge): teams list with totals, progress bar and "N to review", search by team, player name or ID; a team's players in rows by position (Goalkeepers, Defenders, Midfielders, Forwards), 3-column photo grid, To review / Approved / All; **select several and approve together**; review screen (photo, automatic checks, visual verification, details). Approve = transaction giving the player ID (`GE26-0042`) from `settings/playerCounter`; re-checked players keep their ID. Reject with a reason. Notification bell (placeholder) on the main app bars. 90 rules tests *(done 22 Oct 2026)*
 - [ ] 2.4 Status filters and search
 - [x] 2.5 Lock approved players (changes to name, DOB, jersey or photo need re-approval) *(done early, in 1.5 and 1.6)*
 - [ ] 2.6 Role management by **invitation**: invite FA admins and referees by email; last-admin protection; role change history
 - [ ] 2.7 **FA announcements** (first part of the league feed)
-- [ ] 2.8 **Activity list** behind the app-bar bell: "Player approved", "Player rejected: reason", "Team approved", FA announcements. The bell appears only when this exists
-- [ ] 2.9 FA admin security rules, with rules tests added to `test/rules/`
+- [ ] 2.8 **Activity list** behind the app-bar bell: "Player approved", "Player rejected: reason", "Team approved", FA announcements. The bell is already on the team and FA app bars and opens a "Coming soon" page until then
+- [ ] 2.9 FA admin security rules, with rules tests added to `test/rules/` *(in progress: team requests and players done; corrections and settings to come)*
+- [ ] 2.10 **Team profile and change requests:** team admins view their team; kits, officials and home ground save directly; **name, short name and logo need FA approval** with a reason/note
+- [ ] 2.11 **FA corrections** for approved teams: edit small mistakes directly (logged); **ask for a correction** (yellow banner on the team's squad screen, fix goes back to the FA); **suspend** a team for serious problems. An approved team is never moved back to Pending
+
+- [ ] 2.12 **FA dashboard** (Home tab): totals of teams and players, players by competition and position group, waiting reviews; later referees, cards and suspensions. Uses Firestore count queries so it stays cheap as the league grows
+
+> **Flutter and React:** the Flutter app (Android + web) is the working tool for the FA, team admins and referees. The React website (by a colleague) is the public face for fans: fixtures, results, table, news and approved teams. Both use the same Firebase project, `DATA_MODEL.md` and security rules. *(To be agreed with the colleague.)*
+
+> **After Phase 3:** go through GEDFA's answers to the open questions (Section 10) and a friend's suggestion, and update the roadmap and data model.
 
 ### Phase 3 — Team sheet builder and PDF
 - [ ] 3.1–3.7 As before: select fixture, pick approved players within limits, captain/GK, formation, PDF, print/share, FA can view
@@ -282,4 +293,6 @@ Work backwards from the GEDFA season start date to decide what the pilot must co
 | 12 Oct 2026 | Renamed to GEDFA Connect; dev/prod projects created |
 | 13 Oct 2026 | Phase 0 complete; added 0.8 design foundation, 1.0 emulators, 1.1a toasts/connectivity/responsive; invite-only roles (2.6); FA announcements (2.7); new Phase 5.5 League feed; navigation, connectivity and responsive standards; pre-pilot checklist |
 | 17 Oct 2026 | 1.1b, 1.2, 1.3 done; new 1.3b Competitions (Division / Juvenile, one registration per club); 1.4 split into Division first, Juvenile after GEDFA answers |
+| 22 Oct 2026 | 2.3 done: FA Players tab (by team, then by position), select several and approve, player review, player ID transaction, re-checked players keep their ID; notification bell placeholder; 90 rules tests. New 2.12 FA dashboard. Flutter / React split proposed |
+| 22 Oct 2026 | 2.0, 2.1, 2.2 done (tab shells, More / My profile / Settings, FA team requests, approve and reject; 71 rules tests). New 2.10 Team profile and change requests (name, short name and logo need FA approval) and 2.11 FA corrections (never back to Pending). Live rules are deployed with the CLI, not pasted in the console. GEDFA answers to be reviewed after Phase 3 |
 | 18 Oct 2026 | **Phase 1 complete:** 1.3b–1.7 done; new 1.8 web link on Firebase Hosting (dev), tested on iPhone 8. Distribution decided (Android APK via App Distribution; iPhone via web + Add to Home Screen; native iOS later if funded). 23 positions; squad 30; jersey 1–99. FA admin rules moved to Phase 2 (2.9). New 2.0 Settings screen and app-bar clean-up; new 2.8 activity list (bell). 2.5 done early. Rules tests and emulator-data workflow added to Section 4 |

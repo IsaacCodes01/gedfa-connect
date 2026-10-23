@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gedfa_connect/app/theme.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
+import 'package:gedfa_connect/features/players/data/player_repository.dart';
 import 'package:gedfa_connect/features/teams/data/team_request_repository.dart';
 import 'package:go_router/go_router.dart';
 
@@ -21,7 +22,7 @@ class ShellDestination {
 
   /// Optional number shown in a gold bubble on the icon (e.g. requests
   /// waiting). Hidden when it is 0.
-    final Provider<int>? badge;
+  final Provider<int>? badge;
 }
 
 /// The team admin's tabs. Add Fixtures and Feed here (and a branch for each
@@ -39,13 +40,19 @@ final teamDestinations = [
   ),
 ];
 
-/// The FA admin's tabs. Players comes with 2.3 (approving players).
+/// The FA admin's tabs. The gold numbers are things waiting for the FA.
 final adminDestinations = [
   ShellDestination(
     icon: Icons.shield_outlined,
     selectedIcon: Icons.shield_rounded,
     label: 'Teams',
     badge: pendingTeamRequestCountProvider,
+  ),
+  ShellDestination(
+    icon: Icons.groups_outlined,
+    selectedIcon: Icons.groups_rounded,
+    label: 'Players',
+    badge: pendingPlayerCountProvider,
   ),
   const ShellDestination(
     icon: Icons.more_horiz_rounded,

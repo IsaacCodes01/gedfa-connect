@@ -21,6 +21,9 @@ class FirestorePaths {
   static String playerKey(String key) => '$district/playerKeys/$key';
 
   static const leagueSettings = '$district/settings/league';
+
+  /// The next player-ID number: `{ next: 43 }`. FA only.
+  static const playerCounter = '$district/settings/playerCounter';
 }
 
 class StoragePaths {

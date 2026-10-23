@@ -1,4 +1,4 @@
-// Security rules tests for GEDFA Connect (step 1.7).
+// Security rules tests for GEDFA Connect (steps 1.7 to 2.3).
 //
 // Run while the emulators are running:
 //   cd test/rules
@@ -670,6 +670,181 @@ describe('FA admin: approve and reject', () => {
   it('the club cannot write the review fields itself', async () => {
     await sendTeamRequest(dbAs('newbie'), 'newbie');
     await assertFails(updateDoc(doc(dbAs('newbie'), `${D}/teamRequests/newbie`), {
+      reviewedBy: 'fa1',
+      updatedAt: serverTimestamp(),
+    }));
+  });
+});
+
+// ---------- FA admin: players (2.3) ----------
+
+/** This year's two digits, the same way the rules work it out (UTC). */
+const YY = String(new Date().getUTCFullYear() % 100).padStart(2, '0');
+const COUNTER = `${D}/settings/playerCounter`;
+
+/** Puts the player-ID counter in place with the rules switched off. */
+async function seedCounter(next) {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), COUNTER), { next });
+  });
+}
+
+/**
+ * Approves a player the way the app does: the player and the counter
+ * in one go. [counter] is 'create', 'update' or 'none'.
+ */
+function approvePlayer(db, playerId, { by = 'fa1', code, next, counter = 'update' } = {}) {
+  const batch = writeBatch(db);
+  batch.update(doc(db, `${D}/players/${playerId}`), {
+    status: 'approved',
+    ...(code === undefined ? {} : { playerCode: code }),
+    approvedAt: serverTimestamp(),
+    approvedBy: by,
+    rejectionReason: null,
+    updatedAt: serverTimestamp(),
+  });
+  if (counter === 'create') batch.set(doc(db, COUNTER), { next });
+  if (counter === 'update') batch.update(doc(db, COUNTER), { next });
+  return batch.commit();
+}
+
+/** Rejects a pending player with a reason. */
+function rejectPlayer(db, playerId, { by = 'fa1', reason = 'Photo is not clear' } = {}) {
+  return updateDoc(doc(db, `${D}/players/${playerId}`), {
+    status: 'rejected',
+    rejectionReason: reason,
+    reviewedAt: serverTimestamp(),
+    reviewedBy: by,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+describe('FA admin: players', () => {
+  it('can list every player', async () => {
+    await assertSucceeds(getDocs(collection(dbAs('fa1'), `${D}/players`)));
+  });
+
+  it("can read a player and check their reservations", async () => {
+    const db = dbAs('fa1');
+    await assertSucceeds(getDoc(doc(db, `${D}/players/p3`)));
+    await assertSucceeds(getDoc(doc(db, `${D}/teams/royal/jerseys/division-5`)));
+    await assertSucceeds(getDoc(doc(db, `${D}/playerKeys/kofi-owusu_2005-06-20`)));
+  });
+
+  it('can approve with the next ID and move the counter on', async () => {
+    await seedCounter(2);
+    await assertSucceeds(approvePlayer(dbAs('fa1'), 'p3', { code: `GE${YY}-0002`, next: 3 }));
+  });
+
+  it('the first approval ever starts the counter (ID 0001)', async () => {
+    await assertSucceeds(approvePlayer(dbAs('fa1'), 'p3', {
+      code: `GE${YY}-0001`, next: 2, counter: 'create',
+    }));
+  });
+
+  it('cannot approve without moving the counter on', async () => {
+    await seedCounter(2);
+    await assertFails(approvePlayer(dbAs('fa1'), 'p3', { code: `GE${YY}-0002`, counter: 'none' }));
+  });
+
+  it('cannot skip numbers on the counter', async () => {
+    await seedCounter(2);
+    await assertFails(approvePlayer(dbAs('fa1'), 'p3', { code: `GE${YY}-0002`, next: 5 }));
+  });
+
+  it('cannot give an ID that is not the next number', async () => {
+    await seedCounter(2);
+    await assertFails(approvePlayer(dbAs('fa1'), 'p3', { code: `GE${YY}-0009`, next: 3 }));
+  });
+
+  it('cannot approve without an ID', async () => {
+    await seedCounter(2);
+    await assertFails(approvePlayer(dbAs('fa1'), 'p3', { counter: 'none' }));
+  });
+
+  it('cannot sign the approval as someone else', async () => {
+    await seedCounter(2);
+    await assertFails(approvePlayer(dbAs('fa1'), 'p3', {
+      by: 'admin1', code: `GE${YY}-0002`, next: 3,
+    }));
+  });
+
+  it('a re-checked player keeps their ID (the counter stays)', async () => {
+    await seedCounter(2);
+    // The team changes p1's name, so p1 goes back to pending with GE26-0001
+    await updateDoc(doc(dbAs('admin1'), `${D}/players/p1`), {
+      fullName: 'Kwame Asante Jnr',
+      fullNameLower: 'kwame asante jnr',
+      status: 'pending',
+      updatedAt: serverTimestamp(),
+    });
+    await assertSucceeds(approvePlayer(dbAs('fa1'), 'p1', { counter: 'none' }));
+  });
+
+  it('cannot give a re-checked player a new ID', async () => {
+    await seedCounter(2);
+    await updateDoc(doc(dbAs('admin1'), `${D}/players/p1`), {
+      status: 'pending',
+      updatedAt: serverTimestamp(),
+    });
+    await assertFails(approvePlayer(dbAs('fa1'), 'p1', { code: `GE${YY}-0002`, next: 3 }));
+  });
+
+  it('cannot approve a player who is already approved', async () => {
+    await assertFails(approvePlayer(dbAs('fa1'), 'p1', { counter: 'none' }));
+  });
+
+  it('cannot change player details while approving', async () => {
+    await seedCounter(2);
+    const db = dbAs('fa1');
+    const batch = writeBatch(db);
+    batch.update(doc(db, `${D}/players/p3`), {
+      status: 'approved',
+      playerCode: `GE${YY}-0002`,
+      jerseyNo: 99,
+      approvedAt: serverTimestamp(),
+      approvedBy: 'fa1',
+      updatedAt: serverTimestamp(),
+    });
+    batch.update(doc(db, COUNTER), { next: 3 });
+    await assertFails(batch.commit());
+  });
+
+  it('can reject with a reason', async () => {
+    await assertSucceeds(rejectPlayer(dbAs('fa1'), 'p3'));
+  });
+
+  it('cannot reject without a real reason', async () => {
+    await assertFails(rejectPlayer(dbAs('fa1'), 'p3', { reason: 'no' }));
+  });
+
+  it('a team admin cannot approve or touch the counter', async () => {
+    await seedCounter(2);
+    await assertFails(approvePlayer(dbAs('admin1'), 'p3', {
+      by: 'admin1', code: `GE${YY}-0002`, next: 3,
+    }));
+    await assertFails(updateDoc(doc(dbAs('admin1'), COUNTER), { next: 3 }));
+    await assertFails(getDoc(doc(dbAs('admin1'), COUNTER)));
+  });
+
+  it('the counter cannot go backwards', async () => {
+    await seedCounter(5);
+    await assertFails(updateDoc(doc(dbAs('fa1'), COUNTER), { next: 4 }));
+  });
+
+  it('the team can fix and resend after a rejection', async () => {
+    await rejectPlayer(dbAs('fa1'), 'p3');
+    await assertSucceeds(updateDoc(doc(dbAs('admin1'), `${D}/players/p3`), {
+      position: 'DM',
+      positionGroup: 'MID',
+      status: 'pending',
+      rejectionReason: null,
+      updatedAt: serverTimestamp(),
+    }));
+  });
+
+  it('the team cannot write the review fields itself', async () => {
+    await assertFails(updateDoc(doc(dbAs('admin1'), `${D}/players/p3`), {
       reviewedBy: 'fa1',
       updatedAt: serverTimestamp(),
     }));

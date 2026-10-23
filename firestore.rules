@@ -93,7 +93,8 @@ service cloud.firestore {
             'teamId', 'teamName', 'category', 'fullName', 'fullNameLower',
             'searchKeys', 'dob', 'position', 'positionGroup', 'jerseyNo',
             'photoUrl', 'thumbUrl', 'status', 'playerCode', 'rejectionReason',
-            'createdAt', 'updatedAt', 'approvedAt', 'approvedBy', 'playerKey'
+            'createdAt', 'updatedAt', 'approvedAt', 'approvedBy', 'playerKey',
+            'reviewedAt', 'reviewedBy'
           ])
           && isText(data.fullName, 3, 80)
           && data.fullNameLower == data.fullName.lower()
@@ -274,7 +275,7 @@ service cloud.firestore {
 
         // ---------- teams/{teamId}/jerseys/{jerseyId} ----------
         match /jerseys/{jerseyId} {
-          allow get: if isTeamAdminOf(teamId);
+          allow get: if isTeamAdminOf(teamId) || isFaAdmin();
 
           allow create: if isTeamAdminOf(teamId)
             && request.resource.data.keys().hasOnly(['playerId', 'createdAt'])
@@ -290,7 +291,7 @@ service cloud.firestore {
 
       // ---------- playerKeys/{key} ----------
       match /playerKeys/{key} {
-        allow get: if isTeamAdmin();
+        allow get: if isTeamAdmin() || isFaAdmin();
 
         allow create: if isTeamAdminOf(request.resource.data.teamId)
           && request.resource.data.keys().hasOnly(['playerId', 'teamId', 'createdAt'])
@@ -304,11 +305,82 @@ service cloud.firestore {
               || getAfter(playerDoc(resource.data.playerId)).data.playerKey != key);
       }
 
-            // ---------- players/{playerId} ----------
-      match /players/{playerId} {
-        allow read: if isTeamAdminOf(resource.data.teamId);
-      
+      // ---------- settings/playerCounter ----------
+      // The next player-ID number. Only moves forward, one at a time,
+      // inside the FA's approval transaction.
+      function counterDoc() {
+        return /databases/$(database)/documents/districts/$(districtId)/settings/playerCounter;
+      }
 
+      // The number the next approved player gets (1 if no counter yet)
+      function nextNumber() {
+        return exists(counterDoc()) ? get(counterDoc()).data.next : 1;
+      }
+
+      // 43 in 2026 -> 'GE26-0043'. Must match player_code.dart.
+      function playerCodeFor(n) {
+        return 'GE' + string(request.time.year() % 100) + '-'
+          + (n < 10 ? '000' : (n < 100 ? '00' : (n < 1000 ? '0' : '')))
+          + string(n);
+      }
+
+      match /settings/playerCounter {
+        allow get: if isFaAdmin();
+        allow create: if isFaAdmin()
+          && request.resource.data.keys().hasOnly(['next'])
+          && request.resource.data.next == 2;
+        allow update: if isFaAdmin()
+          && request.resource.data.keys().hasOnly(['next'])
+          && request.resource.data.next == resource.data.next + 1;
+      }
+
+      // ---------- FA review of players ----------
+
+      // Approve: status, ID and approval stamp only.
+      // - A player who already has an ID (approved before, then edited)
+      //   keeps it.
+      // - A first approval takes the counter's number, and the counter moves
+      //   on by exactly 1 in the same transaction.
+      function isPlayerApproval() {
+        let before = resource.data;
+        let after = request.resource.data;
+        return after.status == 'approved'
+          && after.diff(before).affectedKeys()
+               .hasOnly(['status', 'playerCode', 'approvedAt', 'approvedBy',
+                         'rejectionReason', 'updatedAt'])
+          && after.approvedBy == request.auth.uid
+          && after.approvedAt == request.time
+          && after.get('rejectionReason', null) == null
+          && ((before.get('playerCode', null) != null
+                && after.playerCode == before.playerCode)
+              || (before.get('playerCode', null) == null
+                && after.playerCode == playerCodeFor(nextNumber())
+                && getAfter(counterDoc()).data.next == nextNumber() + 1));
+      }
+
+      // Reject: status and a real reason (10 to 500 characters).
+      function isPlayerRejection() {
+        let after = request.resource.data;
+        return after.status == 'rejected'
+          && after.diff(resource.data).affectedKeys()
+               .hasOnly(['status', 'rejectionReason', 'reviewedAt', 'reviewedBy',
+                         'updatedAt'])
+          && isText(after.rejectionReason, 10, 500)
+          && after.reviewedBy == request.auth.uid
+          && after.reviewedAt == request.time;
+      }
+
+      // ---------- players/{playerId} ----------
+      match /players/{playerId} {
+        allow read: if isTeamAdminOf(resource.data.teamId) || isFaAdmin();
+
+        // The FA approves or rejects a pending player.
+        allow update: if isFaAdmin()
+          && resource.data.status == 'pending'
+          && request.resource.data.updatedAt == request.time
+          && (isPlayerApproval() || isPlayerRejection());
+
+        // The team adds and edits its own players.
         allow create: if isTeamAdminOf(request.resource.data.teamId)
           && isValidPlayer(request.resource.data)
           && hasReservations(request.resource.data, playerId)
@@ -330,6 +402,8 @@ service cloud.firestore {
           && request.resource.data.get('playerCode', null) == resource.data.get('playerCode', null)
           && request.resource.data.get('approvedAt', null) == resource.data.get('approvedAt', null)
           && request.resource.data.get('approvedBy', null) == resource.data.get('approvedBy', null)
+          && !request.resource.data.diff(resource.data).affectedKeys()
+                .hasAny(['reviewedAt', 'reviewedBy'])
           && request.resource.data.createdAt == resource.data.createdAt
           && request.resource.data.updatedAt == request.time
           && (request.resource.data.status == 'pending'

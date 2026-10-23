@@ -8,6 +8,7 @@ import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/initials.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
+import 'package:gedfa_connect/core/widgets/notification_bell.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/core/widgets/status_badge.dart';
 import 'package:gedfa_connect/features/players/data/player_repository.dart';
@@ -100,6 +101,7 @@ class _TeamHomeScreenState extends ConsumerState<TeamHomeScreen> {
             ),
           ),
         ),
+        actions: const [NotificationBell()],
       ),
       floatingActionButton: isDivision && squadCount > 0
           ? FloatingActionButton.extended(

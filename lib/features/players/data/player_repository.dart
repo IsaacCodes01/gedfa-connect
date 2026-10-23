@@ -4,8 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gedfa_connect/core/constants/firestore_paths.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/utils/passport_photo.dart';
+import 'package:gedfa_connect/core/utils/player_code.dart';
 import 'package:gedfa_connect/core/utils/player_key.dart';
 import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
+import 'package:gedfa_connect/core/constants/approval_status.dart';
 import 'package:gedfa_connect/features/players/domain/player.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/data/team_request_repository.dart'
@@ -40,6 +42,25 @@ bool needsReapproval(
 }) =>
     reapprovalChanges(before, after, photoChanged: photoChanged).isNotEmpty;
 
+/// What the reservation check needs to know about a player. A record, so
+/// two keys with the same values are equal (the provider below then
+/// checks only once, not every time the players list updates).
+typedef ReservationKey = ({
+  String playerId,
+  String teamId,
+  String category,
+  int jerseyNo,
+  String playerKey,
+});
+
+ReservationKey reservationKeyOf(Player player) => (
+      playerId: player.id,
+      teamId: player.teamId,
+      category: player.category.name,
+      jerseyNo: player.jerseyNo,
+      playerKey: player.playerKey,
+    );
+
 class PlayerRepository {
   PlayerRepository(this._db, this._storage);
 
@@ -55,6 +76,10 @@ class PlayerRepository {
         player.teamId,
         jerseyIdFor(player.category.name, player.jerseyNo),
       ));
+
+  /// `settings/playerCounter`: `{ next: 43 }`.
+  DocumentReference<Map<String, dynamic>> get _counterRef =>
+      _db.doc(FirestorePaths.playerCounter);
 
   /// `playerKeys/{name_dob}` for this player.
   DocumentReference<Map<String, dynamic>> _keyRef(Player player) =>
@@ -85,6 +110,42 @@ class PlayerRepository {
         if (!snapshot.exists || data == null) return null;
         return Player.fromMap(snapshot.id, data);
       },
+    );
+  }
+
+  /// FA: every player in the district, live. The Players tab groups them
+  /// by team in the app, so this is the only query it needs.
+  Stream<List<Player>> watchAll() {
+    return _players.snapshots().map((snapshot) => [
+          for (final doc in snapshot.docs) Player.fromMap(doc.id, doc.data()),
+        ]);
+  }
+
+  /// FA: the number the next approved player gets (1 if nobody has been
+  /// approved yet), live. Used to show "New player ID: GE26-0043".
+  Stream<int> watchNextNumber() {
+    return _counterRef.snapshots().map(
+          (snapshot) => (snapshot.data()?['next'] as num?)?.toInt() ?? 1,
+        );
+  }
+
+  /// FA: true if the player's jersey number and player key are both
+  /// reserved for this player (the app's duplicate checks worked).
+  Future<({bool jersey, bool key})> checkReservations(
+    ReservationKey player,
+  ) async {
+    final results = await Future.wait([
+      _db
+          .doc(FirestorePaths.jersey(
+            player.teamId,
+            jerseyIdFor(player.category, player.jerseyNo),
+          ))
+          .get(),
+      _db.doc(FirestorePaths.playerKey(player.playerKey)).get(),
+    ]).timeout(_timeout);
+    return (
+      jersey: results[0].data()?['playerId'] == player.playerId,
+      key: results[1].data()?['playerId'] == player.playerId,
     );
   }
 
@@ -280,6 +341,84 @@ class PlayerRepository {
     // Saved: the old photo files are no longer used
     if (urls != null) await _deleteFiles([before.photoUrl, before.thumbUrl]);
   }
+
+  // ---------- FA review ----------
+
+  /// FA: approves a pending player and returns their player ID.
+  ///
+  /// Runs as a transaction (all or nothing, retried if two FA officials
+  /// approve at the same moment):
+  /// 1. Read the player. Stop if they are no longer pending.
+  /// 2. A player approved before (then edited by the team) keeps their ID.
+  ///    Otherwise read the counter, build the ID from it, and move the
+  ///    counter on by 1.
+  /// 3. Save the player as approved.
+  Future<String> approve(String playerId, {required String faUid}) {
+    final playerRef = _db.doc(FirestorePaths.player(playerId));
+
+    return _db.runTransaction<String>((tx) async {
+      final snapshot = await tx.get(playerRef);
+      final data = snapshot.data();
+      if (data == null || data['status'] != ApprovalStatus.pending.name) {
+        throw const PlayerNotPendingException();
+      }
+
+      var code = data['playerCode'] as String?;
+      if (code == null) {
+        final counter = await tx.get(_counterRef);
+        final next = (counter.data()?['next'] as num?)?.toInt() ?? 1;
+        code = playerCodeFor(next, DateTime.now().toUtc().year);
+        if (counter.exists) {
+          tx.update(_counterRef, {'next': next + 1});
+        } else {
+          tx.set(_counterRef, {'next': 2}); // the very first approval
+        }
+      }
+
+      tx.update(playerRef, {
+        'status': ApprovalStatus.approved.name,
+        'playerCode': code,
+        'approvedAt': FieldValue.serverTimestamp(),
+        'approvedBy': faUid,
+        'rejectionReason': null,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      return code;
+    }).timeout(_timeout);
+  }
+
+  /// FA: approves several players, one transaction each, in order.
+  /// Keeps going if one fails. Returns the IDs given and how many failed.
+  Future<({List<String> codes, int failed})> approveMany(
+    List<String> playerIds, {
+    required String faUid,
+  }) async {
+    final codes = <String>[];
+    var failed = 0;
+    for (final id in playerIds) {
+      try {
+        codes.add(await approve(id, faUid: faUid));
+      } catch (_) {
+        failed++;
+      }
+    }
+    return (codes: codes, failed: failed);
+  }
+
+  /// FA: rejects a pending player. The team sees [reason] on the player.
+  Future<void> reject(
+    String playerId, {
+    required String reason,
+    required String faUid,
+  }) {
+    return _db.doc(FirestorePaths.player(playerId)).update({
+      'status': ApprovalStatus.rejected.name,
+      'rejectionReason': reason.trim(),
+      'reviewedAt': FieldValue.serverTimestamp(),
+      'reviewedBy': faUid,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }).timeout(_timeout);
+  }
 }
 
 final playerRepositoryProvider = Provider<PlayerRepository>((ref) {
@@ -304,4 +443,28 @@ final teamPlayersProvider = StreamProvider<List<Player>>((ref) async* {
 final playerProvider =
     StreamProvider.family<Player?, String>((ref, playerId) {
   return ref.watch(playerRepositoryProvider).watch(playerId);
+});
+
+/// FA: every player in the district, live.
+final allPlayersProvider = StreamProvider<List<Player>>((ref) {
+  return ref.watch(playerRepositoryProvider).watchAll();
+});
+
+/// FA: how many players are waiting for review (gold number on the
+/// Players tab).
+final pendingPlayerCountProvider = Provider<int>((ref) {
+  final players = ref.watch(allPlayersProvider).value ?? const [];
+  return players.where((p) => p.status == ApprovalStatus.pending).length;
+});
+
+/// FA: the next player-ID number, live.
+final nextPlayerNumberProvider = StreamProvider<int>((ref) {
+  return ref.watch(playerRepositoryProvider).watchNextNumber();
+});
+
+/// FA: are this player's jersey and player key reserved for them?
+/// It checks again only if the number, name or date of birth changes.
+final playerReservationsProvider = FutureProvider.autoDispose
+    .family<({bool jersey, bool key}), ReservationKey>((ref, key) {
+  return ref.watch(playerRepositoryProvider).checkReservations(key);
 });

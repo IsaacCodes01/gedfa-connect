@@ -8,6 +8,7 @@ import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/core/utils/initials.dart';
 import 'package:gedfa_connect/core/widgets/count_tabs.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
+import 'package:gedfa_connect/core/widgets/notification_bell.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/features/teams/data/team_request_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/team_request.dart';
@@ -36,6 +37,7 @@ class _FaRequestsScreenState extends ConsumerState<FaRequestsScreen> {
       appBar: const GedfaAppBar(
         title: 'Team requests',
         subtitle: 'Gomoa East District FA',
+        actions: [NotificationBell()],
       ),
       body: requestsAsync.when(
         data: _body,

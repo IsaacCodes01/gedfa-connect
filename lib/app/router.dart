@@ -9,8 +9,11 @@ import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/auth/presentation/login_screen.dart';
 import 'package:gedfa_connect/features/home/presentation/placeholder_home.dart';
+import 'package:gedfa_connect/features/fa/presentation/fa_player_review_screen.dart';
+import 'package:gedfa_connect/features/fa/presentation/fa_player_teams_screen.dart';
 import 'package:gedfa_connect/features/fa/presentation/fa_request_review_screen.dart';
 import 'package:gedfa_connect/features/fa/presentation/fa_requests_screen.dart';
+import 'package:gedfa_connect/features/fa/presentation/fa_team_players_screen.dart';
 import 'package:gedfa_connect/features/auth/presentation/verify_email_screen.dart';
 import 'package:gedfa_connect/features/auth/presentation/forgot_password_screen.dart';
 import 'package:gedfa_connect/features/auth/presentation/sign_up_screen.dart';
@@ -72,7 +75,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
-      // FA admin area: a shell with tabs (Teams, More).
+      // FA admin area: a shell with tabs (Teams, Players, More).
       StatefulShellRoute.indexedStack(
         builder: (_, _, navigationShell) => AppShell(
           navigationShell: navigationShell,
@@ -98,7 +101,33 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
-          // Tab 1: More
+          // Tab 1: Players (by team, then by position)
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: Routes.adminPlayers,
+                builder: (_, _) => const FaPlayerTeamsScreen(),
+                routes: [
+                  // One team's players. Inside the tab (bottom bar stays).
+                  GoRoute(
+                    path: 'team/:teamId',
+                    builder: (_, state) => FaTeamPlayersScreen(
+                      teamId: state.pathParameters['teamId']!,
+                    ),
+                  ),
+                  // Review one player. Full-screen, above the tabs.
+                  GoRoute(
+                    path: 'player/:playerId',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (_, state) => FaPlayerReviewScreen(
+                      playerId: state.pathParameters['playerId']!,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          // Tab 2: More
           StatefulShellBranch(
             routes: [
               GoRoute(

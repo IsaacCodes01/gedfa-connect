@@ -17,6 +17,19 @@ class TeamRepository {
       return Team.fromMap(snapshot.id, data);
     });
   }
+
+  /// FA: every team in the district, live, A to Z.
+  Stream<List<Team>> watchAll() {
+    return _db.collection(FirestorePaths.teams).snapshots().map((snapshot) {
+      final teams = [
+        for (final doc in snapshot.docs) Team.fromMap(doc.id, doc.data()),
+      ];
+      teams.sort(
+        (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+      );
+      return teams;
+    });
+  }
 }
 
 final teamRepositoryProvider = Provider<TeamRepository>((ref) {
@@ -33,4 +46,14 @@ final myTeamProvider = StreamProvider<Team?>((ref) async* {
     return;
   }
   yield* ref.watch(teamRepositoryProvider).watch(teamId);
+});
+
+/// FA: every team, live (Players tab).
+final allTeamsProvider = StreamProvider<List<Team>>((ref) {
+  return ref.watch(teamRepositoryProvider).watchAll();
+});
+
+/// FA: one team by ID, live.
+final teamByIdProvider = StreamProvider.family<Team?, String>((ref, teamId) {
+  return ref.watch(teamRepositoryProvider).watch(teamId);
 });

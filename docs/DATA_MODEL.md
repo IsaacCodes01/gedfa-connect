@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v1.4, matches security rules v1 and the Phase 1 app (18 Oct 2026)
+**Status:** v1.6, matches the rules after step 2.3 (22 Oct 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -89,7 +89,9 @@ One document per person who has been given a role. `{uid}` is the Firebase Auth 
 | `createdBy`   | string    | `uid` of the FA admin who gave it       |
 
 - **No document = no role.** A new sign-up has no document and is routed to "Register your team".
-- Written **only by an FA admin**. A user can `get` their own document (never list or query users) and never write it.
+- Written **only by an FA admin**. A user can `get` their own document (never list or query users) and never write it. FA admins can `get` any user document.
+- **Approving a team** creates the club's document with only `role: teamAdmin`, `teamId`, `createdAt`, `createdBy` (the FA's uid). The rules allow **create only** (never update), **only** the `teamAdmin` role, and only for an admin of the team created in the same batch. **Nobody can be made an FA admin through the app**: FA admins are still created by hand in the console.
+- A person's **full name** lives on their Firebase Auth account (`displayName`), set at sign-up and editable on My profile; `displayName` and `email` here are optional copies.
 - The app listens to this document live: when the FA changes a role, the app moves the user to the matching home screen at once.
 - The first FA admin is created by hand in the Firebase console (see step 0.7).
 
@@ -126,7 +128,16 @@ Keyed by the requester's `uid`, so each person can have at most one request.
 
 - Only a person with a **confirmed email** may create a request (Google accounts count as confirmed).
 - The requester may create it, and edit it **only while `pending` or `rejected`**. Every edit sets `status` back to `pending` and clears `rejectionReason`.
-- Only an FA admin may set `status` to `approved` or `rejected`.
+- Only an FA admin may set `status` to `approved` or `rejected`, and only on a `pending` request. Review fields, written only by the FA:
+
+| Field          | Type      | Notes                                                   |
+| -------------- | --------- | ------------------------------------------------------- |
+| `reviewedBy` | string    | uid of the FA admin who approved or rejected            |
+| `reviewedAt` | timestamp | When                                                    |
+| `teamId`     | string?   | Set on approval: the team created from this request     |
+
+- **Reject:** `status: rejected` + `rejectionReason` (10–500 characters). The club sees the reason, edits and resends (back to `pending`, reason cleared; the review fields stay but the club can never change them).
+- **Approve:** see Section 4. An approved request is never edited again; later changes to the team go through change requests (planned, ROADMAP 2.10–2.11).
 - One club = one request, whatever it plays in. A club in both competitions registers **once** and ticks both; name, logo, kits and officials are shared.
 - Requests saved before `categories` existed are read as `["division"]` by the app; the next edit saves the field.
 - **Pending GEDFA:** registration fee payment reference, supporting documents, previous league. These fields will be added when GEDFA answers (see the *Team Registration Requirements* document).
@@ -171,7 +182,10 @@ Created by an FA admin when approving a request.
 | `createdAt`            | timestamp        | Approval time                                              |
 | `updatedAt`            | timestamp        |                                                            |
 
-- **Phase 1 (testing):** teams on dev are created by hand in the console with the same fields as the request. From Phase 2 the FA's Approve button creates them.
+- Created **only by the FA's Approve button** (since 2.2), in the same batch as the approval. The **team ID is the reserved name key** (e.g. `gomoa-united-fc`), so it is unique. The rules check: `nameKey == teamId`, `adminUids == [requestUid]`, the reservation belongs to that club, and the request becomes approved in the same batch.
+- `logoUrl` reuses the request's logo download link (it keeps working). Copying the file to `teams/{teamId}/logo.jpg` needs a server function and is deferred.
+- FA admins can `get` and `list` teams; a team admin can `get` only their own.
+- Teams created by hand during Phase 1 testing may lack some fields.
 
 #### Subcollection `teams/{teamId}/jerseys/{category}-{number}` — jersey reservations
 
@@ -214,12 +228,16 @@ One collection for the whole district. Team admins see only their own team's pla
 | `updatedAt`       | timestamp        |                                                                                                                                                                                                                                    |
 | `approvedAt`      | timestamp?       |                                                                                                                                                                                                                                    |
 | `approvedBy`      | string?          | FA admin`uid`                                                                                                                                                                                                                    |
+| `reviewedAt`      | timestamp?       | When the FA last **rejected** the player (approval uses `approvedAt`)                                                                                                                                                              |
+| `reviewedBy`      | string?          | FA admin `uid` who rejected                                                                                                                                                                                                        |
 
 - After approval, changing `fullName`, `dob`, `jerseyNo` or the photo sets `status` back to `pending` (FA re-approval). Changing only `position` keeps it approved. `playerCode` never changes.
 - Created by the team admin with `status: pending` and no `playerCode`, `approvedAt` or `approvedBy`. A team may hold at most `settings/league.maxSquadSize` players per competition (checked in the app; 30 for now).
 - **No passport photo, no player:** the rules refuse a player without `photoUrl` and `thumbUrl`.
 - An approved player stays approved only if the edit changes nothing but `position` (and `positionGroup`). Any other change must set `status` back to `pending`.
-- A team admin can't change `teamId`, `category`, `playerCode`, `approvedAt`, `approvedBy` or `createdAt`, and can't delete a player (removing players comes later).
+- A team admin can't change `teamId`, `category`, `playerCode`, `approvedAt`, `approvedBy`, `reviewedAt`, `reviewedBy` or `createdAt`, and can't delete a player (removing players comes later).
+- **FA review (2.3):** the FA may change a **pending** player only. *Approve* touches only `status`, `playerCode`, `approvedAt`, `approvedBy`, `rejectionReason` (null) and `updatedAt`. *Reject* touches only `status`, `rejectionReason` (10–500 characters), `reviewedAt`, `reviewedBy` and `updatedAt`. The FA never edits the player's details.
+- **Re-check:** a player approved before and then changed by the team comes back as pending **with** their `playerCode`; approving again keeps that ID and leaves the counter alone.
 - Only Division players can be added for now; Juvenile waits for GEDFA's answers.
 - **Juvenile players:** the age group (U13 / U15 / U17) is **calculated** from `dob` and the season's cut-off date, never stored as typed input. Extra fields planned, pending GEDFA: birth certificate photo, parent or guardian name and phone, consent. Juvenile player photos are **never shown publicly**.
 - Only an FA admin may set `status` to `approved` or `rejected`.
@@ -230,7 +248,9 @@ One collection for the whole district. Team admins see only their own team's pla
 
 - One running number for the whole district (Division and Juvenile together), so no two players ever share an ID.
 - Stays with the person for life: a transfer to another team, or a youth player moving up to the Division side, keeps the same ID.
-- Made inside the FA's **approval transaction**: read `settings/playerCounter.next`, write the player with that number, add 1 to the counter. Firestore retries if two approvals happen at once, so numbers are never repeated.
+- Made inside the FA's **approval transaction**: read `settings/playerCounter.next` (1 if the counter doesn't exist yet), write the player with that number, add 1 to the counter. Firestore retries if two approvals happen at once, so numbers are never repeated.
+- The rules rebuild the ID themselves (`playerCodeFor` in `firestore.rules`, same as `lib/core/utils/player_code.dart`) and refuse any other ID, a skipped number or a counter that doesn't move on by exactly 1.
+- Approving several players at once = one transaction per player, in order.
 
 ### 2.4b Search
 
@@ -281,7 +301,7 @@ Readable by any signed-in user; writable only by FA admins.
 | -------- | ------ | ------------------------------------------------------------- |
 | `next` | number | The running number the next approved player gets. Starts at 1 |
 
-Readable and writable only by FA admins, and only changed inside the approval transaction.
+Readable and writable only by FA admins. Created with `next: 2` by the very first approval; afterwards it can only go up by exactly 1 at a time.
 
 ---
 
@@ -289,17 +309,18 @@ Readable and writable only by FA admins, and only changed inside the approval tr
 
 The security rules enforce this table. Screens hiding a button is **not** security.
 
-**Rules v1 (Phase 1, live on dev)** cover the *No role* and *Team admin* columns and are proven by 49 automated tests in `test/rules/`. The *Referee* and *FA admin* columns are the plan; their rules come with Phases 2 and 4. Until then anything not listed is refused.
+**Rules (live on dev)** cover the *No role* and *Team admin* columns, and the FA admin's team-request and player review work, proven by **90 automated tests** in `test/rules/`. The rest of the *FA admin* column (corrections, settings) comes later; the *Referee* column with Phase 4. Anything not listed is refused.
 
 | Collection          | No role                                                             | Team admin                                                                 | Referee                                       | FA admin *(Phase 2)* |
 | ------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------- | -------------------- |
-| `users`           | Get own (none exists)                                               | Get own                                                                    | Get own                                       | Read / write all     |
-| `teamRequests`    | Create (confirmed email) / get / edit own while pending or rejected | Get own                                                                    | —                                            | Read all, set status |
+| `users`           | Get own (none exists)                                               | Get own                                                                    | Get own                                       | Get any ✓; create a `teamAdmin` role on approval ✓ |
+| `teamRequests`    | Create (confirmed email) / get / edit own while pending or rejected | Get own                                                                    | —                                            | Get / list all ✓; approve or reject pending ✓ |
 | `teamNames`       | Get any key; create / delete own                                    | Get any key                                                                | Get any key                                   | Read / delete all    |
-| `teams`           | —                                                                  | Get own team *(editing later)*                                             | Read                                          | Read / write all     |
-| `teams/*/jerseys` | —                                                                  | Get / create / delete for own team                                         | —                                            | Read / write all     |
-| `players`         | —                                                                  | Create / read / edit own team's (never status, player ID or team); no delete yet | Read players in assigned matches*(Phase 4)* | Read all, set status |
-| `playerKeys`      | —                                                                  | Get any key; create / delete for own team's players                        | —                                            | Read / write all     |
+| `teams`           | —                                                                  | Get own team *(editing later)*                                             | Read                                          | Get / list ✓; create on approval ✓; edit later |
+| `teams/*/jerseys` | —                                                                  | Get / create / delete for own team                                         | —                                            | Get any ✓            |
+| `players`         | —                                                                  | Create / read / edit own team's (never status, player ID or team); no delete yet | Read players in assigned matches*(Phase 4)* | Read / list all ✓; approve or reject pending ✓ |
+| `playerKeys`      | —                                                                  | Get any key; create / delete for own team's players                        | —                                            | Get any key ✓        |
+| `settings/playerCounter` | —                                                           | —                                                                          | —                                            | Get ✓; create / +1 in the approval ✓ |
 | `settings/league` | Read *(rule to add)*                                                | Read *(rule to add)*                                                       | Read                                          | Read / write         |
 | Storage: request logo | Write / read own (image < 1 MB)                                  | —                                                                          | —                                            | Read all             |
 | Storage: player photos | —                                                                | Create / read / delete for own team (JPEG < 1 MB, `photo-` / `thumb-` names) | —                                          | Read all             |
@@ -318,7 +339,10 @@ These changes always happen together in **one batch** (all succeed or none do):
 | Remove player *(later)*               | delete player + delete jersey doc + delete player key                                         |
 | Submit team request                   | create`teamRequests/{uid}` + create `teamNames/{nameKey}`                                 |
 | Rename team while pending or rejected | update request + delete old`teamNames` doc + create new one                                 |
-| Approve team request                  | update request`status` + create `teams/{teamId}` + create/update `users/{uid}`          |
+| Approve team request (FA)             | update request (`status: approved`, `teamId`, `reviewedBy`, `reviewedAt`) + create `teams/{teamId}` + create `users/{uid}` (`role: teamAdmin`) |
+| Reject team request (FA)              | update request only (`status: rejected`, `rejectionReason`, review fields)                    |
+| Approve player (FA) — **transaction** | read player (must be pending) + read counter → update player (`approved`, `playerCode`, `approvedBy`, `approvedAt`) + set / update counter (`next + 1`). A player who already has an ID keeps it and the counter is not touched |
+| Reject player (FA)                    | update player only (`status: rejected`, `rejectionReason`, `reviewedBy`, `reviewedAt`)        |
 
 **Photos and batches.** Storage files can't be part of a Firestore batch, so a player's photo is handled around it:
 
@@ -409,4 +433,6 @@ Feed rules: never include dates of birth; player photos only if agreed with GEDF
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 22 Oct 2026 | v1.6: FA review of players (2.3). Players gain `reviewedAt`, `reviewedBy` (rejection). FA may read every player, jersey and player key, and approve or reject pending players; approval is a transaction with `settings/playerCounter`, re-checked players keep their ID, the ID year is the year of first approval. Access table updated (90 tests). |
+| 22 Oct 2026 | v1.5: FA review of team requests. `teamRequests` gain `reviewedBy`, `reviewedAt`, `teamId`; reject needs a 10–500 character reason. Teams are created only by the FA's Approve batch, ID = reserved name key, logo link reused. `users`: the FA can get any and create a `teamAdmin` role on approval (never `faAdmin`). Full name lives on the Auth account. Access table updated (71 tests). |
 | 18 Oct 2026 | v1.4: matches security rules v1. Jersey reservation ID is now `{category}-{number}` (e.g. `division-9`) with only `playerId` and `createdAt` (`playerName` dropped). Players gain `playerKey`; `photoUrl` and `thumbUrl` are now **required** (300×400 and 96×128). Player photos moved to `teams/{teamId}/players/{playerId}/photo-<millis>.jpg` / `thumb-<millis>.jpg`. Team admins may `get` any `playerKeys` key. Section 3 marks what rules v1 cover; Storage rows added. Photo-and-batch order added to Section 4. Storage CORS for the web build. |

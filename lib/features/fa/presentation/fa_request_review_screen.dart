@@ -14,6 +14,7 @@ import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/core/widgets/status_badge.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
+import 'package:gedfa_connect/features/fa/presentation/widgets/review_widgets.dart';
 import 'package:gedfa_connect/features/settings/presentation/widgets/settings_widgets.dart';
 import 'package:gedfa_connect/features/teams/data/team_request_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/kit.dart';
@@ -87,19 +88,19 @@ class _ReviewBody extends StatelessWidget {
               const SectionTitle('Club details'),
               TileGroup(
                 children: [
-                  _DetailRow('Home ground', request.homeGround),
-                  _DetailRow(
+                  DetailRow('Home ground', request.homeGround),
+                  DetailRow(
                     'Directions',
                     directions == null || directions.isEmpty
                         ? null
                         : directions,
                   ),
-                  _DetailRow('Year founded', request.yearFounded?.toString()),
-                  _DetailRow(
+                  DetailRow('Year founded', request.yearFounded?.toString()),
+                  DetailRow(
                     'Club email',
                     email == null || email.isEmpty ? null : email,
                   ),
-                  _DetailRow('Short name', request.shortName),
+                  DetailRow('Short name', request.shortName),
                 ],
               ),
               const SizedBox(height: 22),
@@ -222,109 +223,23 @@ class _Checks extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _CheckLine(
+        CheckLine(
           ok: holdsName.value,
           okText: 'Team name is free and reserved for this club',
           badText: 'Name reservation is missing. Check before approving.',
           waitingText: 'Checking the team name…',
         ),
         // The rules only accept requests from confirmed emails.
-        const _CheckLine(
+        const CheckLine(
           ok: true,
           okText: 'Sent from a confirmed email address',
         ),
-        _CheckLine(
+        CheckLine(
           ok: hasRequiredOfficials,
           okText: 'Team manager and head coach given',
           badText: 'Team manager or head coach is missing',
         ),
       ],
-    );
-  }
-}
-
-class _CheckLine extends StatelessWidget {
-  const _CheckLine({
-    required this.ok,
-    required this.okText,
-    this.badText = '',
-    this.waitingText = '',
-  });
-
-  /// true = passed, false = failed, null = still checking
-  final bool? ok;
-  final String okText;
-  final String badText;
-  final String waitingText;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final scheme = Theme.of(context).colorScheme;
-    final green = isDark ? const Color(0xFF7BE3B0) : const Color(0xFF006B3F);
-
-    final (icon, color, text) = switch (ok) {
-      true => (Icons.check_circle_rounded, green, okText),
-      false => (Icons.warning_amber_rounded, scheme.error, badText),
-      null => (Icons.hourglass_empty_rounded, scheme.onSurfaceVariant,
-          waitingText),
-    };
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: color),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(text, style: Theme.of(context).textTheme.bodyMedium),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Club details row ─────────────────────────────────────────────────────
-
-class _DetailRow extends StatelessWidget {
-  const _DetailRow(this.label, this.value);
-
-  final String label;
-  final String? value; // null = not given
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final scheme = Theme.of(context).colorScheme;
-    final value = this.value;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 118,
-            child: Text(
-              label,
-              style: textTheme.bodySmall
-                  ?.copyWith(color: scheme.onSurfaceVariant),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value ?? 'Not given',
-              style: value == null
-                  ? textTheme.bodyMedium?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                      fontStyle: FontStyle.italic,
-                    )
-                  : textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -505,11 +420,18 @@ class _ReviewActionsState extends ConsumerState<_ReviewActions> {
 
   Future<void> _reject() async {
     final request = widget.request;
-    final reason = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true, // lets the sheet move up with the keyboard
-      showDragHandle: true,
-      builder: (_) => _RejectSheet(teamName: request.teamName),
+    final reason = await showReasonSheet(
+      context,
+      title: 'Reject ${request.teamName}?',
+      message: 'The club will see this reason on its request and may correct '
+          'and resubmit.',
+      fieldLabel: 'Reason for the club',
+      quickReasons: const [
+        'Logo is not clear',
+        'Team name is already used in the district',
+        "Officials' phone numbers are missing",
+        'Home ground is not approved by the FA',
+      ],
     );
     final faUid = _faUid;
     if (reason == null || faUid == null || !mounted) return;
@@ -534,66 +456,11 @@ class _ReviewActionsState extends ConsumerState<_ReviewActions> {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final green = Theme.of(context).brightness == Brightness.dark
-        ? const Color(0xFF1E8E5A)
-        : const Color(0xFF006B3F);
-
-    return Container(
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        border: Border(top: BorderSide(color: scheme.outline)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          child: Center(
-            heightFactor: 1,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: _busy ? null : _reject,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: scheme.error,
-                        side: BorderSide(color: scheme.error, width: 1.5),
-                        minimumSize: const Size.fromHeight(50),
-                      ),
-                      child: const Text('Reject'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 2,
-                    child: FilledButton.icon(
-                      onPressed: _busy ? null : _approve,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: green,
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size.fromHeight(50),
-                      ),
-                      icon: _busy
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Icon(Icons.check_rounded),
-                      label: const Text('Approve team'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
+    return ReviewActionsBar(
+      approveLabel: 'Approve team',
+      busy: _busy,
+      onReject: _reject,
+      onApprove: _approve,
     );
   }
 }
@@ -606,22 +473,8 @@ class _ApproveDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final green = Theme.of(context).brightness == Brightness.dark
-        ? const Color(0xFF1E8E5A)
-        : const Color(0xFF006B3F);
     final competitions =
         request.categories.map((c) => c.label).join(' and ');
-
-    Widget bullet(String text) => Padding(
-          padding: const EdgeInsets.only(bottom: 6),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('•  '),
-              Expanded(child: Text(text)),
-            ],
-          ),
-        );
 
     return AlertDialog(
       title: Text('Approve ${request.teamName}?'),
@@ -631,9 +484,9 @@ class _ApproveDialog extends StatelessWidget {
         children: [
           const Text('This will:'),
           const SizedBox(height: 8),
-          bullet('Create the team ${request.teamName} ($competitions)'),
-          bullet("Make the club's account the team admin"),
-          bullet('Let them start adding players straight away'),
+          DialogBullet('Create the team ${request.teamName} ($competitions)'),
+          DialogBullet("Make the club's account the team admin"),
+          DialogBullet('Let them start adding players straight away'),
         ],
       ),
       actions: [
@@ -646,165 +499,12 @@ class _ApproveDialog extends StatelessWidget {
           style: FilledButton.styleFrom(
             // The app theme makes filled buttons full-width; not in a dialog.
             minimumSize: const Size(96, 44),
-            backgroundColor: green,
+            backgroundColor: approveGreen(context),
             foregroundColor: Colors.white,
           ),
           child: const Text('Approve'),
         ),
       ],
-    );
-  }
-}
-
-/// Bottom sheet: quick reasons (tap to add) + a text box. Returns the
-/// reason, or null if cancelled.
-class _RejectSheet extends StatefulWidget {
-  const _RejectSheet({required this.teamName});
-
-  final String teamName;
-
-  @override
-  State<_RejectSheet> createState() => _RejectSheetState();
-}
-
-class _RejectSheetState extends State<_RejectSheet> {
-  static const _quickReasons = [
-    'Logo is unclear',
-    'Team name already used in the district',
-    'Officials phone numbers missing',
-    'Home ground not approved by the FA',
-  ];
-
-  final _formKey = GlobalKey<FormState>();
-  final _controller = TextEditingController();
-  final _picked = <String>{};
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  /// Tapping a quick reason adds it to (or removes it from) the text box.
-  void _toggle(String reason) {
-    setState(() {
-      if (_picked.contains(reason)) {
-        _picked.remove(reason);
-      } else {
-        _picked.add(reason);
-      }
-      _controller.text = _picked.isEmpty
-          ? ''
-          : '${_picked.join('. ')}. Please fix and send again.';
-    });
-  }
-
-  void _send() {
-    if (!_formKey.currentState!.validate()) return;
-    Navigator.of(context).pop(_controller.text.trim());
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final scheme = Theme.of(context).colorScheme;
-    final keyboard = MediaQuery.viewInsetsOf(context).bottom;
-
-    return Padding(
-      // Keeps the text box above the keyboard
-      padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + keyboard),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Reject ${widget.teamName}?',
-              style:
-                  textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'The club sees your reason, can fix the request and send it '
-              'again.',
-              style: textTheme.bodySmall
-                  ?.copyWith(color: scheme.onSurfaceVariant),
-            ),
-            const SizedBox(height: 14),
-            Text(
-              'QUICK REASONS',
-              style: textTheme.labelMedium?.copyWith(
-                color: scheme.onSurfaceVariant,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.5,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final reason in _quickReasons)
-                  FilterChip(
-                    label: Text(reason),
-                    selected: _picked.contains(reason),
-                    onSelected: (_) => _toggle(reason),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _controller,
-              minLines: 3,
-              maxLines: 5,
-              inputFormatters: [LengthLimitingTextInputFormatter(500)],
-              textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(
-                labelText: 'Reason for the club',
-                helperText:
-                    'At least 10 characters. Be specific so they know what '
-                    'to fix.',
-                helperMaxLines: 2,
-                alignLabelWithHint: true,
-              ),
-              validator: (value) => (value?.trim().length ?? 0) < 10
-                  ? 'Write at least 10 characters'
-                  : null,
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(50),
-                    ),
-                    child: const Text('Cancel'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  flex: 2,
-                  child: FilledButton(
-                    onPressed: _send,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Theme.of(context).brightness ==
-                              Brightness.dark
-                          ? const Color(0xFFC8283A)
-                          : scheme.error,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size.fromHeight(50),
-                    ),
-                    child: const Text('Send rejection'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
