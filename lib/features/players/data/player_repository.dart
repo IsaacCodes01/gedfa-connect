@@ -9,6 +9,8 @@ import 'package:gedfa_connect/core/utils/player_code.dart';
 import 'package:gedfa_connect/core/utils/player_key.dart';
 import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/core/constants/approval_status.dart';
+import 'package:gedfa_connect/features/notifications/data/notification_writer.dart';
+import 'package:gedfa_connect/features/notifications/domain/app_notification.dart';
 import 'package:gedfa_connect/features/players/domain/player.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/data/team_request_repository.dart'
@@ -292,6 +294,14 @@ class PlayerRepository {
         'teamId': player.teamId,
         'createdAt': FieldValue.serverTimestamp(),
       });
+    // The FA's bell: "4 new players from Royal Unique FC" (one per day)
+    NotificationWriter(_db).forFaInBatch(
+      batch,
+      kind: NotificationKind.playersSubmitted,
+      teamId: player.teamId,
+      teamName: player.teamName,
+      name: player.fullName.trim(),
+    );
 
     try {
       await _commit(batch, () => _checkFree(player));
@@ -361,6 +371,26 @@ class PlayerRepository {
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
+    // The FA's bell, when a reviewed player comes back to them:
+    // "Yaw Boateng: Jersey number #10 → #14"
+    if (!keepApproved && before.status != ApprovalStatus.pending) {
+      final first = changes.entries.firstOrNull;
+      final what = first == null
+          ? 'details updated'
+          : first.key == 'photo'
+              ? 'new photo'
+              : '${PlayerChange.labels[first.key]} '
+                  '${first.value.from} → ${first.value.to}';
+      final more = changes.length > 1 ? ' (+${changes.length - 1} more)' : '';
+      NotificationWriter(_db).forFaInBatch(
+        batch,
+        kind: NotificationKind.playersResubmitted,
+        teamId: after.teamId,
+        teamName: after.teamName,
+        name: '${after.fullName.trim()}: $what$more',
+      );
+    }
+
     if (jerseyChanged) {
       batch
         ..delete(_jerseyRef(before))
@@ -426,6 +456,15 @@ class PlayerRepository {
         }
       }
 
+      // The team's bell: "3 players approved: Kojo Arthur (GE26-0011), …"
+      NotificationWriter(_db).forTeamInTransaction(
+        tx,
+        kind: NotificationKind.playersApproved,
+        teamId: data['teamId'] as String? ?? '',
+        teamName: data['teamName'] as String? ?? '',
+        name: '${data['fullName']} ($code)',
+      );
+
       tx.update(playerRef, {
         'status': ApprovalStatus.approved.name,
         'playerCode': code,
@@ -459,18 +498,28 @@ class PlayerRepository {
 
   /// FA: rejects a pending player. The team sees [reason] on the player.
   Future<void> reject(
-    String playerId, {
+    Player player, {
     required String reason,
     required String faUid,
   }) {
-    return _db.doc(FirestorePaths.player(playerId)).update({
-      'status': ApprovalStatus.rejected.name,
-      'rejectionReason': reason.trim(),
-      'reviewedAt': FieldValue.serverTimestamp(),
-      'reviewedBy': faUid,
-      'changes': FieldValue.delete(), // reviewed
-      'updatedAt': FieldValue.serverTimestamp(),
-    }).timeout(_timeout);
+    final batch = _db.batch()
+      ..update(_db.doc(FirestorePaths.player(player.id)), {
+        'status': ApprovalStatus.rejected.name,
+        'rejectionReason': reason.trim(),
+        'reviewedAt': FieldValue.serverTimestamp(),
+        'reviewedBy': faUid,
+        'changes': FieldValue.delete(), // reviewed
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    // The team's bell: "2 players rejected: …" (reasons are on the players)
+    NotificationWriter(_db).forTeamInBatch(
+      batch,
+      kind: NotificationKind.playersRejected,
+      teamId: player.teamId,
+      teamName: player.teamName,
+      name: player.fullName,
+    );
+    return batch.commit().timeout(_timeout);
   }
 }
 

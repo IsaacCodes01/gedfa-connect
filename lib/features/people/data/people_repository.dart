@@ -6,6 +6,8 @@ import 'package:gedfa_connect/core/constants/user_role.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
+import 'package:gedfa_connect/features/notifications/data/notification_writer.dart';
+import 'package:gedfa_connect/features/notifications/domain/app_notification.dart';
 import 'package:gedfa_connect/features/people/domain/invite.dart';
 import 'package:gedfa_connect/features/people/domain/member.dart';
 import 'package:gedfa_connect/features/people/domain/role_log_entry.dart';
@@ -236,6 +238,14 @@ class PeopleRepository {
         uid: me.uid,
         by: me,
       ));
+    // The FA's bell: "Kwesi Arthur (Referee)"
+    NotificationWriter(_db).forFaInBatch(
+      batch,
+      kind: NotificationKind.inviteAccepted,
+      teamId: '',
+      teamName: '',
+      name: '$name (${roleLabelFor(invite.role)})',
+    );
     return batch.commit().timeout(_timeout);
   }
 

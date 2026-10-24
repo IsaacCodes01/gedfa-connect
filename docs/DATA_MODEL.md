@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v1.9, matches the rules after step 2.3d (24 Oct 2026)
+**Status:** v2.0, matches the rules after step 2.8 (24 Oct 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -366,6 +366,38 @@ Readable and writable only by FA admins. Created with `next: 2` by the very firs
 
 ---
 
+### 2.8 `announcements/{id}` — FA announcements (2.7)
+
+| Field | Notes |
+| ----- | ----- |
+| `title` (3–80), `body` (10–2000) | Never changed after publishing |
+| `to` | `everyone` / `teams` / `division` / `juvenile` / `referees` |
+| `important`, `pinned` | booleans; only `pinned` can change later |
+| `createdBy`, `createdByName`, `createdAt` | Any FA admin |
+
+- Read by anyone with a role (the app shows each person the ones for them); written, pinned and deleted by FA admins.
+- **`seen/{teamId or uid}`** `{at, by}`: written when a team admin (key = team ID) or referee (key = uid) opens it. Only FA admins read it ("Seen by 7 of 12").
+
+### 2.9 `notifications/{id}` — the bell (2.8)
+
+**One document per audience, kind, team and day**, e.g. `team-royal_playersApproved_royal_2026-10-24`. Each event updates it with `count + 1` and one more name, so 20 approvals = 1 notification.
+
+| Field | Notes |
+| ----- | ----- |
+| `audience` | `fa` or `team:<teamId>` |
+| `kind` | `playersApproved`, `playersRejected`, `teamApproved` (for teams, written by the FA); `teamRequest`, `playersSubmitted`, `playersResubmitted`, `inviteAccepted` (for the FA) |
+| `teamId`, `teamName` | The team concerned (`teamRequest`: the club's uid) |
+| `names` | e.g. `Kojo Arthur (GE26-0011)`, `Yaw Boateng: Jersey number #10 → #14` |
+| `count`, `day`, `updatedAt` | |
+
+- Written in the **same batch or transaction** as the action. Teams write only `playersSubmitted` / `playersResubmitted` for their own team; only the FA writes team notifications.
+- Read: the FA reads `fa`; a team admin reads `team:<their team>`.
+- Indexes: `audience` + `updatedAt` (desc); announcements `to` + `createdAt` (desc). See `firestore.indexes.json`.
+
+### 2.10 `readMarks/{uid}` — my bell
+
+`notificationsSeenAt` (Mark all read) and `hiddenAnnouncements` (pinned cards I closed, up to 30). Mine only.
+
 ## 3. Who can do what (summary)
 
 The security rules enforce this table. Screens hiding a button is **not** security.
@@ -494,6 +526,7 @@ Feed rules: never include dates of birth; player photos only if agreed with GEDF
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 24 Oct 2026 | v2.0: `announcements` (+ `seen`), grouped `notifications`, `readMarks` (2.7 – 2.8); composite indexes. 149 tests. |
 | 24 Oct 2026 | v1.9.1: `playerProfiles.unavailableReason`; the availability tiles filter the Player profiles tab. 137 tests. |
 | 24 Oct 2026 | v1.9: new `playerProfiles` and `teams/*/armbands` (2.3d). 136 tests. |
 | 24 Oct 2026 | v1.8: players gain `changes` (what the team changed, for the FA); approval and rejection clear it. 124 tests. |

@@ -10,6 +10,7 @@ import 'package:gedfa_connect/core/utils/initials.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/notification_bell.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
+import 'package:gedfa_connect/features/notifications/presentation/pinned_announcement_card.dart';
 import 'package:gedfa_connect/features/players/data/player_repository.dart';
 import 'package:gedfa_connect/features/players/presentation/widgets/position_rows.dart';
 import 'package:gedfa_connect/features/settings/presentation/widgets/settings_widgets.dart';
@@ -226,6 +227,8 @@ class _SquadBody extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // FA's pinned announcement (2.7), if any
+                  const PinnedAnnouncementCard(),
                   Row(
                     children: [
                       _StatusTile(

@@ -9,6 +9,8 @@ import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/utils/team_name_key.dart';
 import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
+import 'package:gedfa_connect/features/notifications/data/notification_writer.dart';
+import 'package:gedfa_connect/features/notifications/domain/app_notification.dart';
 import 'package:gedfa_connect/features/teams/domain/team_request.dart';
 
 const _timeout = Duration(seconds: 15);
@@ -102,6 +104,14 @@ class TeamRequestRepository {
         'createdBy': faUid,
         'createdAt': FieldValue.serverTimestamp(),
       });
+    // The new team's bell: "Gomoa United FC approved"
+    NotificationWriter(_db).forTeamInBatch(
+      batch,
+      kind: NotificationKind.teamApproved,
+      teamId: teamId,
+      teamName: teamName,
+      name: teamName,
+    );
 
     await batch.commit().timeout(_timeout);
     return teamId;
@@ -171,6 +181,14 @@ class TeamRequestRepository {
         'createdAt': FieldValue.serverTimestamp(),
       })
       ..set(_nameRef(key), _reservation(uid));
+    // The FA's bell: "New team request: Afransi Stars"
+    NotificationWriter(_db).forFaInBatch(
+      batch,
+      kind: NotificationKind.teamRequest,
+      teamId: uid,
+      teamName: request.teamName.trim(),
+      name: request.teamName.trim(),
+    );
 
     await batch.commit().timeout(_timeout);
   }

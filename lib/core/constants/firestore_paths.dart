@@ -37,6 +37,17 @@ class FirestorePaths {
   static String armbands(String teamId, String category) =>
       '${team(teamId)}/armbands/$category';
 
+  // Announcements and notifications (2.7 – 2.8)
+  static const announcements = '$district/announcements';
+  static String announcement(String id) => '$district/announcements/$id';
+  static String announcementSeen(String id, String key) =>
+      '$district/announcements/$id/seen/$key';
+  static String announcementSeenAll(String id) =>
+      '$district/announcements/$id/seen';
+  static const notifications = '$district/notifications';
+  static String notification(String id) => '$district/notifications/$id';
+  static String readMark(String uid) => '$district/readMarks/$uid';
+
   static const leagueSettings = '$district/settings/league';
 
   /// The next player-ID number: `{ next: 43 }`. FA only.

@@ -4,7 +4,7 @@
 **Platforms:** Flutter app: Android (APK) and web (iPhone users via "Add to Home Screen"); native iOS later (see Section 4, Distribution); separate React website by a colleague
 **Backend:** Firebase (Auth, Firestore, Cloud Storage, Hosting) on the Blaze plan
 **Projects:** `gedfa-connect-dev` (building/testing) and `gedfa-connect-prod` (real GEDFA data)
-**Status:** Phase 0 and Phase 1 complete · Phase 2 in progress: 2.0–2.4 and 2.6 done · web test link live on dev (24 Oct 2026)
+**Status:** Phase 0 and Phase 1 complete · Phase 2: 2.0–2.8 done (2.10–2.12 before or during the pilot) · next: GEDFA's answers, then Phase 3 · web test link live on dev (24 Oct 2026)
 
 See also: `docs/DATA_MODEL.md` (the data contract).
 
@@ -189,8 +189,8 @@ Time estimates assume part-time work and are rough guides.
 - [x] 2.6 Role management by **invitation**: More › People and roles (FA admins, referees, invited); the chairman invites FA officials and referees, FA officials invite referees; the invitation is shared on WhatsApp or copied (no automatic email), expires after 14 days; the invited person signs up with that email and accepts or declines; remove role (chairman protected, never yourself); role history. 119 rules tests *(done 24 Oct 2026)*
 - [x] 2.3c **Possible duplicates** on the FA player review: same date of birth and a similar name (word order, "Jnr", 1–2 letters), or the same name with a date of birth up to 2 years apart; photos side by side, the FA decides (alongside the name + date-of-birth key). **What the team changed**: re-submitted players list each change from → to (old and new photo side by side); the FA's review clears the list. 124 rules tests *(done 24 Oct 2026)*
 - [x] 2.3d **Player profiles** (Positions tab, clipboard icon): availability (Available / Injured / Unavailable, expected back, no medical details) with counts and an "Available players only" switch; height, weight, preferred foot, can also play (2), strengths (3), hometown, at the club since, previous club; captain and vice-captain (one each per squad, C / VC badges; team sheets will fill them in); private emergency contact (**required for Juvenile** later). No FA approval. 136 rules tests *(done 24 Oct 2026)*
-- [ ] 2.7 **FA announcements** (first part of the league feed)
-- [ ] 2.8 **Activity list** behind the app-bar bell: "Player approved", "Player rejected: reason", "Team approved", FA announcements. The bell is already on the team and FA app bars and opens a "Coming soon" page until then
+- [x] 2.7 **FA announcements**: any FA admin publishes (agreed in the officials' meeting first); to everyone, all teams, Division, Juvenile or referees; Important and Pinned; one-way; pinned card on top of Squad (each team can hide it); the FA sees who has seen it, by team logo *(done 24 Oct 2026)*
+- [x] 2.8 **Notifications** behind the bell, with a red unread count: teams get players approved / rejected and team approved; the FA gets team requests, new and resubmitted players (with the change) and accepted invitations; plus announcements. **Grouped**: one notification per kind, team and day that counts up (20 approvals = 1 notification). Written in the same batch as the action. Mark all read. 149 rules tests *(done 24 Oct 2026)*
 - [ ] 2.9 FA admin security rules, with rules tests added to `test/rules/` *(in progress: team requests and players done; corrections and settings to come)*
 - [ ] 2.10 **Team profile and change requests:** team admins view their team; kits, officials and home ground save directly; **name, short name and logo need FA approval** with a reason/note
 - [ ] 2.11 **FA corrections** for approved teams: edit small mistakes directly (logged); **ask for a correction** (yellow banner on the team's squad screen, fix goes back to the FA); **suspend** a team for serious problems. An approved team is never moved back to Pending
@@ -204,7 +204,7 @@ Time estimates assume part-time work and are rough guides.
 ### Phase 3 — Team sheet builder and PDF
 - [ ] 3.1–3.7 As before: select fixture, pick approved players within limits, captain/GK, formation, PDF, print/share, FA can view
 
-> **Before the pilot:** bundle fonts in the app (offline-safe), set up dev/prod switching (flavors), enable App Check, create the first FA Admin on prod, deploy rules to prod, set Storage CORS and Hosting on prod, set up Firebase App Distribution for the Android APK, consider weekly Firestore backups on prod.
+> **Before the pilot:** bundle fonts in the app (offline-safe), set up dev/prod switching (flavors), enable App Check, create the first FA Admin on prod, deploy rules to prod, set Storage CORS and Hosting on prod, set up Firebase App Distribution for the Android APK, consider weekly Firestore backups on prod, **phone push notifications** (Firebase Cloud Messaging, grouped the same way), deploy `firestore.indexes.json`.
 
 > **PILOT MILESTONE:** registration, approval, team sheets and FA announcements usable. Pilot with the FA and one or two teams.
 
@@ -296,6 +296,7 @@ Work backwards from the GEDFA season start date to decide what the pilot must co
 | 12 Oct 2026 | Renamed to GEDFA Connect; dev/prod projects created |
 | 13 Oct 2026 | Phase 0 complete; added 0.8 design foundation, 1.0 emulators, 1.1a toasts/connectivity/responsive; invite-only roles (2.6); FA announcements (2.7); new Phase 5.5 League feed; navigation, connectivity and responsive standards; pre-pilot checklist |
 | 17 Oct 2026 | 1.1b, 1.2, 1.3 done; new 1.3b Competitions (Division / Juvenile, one registration per club); 1.4 split into Division first, Juvenile after GEDFA answers |
+| 24 Oct 2026 | 2.7 and 2.8 done: announcements, notifications (grouped), bell count, pinned card, who has seen it. Phase 2 core done |
 | 24 Oct 2026 | 2.3d done: Player profiles, availability and armbands |
 | 24 Oct 2026 | 2.3c done: possible duplicates and the exact changes on the FA player review |
 | 24 Oct 2026 | 2.6 done (invitations, People and roles, role history, chairman flag). New 2.3c possible duplicates and 2.3d player profiles (proposed) |

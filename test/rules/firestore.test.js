@@ -1,4 +1,4 @@
-// Security rules tests for GEDFA Connect (steps 1.7 to 2.6, 2.3c, 2.3d).
+// Security rules tests for GEDFA Connect (steps 1.7 to 2.8).
 //
 // Run while the emulators are running:
 //   cd test/rules
@@ -26,6 +26,8 @@ import {
   getDoc,
   getDocs,
   query,
+  increment,
+  arrayUnion,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -1204,7 +1206,7 @@ describe('Player profiles', () => {
     await assertFails(setDoc(profile(dbAs('admin1')), profileData({ injury: 'hamstring' })));
   });
 
-    it("saving a profile doesn't touch the FA's approval", async () => {
+  it("saving a profile doesn't touch the FA's approval", async () => {
     await setDoc(profile(dbAs('admin1')), profileData());
     let status;
     await testEnv.withSecurityRulesDisabled(async (context) => {
@@ -1238,5 +1240,121 @@ describe('Armbands', () => {
     await assertFails(setDoc(armbands(dbAs('admin2'), 'royal'), {
       captainId: null, viceCaptainId: null, updatedAt: serverTimestamp(),
     }));
+  });
+});
+
+// ---------- Announcements and notifications (2.7 – 2.8) ----------
+
+function announcementData(changes = {}) {
+  return {
+    title: 'Registration closes 15 Nov',
+    body: 'All Division players must be registered by Saturday 15 November.',
+    to: 'division',
+    important: true,
+    pinned: true,
+    createdBy: 'fa1',
+    createdByName: 'Kofi Mensah',
+    createdAt: serverTimestamp(),
+    ...changes,
+  };
+}
+
+/** A grouped notification the way the app writes it (set + merge). */
+function notify(db, id, data) {
+  return setDoc(doc(db, `${D}/notifications/${id}`), {
+    names: arrayUnion(...(data.names ?? ['Someone'])),
+    count: increment(1),
+    day: '2026-10-24',
+    teamName: 'Royal Unique FC',
+    updatedAt: serverTimestamp(),
+    ...data,
+    ...(data.names ? { names: arrayUnion(...data.names) } : {}),
+  }, { merge: true });
+}
+
+describe('Announcements', () => {
+  it('any FA admin can publish', async () => {
+    await assertSucceeds(setDoc(doc(dbAs('fa1'), `${D}/announcements/a1`), announcementData()));
+  });
+
+  it('a team admin cannot publish', async () => {
+    await assertFails(setDoc(doc(dbAs('admin1'), `${D}/announcements/a1`),
+      announcementData({ createdBy: 'admin1' })));
+  });
+
+  it('team admins and referees can read; role-less users cannot', async () => {
+    await setDoc(doc(dbAs('fa1'), `${D}/announcements/a1`), announcementData());
+    await assertSucceeds(getDoc(doc(dbAs('admin1'), `${D}/announcements/a1`)));
+    await assertSucceeds(getDoc(doc(dbAs('ref1'), `${D}/announcements/a1`)));
+    await assertFails(getDoc(doc(dbAs('newbie'), `${D}/announcements/a1`)));
+  });
+
+  it('the FA can unpin but not rewrite the text', async () => {
+    const ref = doc(dbAs('fa1'), `${D}/announcements/a1`);
+    await setDoc(ref, announcementData());
+    await assertSucceeds(updateDoc(ref, { pinned: false }));
+    await assertFails(updateDoc(ref, { title: 'Something else' }));
+  });
+
+  it('a team marks it seen for its own team only; only the FA reads who saw it', async () => {
+    await setDoc(doc(dbAs('fa1'), `${D}/announcements/a1`), announcementData());
+    const mine = (db, key) => doc(db, `${D}/announcements/a1/seen/${key}`);
+    await assertSucceeds(setDoc(mine(dbAs('admin1'), 'royal'), { at: serverTimestamp(), by: 'admin1' }));
+    await assertFails(setDoc(mine(dbAs('admin1'), 'stars'), { at: serverTimestamp(), by: 'admin1' }));
+    await assertFails(getDocs(collection(dbAs('admin1'), `${D}/announcements/a1/seen`)));
+    await assertSucceeds(getDocs(collection(dbAs('fa1'), `${D}/announcements/a1/seen`)));
+  });
+});
+
+describe('Notifications', () => {
+  it('the FA notifies a team, and the counts add up in one notification', async () => {
+    const db = dbAs('fa1');
+    const data = { audience: 'team:royal', kind: 'playersApproved', teamId: 'royal' };
+    await assertSucceeds(notify(db, 'team-royal_playersApproved_2026-10-24', { ...data, names: ['Kofi Owusu (GE26-0002)'] }));
+    await assertSucceeds(notify(db, 'team-royal_playersApproved_2026-10-24', { ...data, names: ['Kwame Asante (GE26-0001)'] }));
+  });
+
+  it('the team reads its own notifications, not another team\'s', async () => {
+    const data = { audience: 'team:royal', kind: 'playersApproved', teamId: 'royal' };
+    await notify(dbAs('fa1'), 'n1', data);
+    await assertSucceeds(getDocs(query(collection(dbAs('admin1'), `${D}/notifications`),
+      where('audience', '==', 'team:royal'))));
+    await assertFails(getDocs(query(collection(dbAs('admin2'), `${D}/notifications`),
+      where('audience', '==', 'team:royal'))));
+  });
+
+  it('a team cannot write notifications for itself or another team', async () => {
+    await assertFails(notify(dbAs('admin1'), 'n1',
+      { audience: 'team:royal', kind: 'playersApproved', teamId: 'royal' }));
+  });
+
+  it('a team notifies the FA about its own new players only', async () => {
+    await assertSucceeds(notify(dbAs('admin1'), 'fa_playersSubmitted_royal',
+      { audience: 'fa', kind: 'playersSubmitted', teamId: 'royal' }));
+    await assertFails(notify(dbAs('admin1'), 'fa_playersSubmitted_stars',
+      { audience: 'fa', kind: 'playersSubmitted', teamId: 'stars' }));
+  });
+
+  it('only the FA reads the FA\'s notifications', async () => {
+    await notify(dbAs('admin1'), 'fa_n', { audience: 'fa', kind: 'playersSubmitted', teamId: 'royal' });
+    await assertSucceeds(getDocs(query(collection(dbAs('fa1'), `${D}/notifications`),
+      where('audience', '==', 'fa'))));
+    await assertFails(getDocs(query(collection(dbAs('admin1'), `${D}/notifications`),
+      where('audience', '==', 'fa'))));
+  });
+
+  it('unknown kinds are refused', async () => {
+    await assertFails(notify(dbAs('fa1'), 'n1',
+      { audience: 'team:royal', kind: 'freeText', teamId: 'royal' }));
+  });
+});
+
+describe('Read marks', () => {
+  it('I can save when I last read my notifications, nobody else can see it', async () => {
+    const mine = doc(dbAs('admin1'), `${D}/readMarks/admin1`);
+    await assertSucceeds(setDoc(mine, { notificationsSeenAt: serverTimestamp(), hiddenAnnouncements: ['a1'] }));
+    await assertSucceeds(getDoc(mine));
+    await assertFails(getDoc(doc(dbAs('admin2'), `${D}/readMarks/admin1`)));
+    await assertFails(setDoc(doc(dbAs('admin2'), `${D}/readMarks/admin1`), { notificationsSeenAt: serverTimestamp() }));
   });
 });

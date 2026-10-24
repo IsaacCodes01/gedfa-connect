@@ -279,6 +279,109 @@ service cloud.firestore {
                 && request.resource.data.action in ['accepted', 'declined']));
       }
 
+      // ---------- Announcements and notifications (2.7 – 2.8) ----------
+
+      function myRole() {
+        return get(userDoc(request.auth.uid)).data.get('role', '');
+      }
+
+      function hasRole() {
+        return isSignedIn()
+          && exists(userDoc(request.auth.uid))
+          && myRole() in ['faAdmin', 'teamAdmin', 'referee'];
+      }
+
+      // announcements/{id}: written by any FA admin, read by everyone with
+      // a role (the app shows each person only the ones meant for them).
+      match /announcements/{announcementId} {
+        allow get, list: if hasRole();
+
+        allow create: if isFaAdmin()
+          && request.resource.data.keys().hasOnly([
+               'title', 'body', 'to', 'important', 'pinned',
+               'createdBy', 'createdByName', 'createdAt'
+             ])
+          && isText(request.resource.data.title, 3, 80)
+          && isText(request.resource.data.body, 10, 2000)
+          && request.resource.data.to in ['everyone', 'teams', 'division', 'juvenile', 'referees']
+          && request.resource.data.important is bool
+          && request.resource.data.pinned is bool
+          && request.resource.data.createdBy == request.auth.uid
+          && isText(request.resource.data.createdByName, 1, 80)
+          && request.resource.data.createdAt == request.time;
+
+        // Pin or unpin only; the text never changes once sent
+        allow update: if isFaAdmin()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pinned'])
+          && request.resource.data.pinned is bool;
+
+        allow delete: if isFaAdmin();
+
+        // seen/{teamId or uid}: "Seen by 7 of 12" (FA only reads it)
+        match /seen/{key} {
+          allow get, list: if isFaAdmin();
+          allow create, update: if hasRole()
+            && (key == request.auth.uid || isTeamAdminOf(key))
+            && request.resource.data.keys().hasOnly(['at', 'by'])
+            && request.resource.data.by == request.auth.uid
+            && request.resource.data.at == request.time;
+        }
+      }
+
+      // notifications/{id}: one per audience, kind, team and day; each new
+      // event updates it (count + 1, one more name), so 20 approvals make
+      // 1 notification. audience = 'fa' or 'team:<teamId>'.
+      function isValidNotification(data) {
+        return data.keys().hasOnly([
+            'audience', 'kind', 'teamId', 'teamName', 'names', 'count', 'day',
+            'updatedAt'
+          ])
+          && data.audience is string
+          && data.kind in ['playersApproved', 'playersRejected', 'teamApproved',
+                           'teamRequest', 'playersSubmitted', 'playersResubmitted',
+                           'inviteAccepted']
+          && data.teamId is string
+          && data.teamName is string
+          && data.names is list && data.names.size() <= 60
+          && data.count is int && data.count >= 1
+          && data.day is string && data.day.size() == 10
+          && data.updatedAt == request.time;
+      }
+
+      // Who may write a notification for the FA's bell
+      function canNotifyFa(data) {
+        return hasConfirmedEmail()
+          && (isFaAdmin()
+              || (data.kind in ['playersSubmitted', 'playersResubmitted']
+                  && isTeamAdminOf(data.teamId))
+              || data.kind in ['teamRequest', 'inviteAccepted']);
+      }
+
+      match /notifications/{notificationId} {
+        allow get, list: if (resource.data.audience == 'fa' && isFaAdmin())
+          || (isTeamAdmin()
+              && resource.data.audience
+                   == 'team:' + get(userDoc(request.auth.uid)).data.get('teamId', ''));
+
+        allow create, update: if isValidNotification(request.resource.data)
+          && ((request.resource.data.audience == 'fa'
+                && canNotifyFa(request.resource.data))
+              || (request.resource.data.audience == 'team:' + request.resource.data.teamId
+                && isFaAdmin()));
+      }
+
+      // readMarks/{uid}: when I last opened my notifications, and the
+      // pinned announcements I hid. Mine only.
+      match /readMarks/{uid} {
+        allow get: if isOwner(uid);
+        allow create, update: if isOwner(uid)
+          && request.resource.data.keys().hasOnly(['notificationsSeenAt', 'hiddenAnnouncements'])
+          && (request.resource.data.get('notificationsSeenAt', null) == null
+              || request.resource.data.notificationsSeenAt is timestamp)
+          && request.resource.data.get('hiddenAnnouncements', []) is list
+          && request.resource.data.get('hiddenAnnouncements', []).size() <= 30;
+      }
+
       // ---------- teamRequests/{uid} ----------
       function isValidTeamRequest(data, uid) {
         return data.keys().hasOnly([

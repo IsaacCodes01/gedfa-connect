@@ -9,6 +9,11 @@ import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/auth/presentation/login_screen.dart';
 import 'package:gedfa_connect/features/home/presentation/placeholder_home.dart';
+import 'package:gedfa_connect/features/notifications/presentation/announcement_screen.dart';
+import 'package:gedfa_connect/features/notifications/presentation/compose_announcement_screen.dart';
+import 'package:gedfa_connect/features/notifications/presentation/fa_announcement_screen.dart';
+import 'package:gedfa_connect/features/notifications/presentation/fa_announcements_screen.dart';
+import 'package:gedfa_connect/features/notifications/presentation/notifications_screen.dart';
 import 'package:gedfa_connect/features/fa/presentation/fa_player_review_screen.dart';
 import 'package:gedfa_connect/features/fa/presentation/fa_player_teams_screen.dart';
 import 'package:gedfa_connect/features/fa/presentation/fa_request_review_screen.dart';
@@ -96,6 +101,12 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: Routes.admin,
                 builder: (_, _) => const FaRequestsScreen(),
                 routes: [
+                  // Notifications (bell). Full-screen, above the tabs.
+                  GoRoute(
+                    path: 'notifications',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (_, _) => const NotificationsScreen(),
+                  ),
                   // Opens full-screen, above the tabs.
                   GoRoute(
                     path: 'request/:uid',
@@ -142,6 +153,24 @@ final routerProvider = Provider<GoRouter>((ref) {
                 builder: (_, _) => const MoreScreen(),
                 routes: [
                   ..._moreChildren(),
+                  // FA only: Announcements (2.7). Inside the More tab.
+                  GoRoute(
+                    path: 'announcements',
+                    builder: (_, _) => const FaAnnouncementsScreen(),
+                    routes: [
+                      GoRoute(
+                        path: 'new',
+                        parentNavigatorKey: rootNavigatorKey,
+                        builder: (_, _) => const ComposeAnnouncementScreen(),
+                      ),
+                      GoRoute(
+                        path: 'view/:id',
+                        builder: (_, state) => FaAnnouncementScreen(
+                          id: state.pathParameters['id']!,
+                        ),
+                      ),
+                    ],
+                  ),
                   // FA only: People and roles (2.6). Inside the More tab.
                   GoRoute(
                     path: 'people',
@@ -185,6 +214,21 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: Routes.team,
                 builder: (_, _) => const TeamHomeScreen(),
                 routes: [
+                  // Notifications (bell) and one announcement.
+                  GoRoute(
+                    path: 'notifications',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (_, _) => const NotificationsScreen(),
+                    routes: [
+                      GoRoute(
+                        path: 'announcement/:id',
+                        parentNavigatorKey: rootNavigatorKey,
+                        builder: (_, state) => AnnouncementScreen(
+                          id: state.pathParameters['id']!,
+                        ),
+                      ),
+                    ],
+                  ),
                   // Player screens open full-screen, above the tabs.
                   GoRoute(
                     path: 'add',

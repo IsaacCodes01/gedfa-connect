@@ -1,37 +1,34 @@
 import 'package:flutter/material.dart';
-import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
-import 'package:gedfa_connect/core/widgets/state_views.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:gedfa_connect/app/routes.dart';
+import 'package:gedfa_connect/features/notifications/data/notifications_repository.dart';
+import 'package:go_router/go_router.dart';
 
-/// The bell on the right of the main app bars (team and FA).
-///
-/// For now it opens a "Coming soon" page. When notifications are built,
-/// this is the one place to change: point it at the real screen and add
-/// a red dot for unread items.
-class NotificationBell extends StatelessWidget {
+/// The bell on the right of the main app bars (team and FA), with a red
+/// number for unread notifications. Opens Notifications (2.8).
+class NotificationBell extends ConsumerWidget {
   const NotificationBell({super.key});
 
-  void _open(BuildContext context) {
-    Navigator.of(context, rootNavigator: true).push(
-      MaterialPageRoute<void>(
-        builder: (_) => const Scaffold(
-          appBar: GedfaAppBar(title: 'Notifications'),
-          body: EmptyView(
-            icon: Icons.notifications_none_rounded,
-            title: 'Coming soon',
-            message: 'Approvals, rejections, fixtures and announcements '
-                'from the FA will appear here.',
-          ),
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final unread = ref.watch(unreadCountProvider);
+    final isFa = ref.watch(myAudienceProvider) == 'fa';
+
+    return IconButton(
+      onPressed: () => context
+          .push(isFa ? Routes.adminNotifications : Routes.teamNotifications),
+      tooltip: unread == 0 ? 'Notifications' : 'Notifications, $unread new',
+      icon: Badge(
+        isLabelVisible: unread > 0,
+        label: Text(unread > 99 ? '99+' : '$unread'),
+        backgroundColor: const Color(0xFFCE1126),
+        textColor: Colors.white,
+        child: Icon(
+          unread > 0
+              ? Icons.notifications_rounded
+              : Icons.notifications_none_rounded,
         ),
       ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      onPressed: () => _open(context),
-      icon: const Icon(Icons.notifications_none_rounded),
-      tooltip: 'Notifications',
     );
   }
 }

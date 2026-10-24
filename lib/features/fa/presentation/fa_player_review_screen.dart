@@ -644,7 +644,7 @@ class _ReviewActionsState extends ConsumerState<_ReviewActions> {
     try {
       await ref
           .read(playerRepositoryProvider)
-          .reject(player.id, reason: reason, faUid: faUid);
+          .reject(player, reason: reason, faUid: faUid);
       if (!mounted) return;
       AppToast.success(
         context,

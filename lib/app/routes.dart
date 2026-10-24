@@ -10,6 +10,11 @@ class Routes {
   static const registerTeam = '/welcome/register';
   static const admin = '/admin';
   static String adminRequest(String uid) => '/admin/request/$uid';
+  static const adminNotifications = '/admin/notifications';
+  static const adminAnnouncements = '/admin/more/announcements';
+  static const adminNewAnnouncement = '/admin/more/announcements/new';
+  static String adminAnnouncement(String id) =>
+      '/admin/more/announcements/view/$id';
   static const adminPlayers = '/admin/players';
   static String adminTeamPlayers(String teamId) =>
       '$adminPlayers/team/$teamId';
@@ -22,6 +27,9 @@ class Routes {
       '$adminPeople/invited/${Uri.encodeComponent(email)}';
   static String adminMember(String uid) => '$adminPeople/member/$uid';
   static const team = '/team';
+  static const teamNotifications = '/team/notifications';
+  static String teamAnnouncement(String id) =>
+      '/team/notifications/announcement/$id';
   static const teamPositions = '/team/positions';
   static String teamPlayerProfile(String playerId) =>
       '$teamPositions/profile/$playerId';

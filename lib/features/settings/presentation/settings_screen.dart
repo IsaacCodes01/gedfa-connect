@@ -161,7 +161,8 @@ class _NotificationsPreview extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4),
           child: Text(
-            'Coming with notifications. Until then, check the Squad tab.',
+            'These will control phone alerts (coming before the pilot). '
+            'Everything always appears under the bell.',
             style: Theme.of(context)
                 .textTheme
                 .bodySmall

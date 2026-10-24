@@ -44,6 +44,12 @@ class MoreScreen extends ConsumerWidget {
                   TileGroup(
                     children: [
                       SettingsTile(
+                        icon: Icons.campaign_outlined,
+                        title: 'Announcements',
+                        subtitle: 'Messages to teams and referees',
+                        onTap: () => context.go(Routes.adminAnnouncements),
+                      ),
+                      SettingsTile(
                         icon: Icons.manage_accounts_outlined,
                         title: 'People and roles',
                         subtitle: 'FA officials, referees and invitations',
