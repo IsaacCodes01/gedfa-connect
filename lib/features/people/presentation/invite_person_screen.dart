@@ -76,16 +76,23 @@ class _InvitePersonScreenState extends ConsumerState<InvitePersonScreen> {
           top: false,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-            child: ResponsiveCenter(
-              child: FilledButton(
-                onPressed: _busy ? null : _create,
-                child: _busy
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2.5),
-                      )
-                    : const Text('Create invitation'),
+            // heightFactor: 1 = only as tall as the button.
+            // A plain Center (ResponsiveCenter) grows to the full screen
+            // height here and hides the form.
+            child: Center(
+              heightFactor: 1,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
+                child: FilledButton(
+                  onPressed: _busy ? null : _create,
+                  child: _busy
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2.5),
+                        )
+                      : const Text('Create invitation'),
+                ),
               ),
             ),
           ),
