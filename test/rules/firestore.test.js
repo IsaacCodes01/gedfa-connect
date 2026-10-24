@@ -1,4 +1,4 @@
-// Security rules tests for GEDFA Connect (steps 1.7 to 2.6, 2.3c).
+// Security rules tests for GEDFA Connect (steps 1.7 to 2.6, 2.3c, 2.3d).
 //
 // Run while the emulators are running:
 //   cd test/rules
@@ -1125,6 +1125,102 @@ describe('Re-check: what the team changed', () => {
       positionGroup: 'MID',
       changes: { position: { from: 'CM', to: 'DM' } },
       updatedAt: serverTimestamp(),
+    }));
+  });
+});
+
+// ---------- Player profiles and armbands (2.3d) ----------
+
+/** A valid profile for p1 (Royal). Pass changes to break it. */
+function profileData(changes = {}) {
+  return {
+    teamId: 'royal',
+    heightCm: 182,
+    weightKg: 76,
+    foot: 'right',
+    otherPositions: ['CB', 'DM'],
+    strengths: ['heading', 'tackling', 'leadership'],
+    hometown: 'Gomoa Fetteh',
+    clubSince: 2023,
+    previousClub: 'Afransi Stars',
+    availability: 'injured',
+    expectedBack: Timestamp.fromDate(new Date(Date.now() + 20 * 86400000)),
+    availabilityAt: serverTimestamp(),
+    emergencyName: 'Akua Boateng (mother)',
+    emergencyPhone: '0241234567',
+    updatedAt: serverTimestamp(),
+    ...changes,
+  };
+}
+
+const profile = (db, id = 'p1') => doc(db, `${D}/playerProfiles/${id}`);
+const armbands = (db, team = 'royal') => doc(db, `${D}/teams/${team}/armbands/division`);
+
+describe('Player profiles', () => {
+  it('the team can save a profile without the FA', async () => {
+    await assertSucceeds(setDoc(profile(dbAs('admin1')), profileData()));
+  });
+
+  it('the team can read its own profiles; the FA can read any', async () => {
+    await setDoc(profile(dbAs('admin1')), profileData());
+    await assertSucceeds(getDoc(profile(dbAs('admin1'))));
+    await assertSucceeds(getDoc(profile(dbAs('fa1'))));
+  });
+
+  it("another team cannot read or write it (emergency contact is private)", async () => {
+    await setDoc(profile(dbAs('admin1')), profileData());
+    await assertFails(getDoc(profile(dbAs('admin2'))));
+    await assertFails(setDoc(profile(dbAs('admin2')), profileData()));
+  });
+
+  it("cannot save a profile for another team's player", async () => {
+    await assertFails(setDoc(profile(dbAs('admin1'), 'p2'), profileData()));
+  });
+
+  it('cannot use an impossible height or a strength that does not exist', async () => {
+    await assertFails(setDoc(profile(dbAs('admin1')), profileData({ heightCm: 300 })));
+    await assertFails(setDoc(profile(dbAs('admin1')), profileData({ strengths: ['magic'] })));
+  });
+
+  it('cannot pick more than 2 other positions or 3 strengths', async () => {
+    await assertFails(setDoc(profile(dbAs('admin1')), profileData({ otherPositions: ['CB', 'DM', 'RB'] })));
+    await assertFails(setDoc(profile(dbAs('admin1')), profileData({ strengths: ['pace', 'heading', 'tackling', 'passing'] })));
+  });
+
+  it('cannot write extra fields (e.g. medical details)', async () => {
+    await assertFails(setDoc(profile(dbAs('admin1')), profileData({ injury: 'hamstring' })));
+  });
+
+  it("saving a profile doesn't touch the FA's approval", async () => {
+    await setDoc(profile(dbAs('admin1')), profileData());
+    const p1 = await testEnv.withSecurityRulesDisabled(async (context) =>
+      (await getDoc(doc(context.firestore(), `${D}/players/p1`))).data());
+    if (p1.status !== 'approved') throw new Error('p1 should still be approved');
+  });
+});
+
+describe('Armbands', () => {
+  it('the team can set its captain and vice-captain', async () => {
+    await assertSucceeds(setDoc(armbands(dbAs('admin1')), {
+      captainId: 'p1', viceCaptainId: 'p3', updatedAt: serverTimestamp(),
+    }));
+  });
+
+  it('the same player cannot be captain and vice-captain', async () => {
+    await assertFails(setDoc(armbands(dbAs('admin1')), {
+      captainId: 'p1', viceCaptainId: 'p1', updatedAt: serverTimestamp(),
+    }));
+  });
+
+  it("cannot make another team's player captain", async () => {
+    await assertFails(setDoc(armbands(dbAs('admin1')), {
+      captainId: 'p2', viceCaptainId: null, updatedAt: serverTimestamp(),
+    }));
+  });
+
+  it("another team cannot change the armbands", async () => {
+    await assertFails(setDoc(armbands(dbAs('admin2'), 'royal'), {
+      captainId: null, viceCaptainId: null, updatedAt: serverTimestamp(),
     }));
   });
 });

@@ -34,8 +34,8 @@ final teamDestinations = [
     label: 'Squad',
   ),
   const ShellDestination(
-    icon: Icons.sports_soccer_outlined,
-    selectedIcon: Icons.sports_soccer_rounded,
+    icon: Icons.assignment_ind_outlined,
+    selectedIcon: Icons.assignment_ind_rounded,
     label: 'Positions',
   ),
   const ShellDestination(

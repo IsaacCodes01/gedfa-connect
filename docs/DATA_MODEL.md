@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v1.8, matches the rules after step 2.3c (24 Oct 2026)
+**Status:** v1.9, matches the rules after step 2.3d (24 Oct 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -279,6 +279,29 @@ One collection for the whole district. Team admins see only their own team's pla
 - **Juvenile players:** the age group (U13 / U15 / U17) is **calculated** from `dob` and the season's cut-off date, never stored as typed input. Extra fields planned, pending GEDFA: birth certificate photo, parent or guardian name and phone, consent. Juvenile player photos are **never shown publicly**.
 - Only an FA admin may set `status` to `approved` or `rejected`.
 
+### 2.4c `playerProfiles/{playerId}` — football details (2.3d)
+
+Kept by the team, **no FA approval**, never part of the registration. Private: the team and FA admins only. No document = nothing filled in, Available.
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `teamId` | string | Must be the player's team |
+| `heightCm`, `weightKg` | number? | 120–220 cm, 35–130 kg |
+| `foot` | string? | `left` / `right` / `both` |
+| `otherPositions` | array | Up to 2 position codes ("can also play") |
+| `strengths` | array | Up to 3 of `pace, strength, stamina, dribbling, passing, finishing, heading, tackling, setPieces, leadership` |
+| `hometown`, `previousClub` | string? | ≤ 60 / ≤ 80 characters |
+| `clubSince` | number? | Year, 1980 to this year |
+| `availability` | string | `available` / `injured` / `unavailable`. **No medical details** are stored anywhere |
+| `expectedBack` | timestamp? | Only while not available |
+| `availabilityAt` | timestamp | When the availability last changed |
+| `emergencyName`, `emergencyPhone` | string? | Private. **Required for Juvenile players** (later) |
+| `updatedAt` | timestamp | |
+
+#### Subcollection `teams/{teamId}/armbands/{category}` — captain and vice-captain
+
+`captainId`, `viceCaptainId` (player IDs or null), `updatedAt`. One document per competition, so there is only ever one captain and one vice-captain; both must be players of that team and competition, never the same player. The team sheet (Phase 3) fills them in and can change them for one match.
+
 ### 2.4a Player ID (`playerCode`)
 
 **Format:** `GE` + two-digit year of first approval + `-` + four-digit running number. Example: `GE26-0042`.
@@ -470,6 +493,7 @@ Feed rules: never include dates of birth; player photos only if agreed with GEDF
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 24 Oct 2026 | v1.9: new `playerProfiles` and `teams/*/armbands` (2.3d). 136 tests. |
 | 24 Oct 2026 | v1.8: players gain `changes` (what the team changed, for the FA); approval and rejection clear it. 124 tests. |
 | 24 Oct 2026 | v1.7: invitations (2.6). New `invites/{email}` and `roleLog`; `users` gain `name`, `inviteId` and the hand-set `isChairman`; invited people create their own user document when accepting; roles removed by deleting the document (chairman protected). FA can list users. 119 tests. |
 | 22 Oct 2026 | v1.6: FA review of players (2.3). Players gain `reviewedAt`, `reviewedBy` (rejection). FA may read every player, jersey and player key, and approve or reject pending players; approval is a transaction with `settings/playerCounter`, re-checked players keep their ID, the ID year is the year of first approval. Access table updated (90 tests). |

@@ -28,6 +28,15 @@ class FirestorePaths {
 
   static String playerKey(String key) => '$district/playerKeys/$key';
 
+  /// Football details the team keeps up to date (2.3d).
+  static const playerProfiles = '$district/playerProfiles';
+  static String playerProfile(String playerId) =>
+      '$district/playerProfiles/$playerId';
+
+  /// Captain and vice-captain of one squad, e.g. teams/royal/armbands/division.
+  static String armbands(String teamId, String category) =>
+      '${team(teamId)}/armbands/$category';
+
   static const leagueSettings = '$district/settings/league';
 
   /// The next player-ID number: `{ next: 43 }`. FA only.

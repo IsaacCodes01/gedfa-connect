@@ -415,6 +415,77 @@ service cloud.firestore {
             && (!existsAfter(playerDoc(resource.data.playerId))
                 || jerseyIdOf(getAfter(playerDoc(resource.data.playerId)).data) != jerseyId);
         }
+
+        // ---------- teams/{teamId}/armbands/{category} (2.3d) ----------
+        // One captain and one vice-captain per squad. One document per
+        // competition, so there can never be two captains.
+        function isArmbandHolder(id, category) {
+          return id == null
+            || (get(playerDoc(id)).data.teamId == teamId
+                && get(playerDoc(id)).data.category == category);
+        }
+
+        match /armbands/{category} {
+          allow get: if isTeamAdminOf(teamId) || isFaAdmin();
+          allow create, update: if isTeamAdminOf(teamId)
+            && category in ['division', 'juvenile']
+            && request.resource.data.keys().hasOnly(['captainId', 'viceCaptainId', 'updatedAt'])
+            && isArmbandHolder(request.resource.data.get('captainId', null), category)
+            && isArmbandHolder(request.resource.data.get('viceCaptainId', null), category)
+            && (request.resource.data.get('captainId', null) == null
+                || request.resource.data.get('captainId', null)
+                     != request.resource.data.get('viceCaptainId', null))
+            && request.resource.data.updatedAt == request.time;
+        }
+      }
+
+      // ---------- playerProfiles/{playerId} (2.3d) ----------
+      // Football details the team keeps up to date: no FA approval, and
+      // they never change the player's registration. Private: the team
+      // and the FA only (the emergency contact is in here).
+      function isValidProfile(data, playerId) {
+        return data.keys().hasOnly([
+            'teamId', 'heightCm', 'weightKg', 'foot', 'otherPositions',
+            'strengths', 'hometown', 'clubSince', 'previousClub',
+            'availability', 'expectedBack', 'availabilityAt',
+            'emergencyName', 'emergencyPhone', 'updatedAt'
+          ])
+          && data.teamId == get(playerDoc(playerId)).data.teamId
+          && (data.get('heightCm', null) == null
+              || (data.heightCm is int && data.heightCm >= 120 && data.heightCm <= 220))
+          && (data.get('weightKg', null) == null
+              || (data.weightKg is int && data.weightKg >= 35 && data.weightKg <= 130))
+          && (data.get('foot', null) == null || data.foot in ['left', 'right', 'both'])
+          && (data.get('otherPositions', []) is list
+              && data.get('otherPositions', []).size() <= 2
+              && positionGroups().keys().hasAll(data.get('otherPositions', [])))
+          && (data.get('strengths', []) is list
+              && data.get('strengths', []).size() <= 3
+              && ['pace', 'strength', 'stamina', 'dribbling', 'passing', 'finishing',
+                  'heading', 'tackling', 'setPieces', 'leadership']
+                   .hasAll(data.get('strengths', [])))
+          && isOptionalText(data, 'hometown', 60)
+          && isOptionalText(data, 'previousClub', 80)
+          && (data.get('clubSince', null) == null
+              || (data.clubSince is int && data.clubSince >= 1980
+                  && data.clubSince <= request.time.year()))
+          && data.availability in ['available', 'injured', 'unavailable']
+          && (data.get('expectedBack', null) == null || data.expectedBack is timestamp)
+          && data.availabilityAt is timestamp
+          && isOptionalText(data, 'emergencyName', 80)
+          && isOptionalText(data, 'emergencyPhone', 20)
+          && data.updatedAt == request.time;
+      }
+
+      match /playerProfiles/{playerId} {
+        // (a profile not filled in yet doesn't exist: any team admin may
+        // look, and finds nothing)
+        allow read: if isFaAdmin()
+          || (resource == null && isTeamAdmin())
+          || isTeamAdminOf(resource.data.teamId);
+        allow create, update: if isTeamAdminOf(request.resource.data.teamId)
+          && isValidProfile(request.resource.data, playerId)
+          && (resource == null || resource.data.teamId == request.resource.data.teamId);
       }
 
       // ---------- playerKeys/{key} ----------

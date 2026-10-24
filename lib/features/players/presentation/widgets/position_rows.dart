@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gedfa_connect/app/theme.dart';
 import 'package:gedfa_connect/core/constants/approval_status.dart';
 import 'package:gedfa_connect/features/players/domain/player.dart';
+import 'package:gedfa_connect/features/players/domain/player_profile.dart';
 import 'package:gedfa_connect/features/players/domain/position.dart';
 import 'package:gedfa_connect/features/settings/data/data_saver_provider.dart';
 
@@ -32,6 +33,21 @@ enum CardLine {
 
   /// Positions tab: "RCB · 24 yrs".
   positionAndAge,
+}
+
+/// Extra things a card can show (Player profiles tab, 2.3d).
+class CardExtra {
+  const CardExtra({this.badge, this.availability, this.line});
+
+  /// 'C' or 'VC' in a gold circle (top right).
+  final String? badge;
+
+  /// For approved players the bottom strip shows this instead of
+  /// "Approved": Available (green), Injured (red), Unavailable (grey).
+  final Availability? availability;
+
+  /// A third small line, e.g. "1.82 m · Right".
+  final String? line;
 }
 
 // ── Sections ─────────────────────────────────────────────────────────────
@@ -135,7 +151,8 @@ class PositionRows extends StatelessWidget {
     required this.sections,
     required this.cardLine,
     required this.onTap,
-    this.showAverageAge = false,
+    this.headingTrailing,
+    this.extras = const {},
     this.selecting = false,
     this.picked = const {},
   });
@@ -144,8 +161,11 @@ class PositionRows extends StatelessWidget {
   final CardLine cardLine;
   final ValueChanged<Player> onTap;
 
-  /// "Avg age 22" on the right of each heading (Positions tab).
-  final bool showAverageAge;
+  /// Small text on the right of each heading, e.g. "Avg age 22 · 1.79 m".
+  final String Function(PlayerSection section)? headingTrailing;
+
+  /// Extra card details by player ID (badges, availability, a third line).
+  final Map<String, CardExtra> extras;
 
   /// FA select mode: pending players get a tick box, the others fade.
   final bool selecting;
@@ -161,7 +181,8 @@ class PositionRows extends StatelessWidget {
             section: section,
             cardLine: cardLine,
             onTap: onTap,
-            showAverageAge: showAverageAge,
+            headingTrailing: headingTrailing,
+            extras: extras,
             selecting: selecting,
             picked: picked,
           ),
@@ -175,7 +196,8 @@ class _Section extends StatelessWidget {
     required this.section,
     required this.cardLine,
     required this.onTap,
-    required this.showAverageAge,
+    required this.headingTrailing,
+    required this.extras,
     required this.selecting,
     required this.picked,
   });
@@ -183,7 +205,8 @@ class _Section extends StatelessWidget {
   final PlayerSection section;
   final CardLine cardLine;
   final ValueChanged<Player> onTap;
-  final bool showAverageAge;
+  final String Function(PlayerSection section)? headingTrailing;
+  final Map<String, CardExtra> extras;
   final bool selecting;
   final Set<String> picked;
 
@@ -230,9 +253,9 @@ class _Section extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (showAverageAge)
+                if (headingTrailing != null)
                   Text(
-                    'Avg age ${section.averageAge}',
+                    headingTrailing!(section),
                     style: textTheme.bodySmall
                         ?.copyWith(color: scheme.onSurfaceVariant),
                   ),
@@ -260,6 +283,7 @@ class _Section extends StatelessWidget {
                                     ? PlayerGridCard(
                                         player: players[i + c],
                                         cardLine: cardLine,
+                                        extra: extras[players[i + c].id],
                                         selecting: selecting,
                                         selected:
                                             picked.contains(players[i + c].id),
@@ -293,6 +317,7 @@ class PlayerGridCard extends ConsumerWidget {
     required this.player,
     required this.cardLine,
     required this.onTap,
+    this.extra,
     this.selecting = false,
     this.selected = false,
   });
@@ -300,6 +325,7 @@ class PlayerGridCard extends ConsumerWidget {
   final Player player;
   final CardLine cardLine;
   final VoidCallback onTap;
+  final CardExtra? extra;
   final bool selecting;
   final bool selected;
 
@@ -322,6 +348,29 @@ class PlayerGridCard extends ConsumerWidget {
     };
   }
 
+  /// The bottom strip for the registration status.
+  static (String, Color, Color) _registrationStrip(
+    ApprovalStatus status,
+    bool isDark,
+  ) =>
+      switch (status) {
+        ApprovalStatus.approved => (
+            'Approved',
+            isDark ? const Color(0xFF123D2B) : AppColors.approvedBg,
+            isDark ? const Color(0xFF7BE3B0) : AppColors.approvedText,
+          ),
+        ApprovalStatus.pending => (
+            'Pending',
+            AppColors.ghanaGold,
+            const Color(0xFF3A2C00),
+          ),
+        ApprovalStatus.rejected => (
+            'Rejected',
+            isDark ? const Color(0xFF4A1820) : AppColors.rejectedBg,
+            isDark ? const Color(0xFFFF9DA6) : AppColors.rejectedText,
+          ),
+      };
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final textTheme = Theme.of(context).textTheme;
@@ -341,23 +390,29 @@ class PlayerGridCard extends ConsumerWidget {
                 : scheme.outline;
     final thickBorder = selected || isPending || isRejected;
 
-    final (statusText, statusBg, statusInk) = switch (status) {
-      ApprovalStatus.approved => (
-          'Approved',
+    // Approved players on the Player profiles tab show their availability
+    final availability =
+        status == ApprovalStatus.approved ? extra?.availability : null;
+    final (statusText, statusBg, statusInk) = switch (availability) {
+      Availability.available => (
+          'Available',
           isDark ? const Color(0xFF123D2B) : AppColors.approvedBg,
           isDark ? const Color(0xFF7BE3B0) : AppColors.approvedText,
         ),
-      ApprovalStatus.pending => (
-          'Pending',
-          AppColors.ghanaGold,
-          const Color(0xFF3A2C00),
-        ),
-      ApprovalStatus.rejected => (
-          'Rejected',
+      Availability.injured => (
+          'Injured',
           isDark ? const Color(0xFF4A1820) : AppColors.rejectedBg,
           isDark ? const Color(0xFFFF9DA6) : AppColors.rejectedText,
         ),
+      Availability.unavailable => (
+          'Unavailable',
+          isDark ? AppColors.darkBorder : const Color(0xFFE3EAF2),
+          isDark ? const Color(0xFFCFE4FB) : const Color(0xFF33445A),
+        ),
+      null => _registrationStrip(status, isDark),
     };
+    final badge = extra?.badge;
+    final extraLine = extra?.line;
 
     // The full 300×400 photo: the 96×128 thumbnail looks blurry this big.
     // Data saver: a silhouette instead of downloading photos.
@@ -419,6 +474,12 @@ class PlayerGridCard extends ConsumerWidget {
                           top: 6,
                           child: _TickBox(selected: selected),
                         ),
+                      if (badge != null && !selecting)
+                        Positioned(
+                          right: 6,
+                          top: 6,
+                          child: _ArmbandBadge(text: badge),
+                        ),
                       Positioned(
                         left: 0,
                         right: 0,
@@ -467,6 +528,16 @@ class PlayerGridCard extends ConsumerWidget {
                               : scheme.onSurfaceVariant,
                         ),
                       ),
+                      if (extraLine != null)
+                        Text(
+                          extraLine,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.labelSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: scheme.onSurface,
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -498,6 +569,36 @@ class _NumberChip extends StatelessWidget {
           color: Colors.white,
           fontSize: 11.5,
           fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+/// Gold "C" or "VC" circle: captain / vice-captain.
+class _ArmbandBadge extends StatelessWidget {
+  const _ArmbandBadge({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 24),
+      height: 24,
+      padding: const EdgeInsets.symmetric(horizontal: 5),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: AppColors.ghanaGold,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white, width: 2),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: Color(0xFF3A2C00),
+          fontSize: 10.5,
+          fontWeight: FontWeight.w800,
         ),
       ),
     );

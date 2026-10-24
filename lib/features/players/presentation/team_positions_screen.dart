@@ -1,27 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gedfa_connect/app/routes.dart';
+import 'package:gedfa_connect/app/theme.dart';
 import 'package:gedfa_connect/core/constants/approval_status.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/notification_bell.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
+import 'package:gedfa_connect/features/players/data/player_profile_repository.dart';
 import 'package:gedfa_connect/features/players/data/player_repository.dart';
 import 'package:gedfa_connect/features/players/domain/player.dart';
+import 'package:gedfa_connect/features/players/domain/player_profile.dart';
 import 'package:gedfa_connect/features/players/domain/position.dart';
 import 'package:gedfa_connect/features/players/presentation/widgets/position_rows.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:go_router/go_router.dart';
 
-/// Team admin, Positions tab: "who can play where?"
+/// Team admin, Positions tab: Player profiles, the team manager's view.
 ///
-/// - All: one row per group (Goalkeepers, Defenders, ...).
-/// - One group (e.g. DEF): one row per detailed position (Centre-back,
-///   Left-back, ...), so gaps in the squad are easy to see.
-/// - Each row shows the average age; cards show position and age.
-/// - "Approved players only" = the players who can go on a team sheet.
+/// - Available / Injured / Unavailable counts (approved players).
+/// - All · GK · DEF · MID · FWD; one group → rows by detailed position.
+/// - Each row: average age and height. Cards: position, age, height,
+///   foot, the C / VC badge and availability.
+/// - "Available players only" = who can go on a team sheet right now.
 ///
 /// Division only for now (Juvenile waits for GEDFA's age rules).
 class TeamPositionsScreen extends ConsumerStatefulWidget {
@@ -34,33 +37,55 @@ class TeamPositionsScreen extends ConsumerStatefulWidget {
 
 class _TeamPositionsScreenState extends ConsumerState<TeamPositionsScreen> {
   PositionGroup? _group; // null = All
-  bool _onlyApproved = false;
+  bool _onlyAvailable = false;
+
+  static const _category = 'division';
 
   @override
   Widget build(BuildContext context) {
     final team = ref.watch(myTeamProvider).value;
     final playersAsync = ref.watch(teamPlayersProvider);
+    final profilesAsync = ref.watch(teamProfilesProvider);
+    final armbands =
+        ref.watch(armbandsProvider(_category)).value ?? const Armbands();
+
+    Widget body;
+    final error = playersAsync.error ?? profilesAsync.error;
+    if (error != null) {
+      body = ErrorView(
+        message: appErrorMessage(error),
+        onRetry: () {
+          ref.invalidate(teamPlayersProvider);
+          ref.invalidate(teamProfilesProvider);
+        },
+      );
+    } else if (!playersAsync.hasValue || !profilesAsync.hasValue) {
+      body = const LoadingView();
+    } else {
+      body = _body(
+        playersAsync.requireValue
+            .where((p) => p.category == Competition.division)
+            .toList(),
+        profilesAsync.requireValue,
+        armbands,
+      );
+    }
 
     return Scaffold(
       appBar: GedfaAppBar(
-        title: 'Positions',
+        title: 'Player profiles',
         subtitle: team == null ? null : '${team.name} · Division',
         actions: const [NotificationBell()],
       ),
-      body: playersAsync.when(
-        loading: () => const LoadingView(),
-        error: (error, _) => ErrorView(
-          message: appErrorMessage(error),
-          onRetry: () => ref.invalidate(teamPlayersProvider),
-        ),
-        data: (all) => _body(
-          all.where((p) => p.category == Competition.division).toList(),
-        ),
-      ),
+      body: body,
     );
   }
 
-  Widget _body(List<Player> division) {
+  Widget _body(
+    List<Player> division,
+    Map<String, PlayerProfile> profiles,
+    Armbands armbands,
+  ) {
     final textTheme = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -73,9 +98,20 @@ class _TeamPositionsScreenState extends ConsumerState<TeamPositionsScreen> {
       );
     }
 
-    final pool = _onlyApproved
-        ? division.where((p) => p.status == ApprovalStatus.approved).toList()
-        : division;
+    PlayerProfile profileOf(Player p) =>
+        profiles[p.id] ?? PlayerProfile.empty(p.id, p.teamId);
+
+    // Availability counts: approved players only (others can't play anyway)
+    final approved =
+        division.where((p) => p.status == ApprovalStatus.approved).toList();
+    int countAvail(Availability a) =>
+        approved.where((p) => profileOf(p).availability == a).length;
+
+    bool canPick(Player p) =>
+        p.status == ApprovalStatus.approved && profileOf(p).isAvailable;
+
+    final pool =
+        _onlyAvailable ? division.where(canPick).toList() : division;
     final group = _group;
 
     final sections = group == null
@@ -86,8 +122,31 @@ class _TeamPositionsScreenState extends ConsumerState<TeamPositionsScreen> {
             isDark: isDark,
           );
 
-    int countIn(PositionGroup? g) =>
-        g == null ? pool.length : pool.where((p) => p.positionGroup == g).length;
+    int countIn(PositionGroup? g) => g == null
+        ? pool.length
+        : pool.where((p) => p.positionGroup == g).length;
+
+    // "Avg age 22 · 1.79 m" (height only from players who filled it in)
+    String headingTrailing(PlayerSection section) {
+      final heights = [
+        for (final p in section.players) ?profileOf(p).heightCm,
+      ];
+      if (heights.isEmpty) return 'Avg age ${section.averageAge}';
+      final avg = heights.reduce((a, b) => a + b) / heights.length / 100;
+      return 'Avg age ${section.averageAge} · ${avg.toStringAsFixed(2)} m';
+    }
+
+    final extras = {
+      for (final p in division)
+        p.id: CardExtra(
+          badge: armbands.badgeFor(p.id),
+          availability: profileOf(p).availability,
+          line: [
+            profileOf(p).heightText ?? 'No height',
+            profileOf(p).foot?.label ?? 'foot?',
+          ].join(' · '),
+        ),
+    };
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
@@ -97,10 +156,36 @@ class _TeamPositionsScreenState extends ConsumerState<TeamPositionsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Row(
+                children: [
+                  _CountTile(
+                    value: countAvail(Availability.available),
+                    label: 'Available',
+                    color:
+                        isDark ? AppColors.darkGreen : AppColors.ghanaGreen,
+                  ),
+                  const SizedBox(width: 10),
+                  _CountTile(
+                    value: countAvail(Availability.injured),
+                    label: 'Injured',
+                    color: scheme.error,
+                  ),
+                  const SizedBox(width: 10),
+                  _CountTile(
+                    value: countAvail(Availability.unavailable),
+                    label: 'Unavailable',
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
               // All · GK · DEF · MID · FWD, equal widths, one row
               Row(
                 children: [
-                  for (final g in <PositionGroup?>[null, ...PositionGroup.values]) ...[
+                  for (final g in <PositionGroup?>[
+                    null,
+                    ...PositionGroup.values,
+                  ]) ...[
                     if (g != null) const SizedBox(width: 6),
                     Expanded(
                       child: _GroupChip(
@@ -123,15 +208,15 @@ class _TeamPositionsScreenState extends ConsumerState<TeamPositionsScreen> {
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: SwitchListTile(
-                  value: _onlyApproved,
-                  onChanged: (value) => setState(() => _onlyApproved = value),
+                  value: _onlyAvailable,
+                  onChanged: (value) => setState(() => _onlyAvailable = value),
                   title: Text(
-                    'Approved players only',
+                    'Available players only',
                     style: textTheme.titleSmall
                         ?.copyWith(fontWeight: FontWeight.w600),
                   ),
                   subtitle: Text(
-                    'Only these can be picked for team sheets',
+                    'Approved, not injured or unavailable: who you can pick',
                     style: textTheme.bodySmall
                         ?.copyWith(color: scheme.onSurfaceVariant),
                   ),
@@ -143,8 +228,8 @@ class _TeamPositionsScreenState extends ConsumerState<TeamPositionsScreen> {
                   child: EmptyView(
                     icon: Icons.person_search_outlined,
                     title: 'No players here',
-                    message: _onlyApproved
-                        ? 'No approved players in this position yet.'
+                    message: _onlyAvailable
+                        ? 'No available players in this position.'
                         : 'No players in this position yet.',
                   ),
                 )
@@ -152,14 +237,63 @@ class _TeamPositionsScreenState extends ConsumerState<TeamPositionsScreen> {
                 PositionRows(
                   sections: sections,
                   cardLine: CardLine.positionAndAge,
-                  showAverageAge: true,
+                  headingTrailing: headingTrailing,
+                  extras: extras,
                   // push, so Back returns here (not to the Squad tab)
-                  onTap: (player) => context.push(Routes.player(player.id)),
+                  onTap: (player) =>
+                      context.push(Routes.teamPlayerProfile(player.id)),
                 ),
             ],
           ),
         ),
       ],
+    );
+  }
+}
+
+class _CountTile extends StatelessWidget {
+  const _CountTile({
+    required this.value,
+    required this.label,
+    required this.color,
+  });
+
+  final int value;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        decoration: BoxDecoration(
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: scheme.outline),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '$value',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
+            Text(
+              label,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: scheme.onSurfaceVariant),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -201,9 +335,7 @@ class _GroupChip extends StatelessWidget {
         child: Material(
           color: background,
           shape: StadiumBorder(
-            side: selected
-                ? BorderSide.none
-                : BorderSide(color: scheme.outline),
+            side: selected ? BorderSide.none : BorderSide(color: scheme.outline),
           ),
           child: InkWell(
             onTap: onTap,

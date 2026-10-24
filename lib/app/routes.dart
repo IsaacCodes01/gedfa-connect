@@ -23,6 +23,10 @@ class Routes {
   static String adminMember(String uid) => '$adminPeople/member/$uid';
   static const team = '/team';
   static const teamPositions = '/team/positions';
+  static String teamPlayerProfile(String playerId) =>
+      '$teamPositions/profile/$playerId';
+  static String teamEditPlayerProfile(String playerId) =>
+      '$teamPositions/profile/$playerId/edit';
   static const teamMore = '/team/more';
   static const teamProfile = '/team/more/profile';
   static const teamChangeEmail = '/team/more/profile/email';

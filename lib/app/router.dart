@@ -26,6 +26,8 @@ import 'package:gedfa_connect/features/people/presentation/member_screen.dart';
 import 'package:gedfa_connect/features/people/presentation/people_screen.dart';
 import 'package:gedfa_connect/features/players/presentation/player_details_screen.dart';
 import 'package:gedfa_connect/features/players/presentation/player_form_screen.dart';
+import 'package:gedfa_connect/features/players/presentation/player_profile_edit_screen.dart';
+import 'package:gedfa_connect/features/players/presentation/player_profile_screen.dart';
 import 'package:gedfa_connect/features/players/presentation/team_positions_screen.dart';
 import 'package:gedfa_connect/features/settings/presentation/change_email_screen.dart';
 import 'package:gedfa_connect/features/settings/presentation/more_screen.dart';
@@ -215,6 +217,25 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: Routes.teamPositions,
                 builder: (_, _) => const TeamPositionsScreen(),
+                routes: [
+                  // Profile screens open full-screen, above the tabs.
+                  GoRoute(
+                    path: 'profile/:playerId',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (_, state) => PlayerProfileScreen(
+                      playerId: state.pathParameters['playerId']!,
+                    ),
+                    routes: [
+                      GoRoute(
+                        path: 'edit',
+                        parentNavigatorKey: rootNavigatorKey,
+                        builder: (_, state) => PlayerProfileEditScreen(
+                          playerId: state.pathParameters['playerId']!,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ],
           ),
