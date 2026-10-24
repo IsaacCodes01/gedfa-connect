@@ -22,6 +22,7 @@ import 'package:gedfa_connect/features/teams/presentation/register_team_screen.d
 import 'package:gedfa_connect/features/teams/presentation/team_home_screen.dart';
 import 'package:gedfa_connect/features/players/presentation/player_details_screen.dart';
 import 'package:gedfa_connect/features/players/presentation/player_form_screen.dart';
+import 'package:gedfa_connect/features/players/presentation/team_positions_screen.dart';
 import 'package:gedfa_connect/features/settings/presentation/change_email_screen.dart';
 import 'package:gedfa_connect/features/settings/presentation/more_screen.dart';
 import 'package:gedfa_connect/features/settings/presentation/my_profile_screen.dart';
@@ -139,7 +140,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
-      // Team admin area: a shell with tabs (Squad, More).
+      // Team admin area: a shell with tabs (Squad, Positions, More).
       StatefulShellRoute.indexedStack(
         builder: (_, _, navigationShell) => AppShell(
           navigationShell: navigationShell,
@@ -179,7 +180,16 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
-          // Tab 1: More (Settings)
+          // Tab 1: Positions (who can play where)
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: Routes.teamPositions,
+                builder: (_, _) => const TeamPositionsScreen(),
+              ),
+            ],
+          ),
+          // Tab 2: More (Settings)
           StatefulShellBranch(
             routes: [
               GoRoute(

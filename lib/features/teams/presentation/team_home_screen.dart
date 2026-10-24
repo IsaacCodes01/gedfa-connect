@@ -10,11 +10,9 @@ import 'package:gedfa_connect/core/utils/initials.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/notification_bell.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
-import 'package:gedfa_connect/core/widgets/status_badge.dart';
 import 'package:gedfa_connect/features/players/data/player_repository.dart';
-import 'package:gedfa_connect/features/players/domain/player.dart';
-import 'package:gedfa_connect/features/players/domain/position.dart';
-import 'package:gedfa_connect/features/players/presentation/widgets/player_photo.dart';
+import 'package:gedfa_connect/features/players/presentation/widgets/position_rows.dart';
+import 'package:gedfa_connect/features/settings/presentation/widgets/settings_widgets.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/teams/domain/team.dart';
@@ -29,7 +27,7 @@ class TeamHomeScreen extends ConsumerStatefulWidget {
 
 class _TeamHomeScreenState extends ConsumerState<TeamHomeScreen> {
   Competition? _competition; // null = the team's first competition
-  PositionGroup? _group; // null = All
+  ApprovalStatus? _status; // null = show everyone
   final _search = TextEditingController();
 
   @override
@@ -135,7 +133,7 @@ class _TeamHomeScreenState extends ConsumerState<TeamHomeScreen> {
                     showSelectedIcon: false,
                     onSelectionChanged: (value) => setState(() {
                       _competition = value.first;
-                      _group = null;
+                      _status = null;
                       _search.clear();
                     }),
                   ),
@@ -144,9 +142,9 @@ class _TeamHomeScreenState extends ConsumerState<TeamHomeScreen> {
             ),
           Expanded(child: _SquadBody(
             competition: competition,
-            group: _group,
+            status: _status,
             search: _search,
-            onGroupChanged: (group) => setState(() => _group = group),
+            onStatusChanged: (status) => setState(() => _status = status),
             onSearchChanged: () => setState(() {}),
             onAddPlayer: _addPlayer,
           )),
@@ -159,17 +157,19 @@ class _TeamHomeScreenState extends ConsumerState<TeamHomeScreen> {
 class _SquadBody extends ConsumerWidget {
   const _SquadBody({
     required this.competition,
-    required this.group,
+    required this.status,
     required this.search,
-    required this.onGroupChanged,
+    required this.onStatusChanged,
     required this.onSearchChanged,
     required this.onAddPlayer,
   });
 
   final Competition competition;
-  final PositionGroup? group;
+
+  /// Which tile is selected (null = show everyone).
+  final ApprovalStatus? status;
   final TextEditingController search;
-  final ValueChanged<PositionGroup?> onGroupChanged;
+  final ValueChanged<ApprovalStatus?> onStatusChanged;
   final VoidCallback onSearchChanged;
   final VoidCallback onAddPlayer;
 
@@ -177,6 +177,9 @@ class _SquadBody extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final playersAsync = ref.watch(teamPlayersProvider);
     final isDivision = competition == Competition.division;
+    final textTheme = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return playersAsync.when(
       loading: () => const LoadingView(),
@@ -199,41 +202,69 @@ class _SquadBody extends ConsumerWidget {
                 );
         }
 
+        int count(ApprovalStatus s) => squad.where((p) => p.status == s).length;
+        final rejected = count(ApprovalStatus.rejected);
+
         final shown = squad
-            .where((p) => group == null || p.positionGroup == group)
+            .where((p) => status == null || p.status == status)
             .where((p) => p.matches(search.text))
             .toList();
 
-        int count(ApprovalStatus status) =>
-            squad.where((p) => p.status == status).length;
+        /// Tapping a tile shows only those players; tapping it again
+        /// shows everyone.
+        void pick(ApprovalStatus s) => onStatusChanged(status == s ? null : s);
+
+        final hint = status == null
+            ? 'Tap a number to show only those players.'
+            : 'Showing ${_statusWord(status!)} players. Tap again to show all.';
 
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
           children: [
             ResponsiveCenter(
+              maxWidth: 720,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Row(
                     children: [
-                      _CountTile(
+                      _StatusTile(
                         value: count(ApprovalStatus.approved),
                         label: 'Approved',
-                        color: AppColors.approvedText,
+                        color: isDark
+                            ? AppColors.darkGreen
+                            : AppColors.ghanaGreen,
+                        selected: status == ApprovalStatus.approved,
+                        onTap: () => pick(ApprovalStatus.approved),
                       ),
                       const SizedBox(width: 10),
-                      _CountTile(
+                      _StatusTile(
                         value: count(ApprovalStatus.pending),
                         label: 'Pending',
-                        color: AppColors.pendingText,
+                        color: isDark
+                            ? const Color(0xFFF5D25B)
+                            : const Color(0xFF8A6A00),
+                        selected: status == ApprovalStatus.pending,
+                        onTap: () => pick(ApprovalStatus.pending),
                       ),
                       const SizedBox(width: 10),
-                      _CountTile(
-                        value: count(ApprovalStatus.rejected),
+                      _StatusTile(
+                        value: rejected,
                         label: 'Rejected',
-                        color: AppColors.rejectedText,
+                        color: scheme.error,
+                        selected: status == ApprovalStatus.rejected,
+                        onTap: () => pick(ApprovalStatus.rejected),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 6),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Text(
+                      hint,
+                      style: textTheme.bodySmall
+                          ?.copyWith(color: scheme.onSurfaceVariant),
+                    ),
                   ),
                   const SizedBox(height: 12),
                   TextField(
@@ -255,48 +286,47 @@ class _SquadBody extends ConsumerWidget {
                             ),
                     ),
                   ),
-                  if (isDivision) ...[
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        ChoiceChip(
-                          label: const Text('All'),
-                          selected: group == null,
-                          onSelected: (_) => onGroupChanged(null),
+                  // Rejected players need the team's attention
+                  if (rejected > 0) ...[
+                    const SizedBox(height: 12),
+                    InfoBox(
+                      icon: Icons.error_outline_rounded,
+                      color: scheme.error,
+                      child: Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(
+                              text: rejected == 1
+                                  ? '1 player was not approved. '
+                                  : '$rejected players were not approved. ',
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                            const TextSpan(
+                              text: "Open the player to read the FA's "
+                                  'reason, correct the details and resubmit.',
+                            ),
+                          ],
                         ),
-                        for (final g in PositionGroup.values)
-                          ChoiceChip(
-                            label: Text(g.code),
-                            tooltip: g.label,
-                            selected: group == g,
-                            onSelected: (_) => onGroupChanged(g),
-                          ),
-                      ],
+                      ),
                     ),
                   ],
-                  const SizedBox(height: 12),
                   if (shown.isEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 32),
                       child: Text(
                         'No players match.',
                         textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color:
-                                  Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
+                        style: textTheme.bodyMedium
+                            ?.copyWith(color: scheme.onSurfaceVariant),
                       ),
                     )
                   else
-                    for (final player in shown) ...[
-                      _PlayerTile(
-                        player: player,
-                        onTap: () => context.go(Routes.player(player.id)),
-                      ),
-                      const SizedBox(height: 8),
-                    ],
+                    PositionRows(
+                      sections: sectionsByGroup(shown, isDark: isDark),
+                      cardLine: CardLine.squad,
+                      onTap: (player) => context.go(Routes.player(player.id)),
+                    ),
                 ],
               ),
             ),
@@ -305,129 +335,76 @@ class _SquadBody extends ConsumerWidget {
       },
     );
   }
+
+  static String _statusWord(ApprovalStatus status) => switch (status) {
+        ApprovalStatus.approved => 'approved',
+        ApprovalStatus.pending => 'pending',
+        ApprovalStatus.rejected => 'rejected',
+      };
 }
 
-class _CountTile extends StatelessWidget {
-  const _CountTile({
+/// One of the three numbers at the top. Tap to filter; the selected tile
+/// gets a blue border.
+class _StatusTile extends StatelessWidget {
+  const _StatusTile({
     required this.value,
     required this.label,
     required this.color,
+    required this.selected,
+    required this.onTap,
   });
 
   final int value;
   final String label;
   final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: scheme.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: scheme.outline),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '$value',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
-                // The light-mode status colours are too dark on navy
-                color: isDark ? scheme.onSurface : color,
-              ),
-            ),
-            Text(
-              label,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: scheme.onSurfaceVariant),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _PlayerTile extends StatelessWidget {
-  const _PlayerTile({required this.player, required this.onTap});
-
-  final Player player;
+  final bool selected;
   final VoidCallback onTap;
 
-  String get _subtitle {
-    final id = switch (player.status) {
-      ApprovalStatus.approved => player.playerCode ?? 'ID coming',
-      ApprovalStatus.pending => 'ID after approval',
-      ApprovalStatus.rejected => 'Not approved',
-    };
-    return '$id · ${player.position.display}';
-  }
-
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
-    final radius = BorderRadius.circular(16);
 
-    return Material(
-      color: scheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: radius,
-        side: BorderSide(color: scheme.outline),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: radius,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          child: Row(
-            children: [
-              PlayerAvatar(name: player.fullName, url: player.thumbUrl),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      player.fullName,
-                      style: textTheme.titleSmall
-                          ?.copyWith(fontWeight: FontWeight.w600),
-                    ),
-                    Text(
-                      _subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.bodySmall
-                          ?.copyWith(color: scheme.onSurfaceVariant),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+    return Expanded(
+      child: Semantics(
+        button: true,
+        selected: selected,
+        label: '$label, $value. ${selected ? 'Showing only these.' : ''}',
+        excludeSemantics: true,
+        child: Material(
+          color: scheme.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+              color: selected ? scheme.primary : scheme.outline,
+              width: selected ? 2 : 1,
+            ),
+          ),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '#${player.jerseyNo}',
-                    style: const TextStyle(
-                      fontSize: 17,
+                    '$value',
+                    style: TextStyle(
+                      fontSize: 22,
                       fontWeight: FontWeight.w700,
+                      color: color,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  StatusBadge(status: player.status),
+                  Text(
+                    label,
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: scheme.onSurfaceVariant),
+                  ),
                 ],
               ),
-            ],
+            ),
           ),
         ),
       ),

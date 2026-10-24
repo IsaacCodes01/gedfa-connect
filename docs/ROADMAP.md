@@ -4,7 +4,7 @@
 **Platforms:** Flutter app: Android (APK) and web (iPhone users via "Add to Home Screen"); native iOS later (see Section 4, Distribution); separate React website by a colleague
 **Backend:** Firebase (Auth, Firestore, Cloud Storage, Hosting) on the Blaze plan
 **Projects:** `gedfa-connect-dev` (building/testing) and `gedfa-connect-prod` (real GEDFA data)
-**Status:** Phase 0 and Phase 1 complete · Phase 2 in progress: 2.0–2.3 done · web test link live on dev (22 Oct 2026)
+**Status:** Phase 0 and Phase 1 complete · Phase 2 in progress: 2.0–2.4 done · web test link live on dev (22 Oct 2026)
 
 See also: `docs/DATA_MODEL.md` (the data contract).
 
@@ -183,7 +183,8 @@ Time estimates assume part-time work and are rough guides.
 - [x] 2.1 FA area: Teams tab with a gold badge for waiting requests; team requests list (Pending / Rejected / Approved with counts, search, oldest pending first); review screen (club details, kits, officials with a call button, automatic checks) *(done 20 Oct 2026)*
 - [x] 2.2 Approve or reject a team request. **Approve** = one batch: request approved + team created from it (ID = reserved name key, logo link reused) + club's account made team admin. **Reject** = reason (10–500 characters, quick reasons); the club fixes and resends. 71 rules tests *(done 22 Oct 2026)*
 - [x] 2.3 FA **Players** tab (gold badge): teams list with totals, progress bar and "N to review", search by team, player name or ID; a team's players in rows by position (Goalkeepers, Defenders, Midfielders, Forwards), 3-column photo grid, To review / Approved / All; **select several and approve together**; review screen (photo, automatic checks, visual verification, details). Approve = transaction giving the player ID (`GE26-0042`) from `settings/playerCounter`; re-checked players keep their ID. Reject with a reason. Notification bell (placeholder) on the main app bars. 90 rules tests *(done 22 Oct 2026)*
-- [ ] 2.4 Status filters and search
+- [x] 2.3b **Team Squad and Positions tabs** with the same position rows as the FA (one shared widget). Squad: Approved / Pending / Rejected tiles that filter, search, a notice when players were rejected; cards show the player ID. New **Positions** tab: All / GK / DEF / MID / FWD, rows by detailed position inside a group, average age, "Approved players only" switch (the players who can go on team sheets) *(done 24 Oct 2026)*
+- [x] 2.4 Status filters and search *(FA requests and players: status tabs and search; team Squad: status tiles and search)*
 - [x] 2.5 Lock approved players (changes to name, DOB, jersey or photo need re-approval) *(done early, in 1.5 and 1.6)*
 - [ ] 2.6 Role management by **invitation**: invite FA admins and referees by email; last-admin protection; role change history
 - [ ] 2.7 **FA announcements** (first part of the league feed)
@@ -196,7 +197,7 @@ Time estimates assume part-time work and are rough guides.
 
 > **Flutter and React:** the Flutter app (Android + web) is the working tool for the FA, team admins and referees. The React website (by a colleague) is the public face for fans: fixtures, results, table, news and approved teams. Both use the same Firebase project, `DATA_MODEL.md` and security rules. *(To be agreed with the colleague.)*
 
-> **After Phase 3:** go through GEDFA's answers to the open questions (Section 10) and a friend's suggestion, and update the roadmap and data model.
+> **Before Phase 3:** go through GEDFA's answers to the open questions (Section 10) and a friend's suggestion, and update the roadmap and data model.
 
 ### Phase 3 — Team sheet builder and PDF
 - [ ] 3.1–3.7 As before: select fixture, pick approved players within limits, captain/GK, formation, PDF, print/share, FA can view
@@ -293,6 +294,7 @@ Work backwards from the GEDFA season start date to decide what the pilot must co
 | 12 Oct 2026 | Renamed to GEDFA Connect; dev/prod projects created |
 | 13 Oct 2026 | Phase 0 complete; added 0.8 design foundation, 1.0 emulators, 1.1a toasts/connectivity/responsive; invite-only roles (2.6); FA announcements (2.7); new Phase 5.5 League feed; navigation, connectivity and responsive standards; pre-pilot checklist |
 | 17 Oct 2026 | 1.1b, 1.2, 1.3 done; new 1.3b Competitions (Division / Juvenile, one registration per club); 1.4 split into Division first, Juvenile after GEDFA answers |
+| 24 Oct 2026 | 2.3b and 2.4 done: shared position rows for the FA and the team; team Squad tab filters by status; new Positions tab. Order agreed: 2.6, then 2.7–2.8, then the GEDFA answers and the friend's suggestion **before** Phase 3; 2.10–2.12 before or during the pilot |
 | 22 Oct 2026 | 2.3 done: FA Players tab (by team, then by position), select several and approve, player review, player ID transaction, re-checked players keep their ID; notification bell placeholder; 90 rules tests. New 2.12 FA dashboard. Flutter / React split proposed |
 | 22 Oct 2026 | 2.0, 2.1, 2.2 done (tab shells, More / My profile / Settings, FA team requests, approve and reject; 71 rules tests). New 2.10 Team profile and change requests (name, short name and logo need FA approval) and 2.11 FA corrections (never back to Pending). Live rules are deployed with the CLI, not pasted in the console. GEDFA answers to be reviewed after Phase 3 |
 | 18 Oct 2026 | **Phase 1 complete:** 1.3b–1.7 done; new 1.8 web link on Firebase Hosting (dev), tested on iPhone 8. Distribution decided (Android APK via App Distribution; iPhone via web + Add to Home Screen; native iOS later if funded). 23 positions; squad 30; jersey 1–99. FA admin rules moved to Phase 2 (2.9). New 2.0 Settings screen and app-bar clean-up; new 2.8 activity list (bell). 2.5 done early. Rules tests and emulator-data workflow added to Section 4 |

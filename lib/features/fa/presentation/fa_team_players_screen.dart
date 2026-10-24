@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gedfa_connect/app/routes.dart';
-import 'package:gedfa_connect/app/theme.dart';
 import 'package:gedfa_connect/core/constants/approval_status.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
@@ -14,8 +13,7 @@ import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/fa/presentation/widgets/review_widgets.dart';
 import 'package:gedfa_connect/features/players/data/player_repository.dart';
 import 'package:gedfa_connect/features/players/domain/player.dart';
-import 'package:gedfa_connect/features/players/domain/position.dart';
-import 'package:gedfa_connect/features/settings/data/data_saver_provider.dart';
+import 'package:gedfa_connect/features/players/presentation/widgets/position_rows.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:go_router/go_router.dart';
 
@@ -115,12 +113,9 @@ class _FaTeamPlayersScreenState extends ConsumerState<FaTeamPlayersScreen> {
     final team = teamAsync.value;
 
     // This team's players, sorted by position group, then jersey number
-    final teamPlayers = [
-      ...?playersAsync.value?.where((p) => p.teamId == widget.teamId),
-    ]..sort((a, b) {
-        final byGroup = a.positionGroup.index.compareTo(b.positionGroup.index);
-        return byGroup != 0 ? byGroup : a.jerseyNo.compareTo(b.jerseyNo);
-      });
+    final teamPlayers = sortedBySquadOrder(
+      playersAsync.value?.where((p) => p.teamId == widget.teamId) ?? [],
+    );
     final pending =
         teamPlayers.where((p) => p.status == ApprovalStatus.pending).length;
 
@@ -257,376 +252,20 @@ class _FaTeamPlayersScreenState extends ConsumerState<FaTeamPlayersScreen> {
                   ),
                 )
               else
-                for (final group in PositionGroup.values)
-                  if (shown.any((p) => p.positionGroup == group))
-                    _GroupSection(
-                      group: group,
-                      players: [
-                        for (final p in shown)
-                          if (p.positionGroup == group) p,
-                      ],
-                      selecting: _selecting,
-                      picked: _picked,
-                      onTap: _open,
-                    ),
+                PositionRows(
+                  sections: sectionsByGroup(
+                    shown,
+                    isDark: Theme.of(context).brightness == Brightness.dark,
+                  ),
+                  cardLine: CardLine.fa,
+                  selecting: _selecting,
+                  picked: _picked,
+                  onTap: _open,
+                ),
             ],
           ),
         ),
       ],
-    );
-  }
-}
-
-// ── One position row: heading + grid of cards ─────────────────────────────
-
-/// Plural heading and accent colour of each position group.
-(String, Color) _groupStyle(PositionGroup group, bool isDark) =>
-    switch (group) {
-      PositionGroup.gk => (
-          'Goalkeepers',
-          isDark ? const Color(0xFFF5D25B) : const Color(0xFF8A6A00)
-        ),
-      PositionGroup.def => (
-          'Defenders',
-          isDark ? AppColors.darkLink : AppColors.deepBlue
-        ),
-      PositionGroup.mid => (
-          'Midfielders',
-          isDark ? AppColors.darkGreen : AppColors.ghanaGreen
-        ),
-      PositionGroup.fwd => (
-          'Forwards',
-          isDark ? const Color(0xFFFF8A94) : AppColors.ghanaRed
-        ),
-    };
-
-class _GroupSection extends StatelessWidget {
-  const _GroupSection({
-    required this.group,
-    required this.players,
-    required this.selecting,
-    required this.picked,
-    required this.onTap,
-  });
-
-  final PositionGroup group;
-  final List<Player> players;
-  final bool selecting;
-  final Set<String> picked;
-  final ValueChanged<Player> onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final (title, accent) = _groupStyle(group, isDark);
-    const gap = 10.0;
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Heading: coloured bar + "Defenders · 5"
-          Semantics(
-            header: true,
-            child: Padding(
-              padding: const EdgeInsets.only(left: 2, bottom: 10),
-              child: Row(
-                children: [
-                  Container(
-                    width: 4,
-                    height: 18,
-                    decoration: BoxDecoration(
-                      color: accent,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '$title · ${players.length}',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: isDark
-                              ? const Color(0xFFCFE4FB)
-                              : const Color(0xFF0B3F7A),
-                        ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          // Grid: 3 cards per row on a phone, more on wider screens.
-          // Built row by row so all cards in a row have the same height.
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final columns = (constraints.maxWidth / 170).floor().clamp(3, 5);
-              final rows = <Widget>[];
-              for (var i = 0; i < players.length; i += columns) {
-                final rowPlayers = players.skip(i).take(columns).toList();
-                rows.add(
-                  Padding(
-                    padding: EdgeInsets.only(top: i == 0 ? 0 : gap),
-                    child: IntrinsicHeight(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          for (var c = 0; c < columns; c++) ...[
-                            if (c > 0) const SizedBox(width: gap),
-                            Expanded(
-                              child: c < rowPlayers.length
-                                  ? _PlayerCard(
-                                      player: rowPlayers[c],
-                                      selecting: selecting,
-                                      selected:
-                                          picked.contains(rowPlayers[c].id),
-                                      onTap: () => onTap(rowPlayers[c]),
-                                    )
-                                  : const SizedBox.shrink(),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              }
-              return Column(children: rows);
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Player card ──────────────────────────────────────────────────────────
-
-/// Passport photo with #number and status, then name and "AMF · 22 yrs".
-/// Pending players get a gold border. In select mode, pending players show
-/// a tick box; the others are faded.
-class _PlayerCard extends ConsumerWidget {
-  const _PlayerCard({
-    required this.player,
-    required this.selecting,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final Player player;
-  final bool selecting;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final textTheme = Theme.of(context).textTheme;
-    final scheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isPending = player.status == ApprovalStatus.pending;
-    final faded = selecting && !isPending;
-
-    final borderColor = selected
-        ? scheme.primary
-        : (isPending ? AppColors.ghanaGold : scheme.outline);
-
-    final (statusText, statusBg, statusInk) = switch (player.status) {
-      ApprovalStatus.approved => (
-          'Approved',
-          isDark ? const Color(0xFF123D2B) : AppColors.approvedBg,
-          isDark ? const Color(0xFF7BE3B0) : AppColors.approvedText,
-        ),
-      ApprovalStatus.pending => (
-          'Pending',
-          AppColors.ghanaGold,
-          const Color(0xFF3A2C00),
-        ),
-      ApprovalStatus.rejected => (
-          'Rejected',
-          isDark ? const Color(0xFF4A1820) : AppColors.rejectedBg,
-          isDark ? const Color(0xFFFF9DA6) : AppColors.rejectedText,
-        ),
-    };
-
-    // Data saver: show initials instead of downloading photos
-    // Grid cards are big: the 96×128 thumbnail looks blurry here,
-    // so use the 300×400 photo (Data saver still turns photos off).
-  final thumb = ref.watch(dataSaverProvider) ? null : player.photoUrl;
-    final silhouette = ColoredBox(
-      color: isDark ? const Color(0xFF1E3A5F) : const Color(0xFFDCEAF9),
-      child: Center(
-        child: Icon(
-          Icons.person,
-          size: 48,
-          color: isDark ? const Color(0xFF3F6690) : const Color(0xFF9DBBDD),
-        ),
-      ),
-    );
-
-    return Semantics(
-      button: true,
-      selected: selecting ? selected : null,
-      label: '${player.fullName}, number ${player.jerseyNo}, '
-          '${player.position.label}, $statusText',
-      excludeSemantics: true,
-      child: Opacity(
-        opacity: faded ? 0.45 : 1,
-        child: Material(
-          color: scheme.surface,
-          clipBehavior: Clip.antiAlias,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-            side: BorderSide(
-              color: borderColor,
-              width: selected || isPending ? 2 : 1,
-            ),
-          ),
-          child: InkWell(
-            onTap: onTap,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Photo (3:4) with the number and status on top
-                AspectRatio(
-                  aspectRatio: 3 / 4,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      thumb == null || thumb.isEmpty
-                          ? silhouette
-                          : Image.network(
-                              thumb,
-                              fit: BoxFit.cover,
-                              // Sharper shrinking: the default (medium) blends in smaller copies
-                              // of the photo, which looks soft on these grid cards.
-                              filterQuality: FilterQuality.high,
-                              errorBuilder: (_, _, _) => silhouette,
-                            ),
-                      Positioned(
-                        left: 6,
-                        top: 6,
-                        child: _Chip(
-                          text: '#${player.jerseyNo}',
-                          background: Colors.black.withValues(alpha: 0.55),
-                          foreground: Colors.white,
-                        ),
-                      ),
-                      if (selecting && isPending)
-                        Positioned(
-                          right: 6,
-                          top: 6,
-                          child: _TickBox(selected: selected),
-                        ),
-                      Positioned(
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        child: Container(
-                          color: statusBg,
-                          padding: const EdgeInsets.symmetric(vertical: 3),
-                          alignment: Alignment.center,
-                          child: Text(
-                            statusText.toUpperCase(),
-                            style: TextStyle(
-                              color: statusInk,
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.4,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        player.fullName,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: scheme.onSurface,
-                          height: 1.25,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${player.position.code} · ${player.age} yrs',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: textTheme.labelSmall
-                            ?.copyWith(color: scheme.onSurfaceVariant),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _Chip extends StatelessWidget {
-  const _Chip({
-    required this.text,
-    required this.background,
-    required this.foreground,
-  });
-
-  final String text;
-  final Color background;
-  final Color foreground;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: foreground,
-          fontSize: 11.5,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-}
-
-/// Round tick box in the corner of a card in select mode.
-class _TickBox extends StatelessWidget {
-  const _TickBox({required this.selected});
-
-  final bool selected;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      width: 24,
-      height: 24,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: selected ? scheme.primary : Colors.white.withValues(alpha: 0.9),
-        border: Border.all(
-          color: selected ? scheme.primary : const Color(0xFF9FB0C4),
-          width: 2,
-        ),
-      ),
-      child: selected
-          ? Icon(Icons.check_rounded, size: 16, color: scheme.onPrimary)
-          : null,
     );
   }
 }

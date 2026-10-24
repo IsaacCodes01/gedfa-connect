@@ -17,6 +17,7 @@ class Routes {
       '$adminPlayers/player/$playerId';
   static const adminMore = '/admin/more';
   static const team = '/team';
+  static const teamPositions = '/team/positions';
   static const teamMore = '/team/more';
   static const teamProfile = '/team/more/profile';
   static const teamChangeEmail = '/team/more/profile/email';
