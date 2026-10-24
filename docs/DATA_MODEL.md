@@ -293,6 +293,7 @@ Kept by the team, **no FA approval**, never part of the registration. Private: t
 | `hometown`, `previousClub` | string? | ≤ 60 / ≤ 80 characters |
 | `clubSince` | number? | Year, 1980 to this year |
 | `availability` | string | `available` / `injured` / `unavailable`. **No medical details** are stored anywhere |
+| `unavailableReason` | string? | Only when `unavailable`: `away`, `family`, `workOrSchool`, `clubDiscipline`, `other`. A reason, never details |
 | `expectedBack` | timestamp? | Only while not available |
 | `availabilityAt` | timestamp | When the availability last changed |
 | `emergencyName`, `emergencyPhone` | string? | Private. **Required for Juvenile players** (later) |
@@ -493,6 +494,7 @@ Feed rules: never include dates of birth; player photos only if agreed with GEDF
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 24 Oct 2026 | v1.9.1: `playerProfiles.unavailableReason`; the availability tiles filter the Player profiles tab. 137 tests. |
 | 24 Oct 2026 | v1.9: new `playerProfiles` and `teams/*/armbands` (2.3d). 136 tests. |
 | 24 Oct 2026 | v1.8: players gain `changes` (what the team changed, for the FA); approval and rejection clear it. 124 tests. |
 | 24 Oct 2026 | v1.7: invitations (2.6). New `invites/{email}` and `roleLog`; `users` gain `name`, `inviteId` and the hand-set `isChairman`; invited people create their own user document when accepting; roles removed by deleting the document (chairman protected). FA can list users. 119 tests. |

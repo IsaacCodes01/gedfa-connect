@@ -36,7 +36,7 @@ final teamDestinations = [
   const ShellDestination(
     icon: Icons.assignment_ind_outlined,
     selectedIcon: Icons.assignment_ind_rounded,
-    label: 'Positions',
+    label: 'Profiles',
   ),
   const ShellDestination(
     icon: Icons.more_horiz_rounded,

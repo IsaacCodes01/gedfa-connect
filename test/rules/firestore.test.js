@@ -1187,15 +1187,31 @@ describe('Player profiles', () => {
     await assertFails(setDoc(profile(dbAs('admin1')), profileData({ strengths: ['pace', 'heading', 'tackling', 'passing'] })));
   });
 
+  it('unavailable can say why (from the list only)', async () => {
+    const db = dbAs('admin1');
+    await assertSucceeds(setDoc(profile(db), profileData({
+      availability: 'unavailable', unavailableReason: 'away',
+    })));
+    await assertFails(setDoc(profile(db), profileData({
+      availability: 'unavailable', unavailableReason: 'sick',
+    })));
+    await assertFails(setDoc(profile(db), profileData({
+      availability: 'injured', unavailableReason: 'away',
+    })));
+  });
+
   it('cannot write extra fields (e.g. medical details)', async () => {
     await assertFails(setDoc(profile(dbAs('admin1')), profileData({ injury: 'hamstring' })));
   });
 
-  it("saving a profile doesn't touch the FA's approval", async () => {
+    it("saving a profile doesn't touch the FA's approval", async () => {
     await setDoc(profile(dbAs('admin1')), profileData());
-    const p1 = await testEnv.withSecurityRulesDisabled(async (context) =>
-      (await getDoc(doc(context.firestore(), `${D}/players/p1`))).data());
-    if (p1.status !== 'approved') throw new Error('p1 should still be approved');
+    let status;
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const snap = await getDoc(doc(context.firestore(), `${D}/players/p1`));
+      status = snap.data().status;
+    });
+    if (status !== 'approved') throw new Error('p1 should still be approved');
   });
 });
 

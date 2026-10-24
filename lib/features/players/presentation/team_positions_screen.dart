@@ -24,7 +24,8 @@ import 'package:go_router/go_router.dart';
 /// - All · GK · DEF · MID · FWD; one group → rows by detailed position.
 /// - Each row: average age and height. Cards: position, age, height,
 ///   foot, the C / VC badge and availability.
-/// - "Available players only" = who can go on a team sheet right now.
+/// - Tap Available / Injured / Unavailable to show only those players
+///   (Available = who can go on a team sheet right now); tap again for all.
 ///
 /// Division only for now (Juvenile waits for GEDFA's age rules).
 class TeamPositionsScreen extends ConsumerStatefulWidget {
@@ -37,7 +38,7 @@ class TeamPositionsScreen extends ConsumerStatefulWidget {
 
 class _TeamPositionsScreenState extends ConsumerState<TeamPositionsScreen> {
   PositionGroup? _group; // null = All
-  bool _onlyAvailable = false;
+  Availability? _filter; // null = everyone
 
   static const _category = 'division';
 
@@ -107,11 +108,22 @@ class _TeamPositionsScreenState extends ConsumerState<TeamPositionsScreen> {
     int countAvail(Availability a) =>
         approved.where((p) => profileOf(p).availability == a).length;
 
-    bool canPick(Player p) =>
-        p.status == ApprovalStatus.approved && profileOf(p).isAvailable;
+    // A tile selected: only approved players with that availability
+    final filter = _filter;
+    final pool = filter == null
+        ? division
+        : approved.where((p) => profileOf(p).availability == filter).toList();
 
-    final pool =
-        _onlyAvailable ? division.where(canPick).toList() : division;
+    // Tap a tile to filter; tap it again to show everyone
+    void pick(Availability a) =>
+        setState(() => _filter = _filter == a ? null : a);
+    final hint = filter == null
+        ? 'Tap a number to show only those players.'
+        : filter == Availability.available
+            ? 'Showing who you can pick for a team sheet. Tap again to show '
+                'all.'
+            : 'Showing ${filter.label.toLowerCase()} players. Tap again to '
+                'show all.';
     final group = _group;
 
     final sections = group == null
@@ -163,20 +175,35 @@ class _TeamPositionsScreenState extends ConsumerState<TeamPositionsScreen> {
                     label: 'Available',
                     color:
                         isDark ? AppColors.darkGreen : AppColors.ghanaGreen,
+                    selected: filter == Availability.available,
+                    onTap: () => pick(Availability.available),
                   ),
                   const SizedBox(width: 10),
                   _CountTile(
                     value: countAvail(Availability.injured),
                     label: 'Injured',
                     color: scheme.error,
+                    selected: filter == Availability.injured,
+                    onTap: () => pick(Availability.injured),
                   ),
                   const SizedBox(width: 10),
                   _CountTile(
                     value: countAvail(Availability.unavailable),
                     label: 'Unavailable',
                     color: scheme.onSurfaceVariant,
+                    selected: filter == Availability.unavailable,
+                    onTap: () => pick(Availability.unavailable),
                   ),
                 ],
+              ),
+              const SizedBox(height: 6),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Text(
+                  hint,
+                  style: textTheme.bodySmall
+                      ?.copyWith(color: scheme.onSurfaceVariant),
+                ),
               ),
               const SizedBox(height: 12),
               // All · GK · DEF · MID · FWD, equal widths, one row
@@ -199,38 +226,16 @@ class _TeamPositionsScreenState extends ConsumerState<TeamPositionsScreen> {
                   ],
                 ],
               ),
-              const SizedBox(height: 12),
-              Material(
-                color: scheme.surface,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  side: BorderSide(color: scheme.outline),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: SwitchListTile(
-                  value: _onlyAvailable,
-                  onChanged: (value) => setState(() => _onlyAvailable = value),
-                  title: Text(
-                    'Available players only',
-                    style: textTheme.titleSmall
-                        ?.copyWith(fontWeight: FontWeight.w600),
-                  ),
-                  subtitle: Text(
-                    'Approved, not injured or unavailable: who you can pick',
-                    style: textTheme.bodySmall
-                        ?.copyWith(color: scheme.onSurfaceVariant),
-                  ),
-                ),
-              ),
               if (sections.isEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 40),
                   child: EmptyView(
                     icon: Icons.person_search_outlined,
                     title: 'No players here',
-                    message: _onlyAvailable
-                        ? 'No available players in this position.'
-                        : 'No players in this position yet.',
+                    message: filter == null
+                        ? 'No players in this position yet.'
+                        : 'No ${filter.label.toLowerCase()} players in this '
+                            'position.',
                   ),
                 )
               else
@@ -251,47 +256,67 @@ class _TeamPositionsScreenState extends ConsumerState<TeamPositionsScreen> {
   }
 }
 
+/// One of the three numbers. Tap to filter; selected = blue border.
 class _CountTile extends StatelessWidget {
   const _CountTile({
     required this.value,
     required this.label,
     required this.color,
+    required this.selected,
+    required this.onTap,
   });
 
   final int value;
   final String label;
   final Color color;
+  final bool selected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-        decoration: BoxDecoration(
+      child: Semantics(
+        button: true,
+        selected: selected,
+        label: '$label, $value',
+        excludeSemantics: true,
+        child: Material(
           color: scheme.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: scheme.outline),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '$value',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
-                color: color,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+              color: selected ? scheme.primary : scheme.outline,
+              width: selected ? 2 : 1,
+            ),
+          ),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$value',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: color,
+                    ),
+                  ),
+                  Text(
+                    label,
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: scheme.onSurfaceVariant),
+                  ),
+                ],
               ),
             ),
-            Text(
-              label,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: scheme.onSurfaceVariant),
-            ),
-          ],
+          ),
         ),
       ),
     );

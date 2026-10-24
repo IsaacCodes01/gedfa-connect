@@ -89,6 +89,7 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
       TextEditingController(text: widget.profile.emergencyPhone);
 
   late Availability _availability = widget.profile.availability;
+  late UnavailableReason? _reason = widget.profile.unavailableReason;
   late DateTime? _expectedBack = widget.profile.expectedBack;
   late Foot? _foot = widget.profile.foot;
   late final Set<Position> _other = {...widget.profile.otherPositions};
@@ -158,6 +159,7 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
       clubSince: number(_since),
       previousClub: _previous.text,
       availability: _availability,
+      unavailableReason: _reason,
       expectedBack: _expectedBack,
       emergencyName: _emName.text,
       emergencyPhone: _emPhone.text,
@@ -304,6 +306,22 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
                     selected: _availability,
                     onChanged: (a) => setState(() => _availability = a),
                   ),
+                  if (_availability == Availability.unavailable) ...[
+                    label('Why?', 'Optional. Only the reason, no details.'),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final r in UnavailableReason.values)
+                          ChoiceChip(
+                            label: Text(r.label),
+                            selected: _reason == r,
+                            onSelected: (on) =>
+                                setState(() => _reason = on ? r : null),
+                          ),
+                      ],
+                    ),
+                  ],
                   if (_availability != Availability.available) ...[
                     label('Expected back (optional)',
                         "Only the date. Don't write medical details here."),

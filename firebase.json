@@ -85,6 +85,15 @@
             "value": "no-cache"
           }
         ]
+      },
+            {
+        "source": "**/*.@(js|json|wasm|mjs|otf|ttf)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
       }
     ]
   }

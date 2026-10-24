@@ -133,9 +133,11 @@ class _Body extends ConsumerWidget {
       Availability.available => null,
       Availability.injured =>
         back == null ? 'Injured' : 'Injured · back around ${formatDate(back)}',
-      Availability.unavailable => back == null
-          ? 'Unavailable'
-          : 'Unavailable · back around ${formatDate(back)}',
+      Availability.unavailable => [
+          'Unavailable',
+          ?profile.unavailableReason?.label,
+          if (back != null) 'back around ${formatDate(back)}',
+        ].join(' · '),
     };
     final since = profile.availabilityAt;
 

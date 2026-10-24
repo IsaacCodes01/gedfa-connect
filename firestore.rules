@@ -447,7 +447,7 @@ service cloud.firestore {
         return data.keys().hasOnly([
             'teamId', 'heightCm', 'weightKg', 'foot', 'otherPositions',
             'strengths', 'hometown', 'clubSince', 'previousClub',
-            'availability', 'expectedBack', 'availabilityAt',
+            'availability', 'unavailableReason', 'expectedBack', 'availabilityAt',
             'emergencyName', 'emergencyPhone', 'updatedAt'
           ])
           && data.teamId == get(playerDoc(playerId)).data.teamId
@@ -470,6 +470,10 @@ service cloud.firestore {
               || (data.clubSince is int && data.clubSince >= 1980
                   && data.clubSince <= request.time.year()))
           && data.availability in ['available', 'injured', 'unavailable']
+          && (data.get('unavailableReason', null) == null
+              || (data.availability == 'unavailable'
+                  && data.unavailableReason in ['away', 'family', 'workOrSchool',
+                                                'clubDiscipline', 'other']))
           && (data.get('expectedBack', null) == null || data.expectedBack is timestamp)
           && data.availabilityAt is timestamp
           && isOptionalText(data, 'emergencyName', 80)

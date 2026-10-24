@@ -67,6 +67,9 @@ class PlayerProfileRepository {
         'clubSince': after.clubSince,
         'previousClub': clean(after.previousClub),
         'availability': after.availability.name,
+        'unavailableReason': after.availability == Availability.unavailable
+            ? after.unavailableReason?.name
+            : null,
         // An expected date only makes sense while away
         'expectedBack': after.isAvailable || after.expectedBack == null
             ? null

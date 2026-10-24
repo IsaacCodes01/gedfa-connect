@@ -17,6 +17,26 @@ enum Availability {
       );
 }
 
+/// Why a player is unavailable (not injured). Chosen by the team.
+/// Suspensions from cards come later from match reports (Phase 5).
+enum UnavailableReason {
+  away('Away / travelling'),
+  family('Family or personal'),
+  workOrSchool('Work or school'),
+  clubDiscipline('Club discipline'),
+  other('Other');
+
+  const UnavailableReason(this.label);
+  final String label;
+
+  static UnavailableReason? fromString(String? value) {
+    for (final r in values) {
+      if (r.name == value) return r;
+    }
+    return null;
+  }
+}
+
 enum Foot {
   left('Left'),
   right('Right'),
@@ -73,6 +93,7 @@ class PlayerProfile {
     this.clubSince,
     this.previousClub,
     this.availability = Availability.available,
+    this.unavailableReason,
     this.expectedBack,
     this.availabilityAt,
     this.emergencyName,
@@ -95,6 +116,7 @@ class PlayerProfile {
   final int? clubSince;
   final String? previousClub;
   final Availability availability;
+  final UnavailableReason? unavailableReason; // only when unavailable
   final DateTime? expectedBack;
   final DateTime? availabilityAt; // when the availability was last changed
   final String? emergencyName;
@@ -131,6 +153,8 @@ class PlayerProfile {
       clubSince: (data['clubSince'] as num?)?.toInt(),
       previousClub: text('previousClub'),
       availability: Availability.fromString(data['availability'] as String?),
+      unavailableReason:
+          UnavailableReason.fromString(data['unavailableReason'] as String?),
       expectedBack: (data['expectedBack'] as Timestamp?)?.toDate(),
       availabilityAt: (data['availabilityAt'] as Timestamp?)?.toDate(),
       emergencyName: text('emergencyName'),
