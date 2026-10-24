@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v1.7, matches the rules after step 2.6 (24 Oct 2026)
+**Status:** v1.8, matches the rules after step 2.3c (24 Oct 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -266,6 +266,7 @@ One collection for the whole district. Team admins see only their own team's pla
 | `approvedBy`      | string?          | FA admin`uid`                                                                                                                                                                                                                    |
 | `reviewedAt`      | timestamp?       | When the FA last **rejected** the player (approval uses `approvedAt`)                                                                                                                                                              |
 | `reviewedBy`      | string?          | FA admin `uid` who rejected                                                                                                                                                                                                        |
+| `changes`         | map?             | What the team changed since the FA last reviewed (re-check or resubmission), e.g. `{jerseyNo: {from: '#10', to: '#14'}, photo: {from: <old link>, to: <new link>}}`. Keys: `fullName`, `dob`, `jerseyNo`, `position`, `photo`; at most 8. The first `from` is kept over several saves; a field changed back is dropped. The FA's approval or rejection **must** delete it. While a photo change waits, the old photo file is kept so the FA can compare |
 
 - After approval, changing `fullName`, `dob`, `jerseyNo` or the photo sets `status` back to `pending` (FA re-approval). Changing only `position` keeps it approved. `playerCode` never changes.
 - Created by the team admin with `status: pending` and no `playerCode`, `approvedAt` or `approvedBy`. A team may hold at most `settings/league.maxSquadSize` players per competition (checked in the app; 30 for now).
@@ -469,6 +470,7 @@ Feed rules: never include dates of birth; player photos only if agreed with GEDF
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 24 Oct 2026 | v1.8: players gain `changes` (what the team changed, for the FA); approval and rejection clear it. 124 tests. |
 | 24 Oct 2026 | v1.7: invitations (2.6). New `invites/{email}` and `roleLog`; `users` gain `name`, `inviteId` and the hand-set `isChairman`; invited people create their own user document when accepting; roles removed by deleting the document (chairman protected). FA can list users. 119 tests. |
 | 22 Oct 2026 | v1.6: FA review of players (2.3). Players gain `reviewedAt`, `reviewedBy` (rejection). FA may read every player, jersey and player key, and approve or reject pending players; approval is a transaction with `settings/playerCounter`, re-checked players keep their ID, the ID year is the year of first approval. Access table updated (90 tests). |
 | 22 Oct 2026 | v1.5: FA review of team requests. `teamRequests` gain `reviewedBy`, `reviewedAt`, `teamId`; reject needs a 10–500 character reason. Teams are created only by the FA's Approve batch, ID = reserved name key, logo link reused. `users`: the FA can get any and create a `teamAdmin` role on approval (never `faAdmin`). Full name lives on the Auth account. Access table updated (71 tests). |

@@ -1,4 +1,4 @@
-// Security rules tests for GEDFA Connect (steps 1.7 to 2.6).
+// Security rules tests for GEDFA Connect (steps 1.7 to 2.6, 2.3c).
 //
 // Run while the emulators are running:
 //   cd test/rules
@@ -21,6 +21,7 @@ import {
   Timestamp,
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -725,6 +726,7 @@ function approvePlayer(db, playerId, { by = 'fa1', code, next, counter = 'update
     approvedAt: serverTimestamp(),
     approvedBy: by,
     rejectionReason: null,
+    changes: deleteField(),
     updatedAt: serverTimestamp(),
   });
   if (counter === 'create') batch.set(doc(db, COUNTER), { next });
@@ -739,6 +741,7 @@ function rejectPlayer(db, playerId, { by = 'fa1', reason = 'Photo is not clear' 
     rejectionReason: reason,
     reviewedAt: serverTimestamp(),
     reviewedBy: by,
+    changes: deleteField(),
     updatedAt: serverTimestamp(),
   });
 }
@@ -1066,5 +1069,62 @@ describe('Invitations: removing roles', () => {
     });
     await assertFails(updateDoc(ref, { action: 'removed' }));
     await assertFails(deleteDoc(ref));
+  });
+});
+
+// ---------- What the team changed (2.3c) ----------
+
+describe('Re-check: what the team changed', () => {
+  const p1 = (db) => doc(db, `${D}/players/p1`); // approved, GE26-0001
+
+  /** The team changes p1's jersey from 10 to 14 and says so. */
+  async function changeJersey() {
+    const db = dbAs('admin1');
+    const batch = writeBatch(db);
+    batch.update(p1(db), {
+      jerseyNo: 14,
+      status: 'pending',
+      changes: { jerseyNo: { from: '#10', to: '#14' } },
+      updatedAt: serverTimestamp(),
+    });
+    batch.delete(doc(db, `${D}/teams/royal/jerseys/division-10`));
+    batch.set(doc(db, `${D}/teams/royal/jerseys/division-14`), {
+      playerId: 'p1', createdAt: serverTimestamp(),
+    });
+    return batch.commit();
+  }
+
+  it('the team can save the list of changes when re-submitting', async () => {
+    await assertSucceeds(changeJersey());
+  });
+
+  it('the FA approval clears the list (ID kept)', async () => {
+    await changeJersey();
+    await assertSucceeds(approvePlayer(dbAs('fa1'), 'p1', { counter: 'none' }));
+  });
+
+  it('the FA cannot approve and leave the list behind', async () => {
+    await changeJersey();
+    await assertFails(updateDoc(p1(dbAs('fa1')), {
+      status: 'approved',
+      approvedAt: serverTimestamp(),
+      approvedBy: 'fa1',
+      rejectionReason: null,
+      updatedAt: serverTimestamp(),
+    }));
+  });
+
+  it('the FA rejection clears the list too', async () => {
+    await changeJersey();
+    await assertSucceeds(rejectPlayer(dbAs('fa1'), 'p1'));
+  });
+
+  it('the list cannot be added to an approved player that stays approved', async () => {
+    await assertFails(updateDoc(p1(dbAs('admin1')), {
+      position: 'DM',
+      positionGroup: 'MID',
+      changes: { position: { from: 'CM', to: 'DM' } },
+      updatedAt: serverTimestamp(),
+    }));
   });
 });

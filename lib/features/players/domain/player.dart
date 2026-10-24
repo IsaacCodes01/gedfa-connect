@@ -23,6 +23,7 @@ class Player {
     this.createdAt,
     this.updatedAt,
     this.approvedAt,
+    this.changes = const {},
   });
 
   /// Firestore document ID ('' for a player not saved yet).
@@ -48,6 +49,11 @@ class Player {
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final DateTime? approvedAt;
+
+  /// What the team changed since the FA last reviewed this player (2.3c),
+  /// e.g. {'jerseyNo': PlayerChange('#10', '#14')}. Empty when nothing
+  /// is waiting. Cleared by the FA's approval or rejection.
+  final Map<String, PlayerChange> changes;
 
   PositionGroup get positionGroup => position.group;
 
@@ -120,6 +126,39 @@ class Player {
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
       approvedAt: (data['approvedAt'] as Timestamp?)?.toDate(),
+      changes: PlayerChange.mapFrom(data['changes']),
     );
   }
+}
+
+/// One change the team made, as text the FA can read: from → to.
+/// For the photo, [from] and [to] are the two photo links.
+class PlayerChange {
+  const PlayerChange(this.from, this.to);
+
+  final String from;
+  final String to;
+
+  Map<String, String> toMap() => {'from': from, 'to': to};
+
+  static Map<String, PlayerChange> mapFrom(Object? raw) {
+    if (raw is! Map) return const {};
+    return {
+      for (final entry in raw.entries)
+        if (entry.value is Map)
+          entry.key.toString(): PlayerChange(
+            (entry.value as Map)['from']?.toString() ?? '',
+            (entry.value as Map)['to']?.toString() ?? '',
+          ),
+    };
+  }
+
+  /// The order and names the FA sees.
+  static const labels = {
+    'fullName': 'Name',
+    'dob': 'Date of birth',
+    'jerseyNo': 'Jersey number',
+    'position': 'Position',
+    'photo': 'Passport photo',
+  };
 }

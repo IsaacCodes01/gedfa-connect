@@ -94,8 +94,11 @@ service cloud.firestore {
             'searchKeys', 'dob', 'position', 'positionGroup', 'jerseyNo',
             'photoUrl', 'thumbUrl', 'status', 'playerCode', 'rejectionReason',
             'createdAt', 'updatedAt', 'approvedAt', 'approvedBy', 'playerKey',
-            'reviewedAt', 'reviewedBy'
+            'reviewedAt', 'reviewedBy', 'changes'
           ])
+          // What the team changed since the FA last saw the player (2.3c),
+          // e.g. {jerseyNo: {from: '#10', to: '#14'}}. Shown to the FA.
+          && (!('changes' in data) || (data.changes is map && data.changes.size() <= 8))
           && isText(data.fullName, 3, 80)
           && data.fullNameLower == data.fullName.lower()
           && data.searchKeys is list
@@ -472,7 +475,8 @@ service cloud.firestore {
         return after.status == 'approved'
           && after.diff(before).affectedKeys()
                .hasOnly(['status', 'playerCode', 'approvedAt', 'approvedBy',
-                         'rejectionReason', 'updatedAt'])
+                         'rejectionReason', 'updatedAt', 'changes'])
+          && !('changes' in after)      // reviewed: the change list is cleared
           && after.approvedBy == request.auth.uid
           && after.approvedAt == request.time
           && after.get('rejectionReason', null) == null
@@ -489,7 +493,8 @@ service cloud.firestore {
         return after.status == 'rejected'
           && after.diff(resource.data).affectedKeys()
                .hasOnly(['status', 'rejectionReason', 'reviewedAt', 'reviewedBy',
-                         'updatedAt'])
+                         'updatedAt', 'changes'])
+          && !('changes' in after)      // reviewed: the change list is cleared
           && isText(after.rejectionReason, 10, 500)
           && after.reviewedBy == request.auth.uid
           && after.reviewedAt == request.time;

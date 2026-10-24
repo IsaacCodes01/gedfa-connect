@@ -13,6 +13,7 @@ import 'package:gedfa_connect/core/widgets/status_badge.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/fa/presentation/widgets/review_widgets.dart';
 import 'package:gedfa_connect/features/players/data/player_repository.dart';
+import 'package:gedfa_connect/features/players/domain/duplicates.dart';
 import 'package:gedfa_connect/features/players/domain/player.dart';
 import 'package:gedfa_connect/features/players/presentation/widgets/player_photo.dart';
 import 'package:gedfa_connect/features/settings/presentation/widgets/settings_widgets.dart';
@@ -100,8 +101,17 @@ class _ReviewBody extends StatelessWidget {
               _Header(player: player),
               const SizedBox(height: 22),
 
+              // What the team changed since the FA last looked (2.3c)
+              if (player.status == ApprovalStatus.pending &&
+                  player.changes.isNotEmpty) ...[
+                const SectionTitle('What the team changed'),
+                _Changes(player: player),
+                const SizedBox(height: 22),
+              ],
+
               const SectionTitle('Checked by the app'),
               _Checks(player: player),
+              _Duplicates(player: player),
               const SizedBox(height: 22),
 
               if (player.status == ApprovalStatus.pending) ...[
@@ -237,7 +247,8 @@ class _Header extends ConsumerWidget {
                   color: scheme.primary,
                   child: Text(
                     'Re-check: this player was approved before and the team '
-                    'has changed their details. The player keeps ID $code.',
+                    'has changed their details (listed below). The player '
+                    'keeps ID $code.',
                   ),
                 ),
               ],
@@ -287,6 +298,246 @@ class _Fact extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ── What the team changed (2.3c) ─────────────────────────────────────────
+
+/// One row per change: "Jersey number   #10 → #14". The photo row shows
+/// the old and new photos side by side.
+class _Changes extends StatelessWidget {
+  const _Changes({required this.player});
+
+  final Player player;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
+
+    // In a fixed order: name, date of birth, jersey, position, photo
+    final keys = [
+      for (final key in PlayerChange.labels.keys)
+        if (player.changes.containsKey(key)) key,
+    ];
+
+    return TileGroup(
+      children: [
+        for (final key in keys)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: key == 'photo'
+                ? _PhotoChange(
+                    name: player.fullName,
+                    change: player.changes[key]!,
+                  )
+                : Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: 112,
+                        child: Text(
+                          PlayerChange.labels[key]!,
+                          style: textTheme.bodySmall
+                              ?.copyWith(color: scheme.onSurfaceVariant),
+                        ),
+                      ),
+                      Expanded(
+                        child: Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(
+                                text: player.changes[key]!.from,
+                                style: TextStyle(
+                                  color: scheme.onSurfaceVariant,
+                                  decoration: TextDecoration.lineThrough,
+                                ),
+                              ),
+                              const TextSpan(text: '  →  '),
+                              TextSpan(
+                                text: player.changes[key]!.to,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                          style: textTheme.bodyMedium,
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+      ],
+    );
+  }
+}
+
+class _PhotoChange extends StatelessWidget {
+  const _PhotoChange({required this.name, required this.change});
+
+  final String name;
+  final PlayerChange change;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
+
+    Widget photo(String label, String url) => Column(
+          children: [
+            PassportPhoto(name: name, url: url, width: 104),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style:
+                  textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+            ),
+          ],
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Passport photo',
+          style: textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            photo('Before', change.from),
+            Icon(Icons.arrow_forward_rounded, color: scheme.onSurfaceVariant),
+            photo('Now', change.to),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+// ── Possible duplicates (2.3c) ───────────────────────────────────────────
+
+/// "No similar players found", or the players who might be the same
+/// person, each with photo, team, ID and why it was flagged. Tap one to
+/// open their review and compare.
+class _Duplicates extends ConsumerWidget {
+  const _Duplicates({required this.player});
+
+  final Player player;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final textTheme = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
+    final all = ref.watch(allPlayersProvider).value;
+
+    if (all == null) {
+      return const CheckLine(
+        ok: null,
+        okText: '',
+        waitingText: 'Looking for similar players…',
+      );
+    }
+
+    final matches = possibleDuplicates(player, all);
+    if (matches.isEmpty) {
+      return const CheckLine(
+        ok: true,
+        okText: 'No similar players found (name and date of birth)',
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        CheckLine(
+          ok: false,
+          okText: '',
+          badText: matches.length == 1
+              ? '1 possible duplicate. Compare the photos below.'
+              : '${matches.length} possible duplicates. Compare the photos '
+                  'below.',
+        ),
+        const SizedBox(height: 8),
+        for (final match in matches) ...[
+          Material(
+            color: scheme.surface,
+            clipBehavior: Clip.antiAlias,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: scheme.error, width: 1.5),
+            ),
+            child: InkWell(
+              onTap: () => context.push(Routes.adminPlayer(match.player.id)),
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: Row(
+                  children: [
+                    PassportPhoto(
+                      name: player.fullName,
+                      url: player.photoUrl,
+                      width: 56,
+                    ),
+                    const SizedBox(width: 6),
+                    PassportPhoto(
+                      name: match.player.fullName,
+                      url: match.player.photoUrl,
+                      width: 56,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            match.player.fullName,
+                            style: textTheme.titleSmall
+                                ?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                          Text(
+                            [
+                              match.player.teamName,
+                              match.player.playerCode ?? 'No ID yet',
+                            ].join(' · '),
+                            style: textTheme.bodySmall
+                                ?.copyWith(color: scheme.onSurfaceVariant),
+                          ),
+                          Text(
+                            'Born ${formatDate(match.player.dob)}',
+                            style: textTheme.bodySmall
+                                ?.copyWith(color: scheme.onSurfaceVariant),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            match.reason,
+                            style: textTheme.bodySmall?.copyWith(
+                              color: scheme.error,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+        Text(
+          'Left: this player. Right: the possible match. If they are the '
+          'same person, reject with "Player is registered with another team".',
+          style: textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+        ),
+      ],
     );
   }
 }

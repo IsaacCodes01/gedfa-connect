@@ -187,7 +187,7 @@ Time estimates assume part-time work and are rough guides.
 - [x] 2.4 Status filters and search *(FA requests and players: status tabs and search; team Squad: status tiles and search)*
 - [x] 2.5 Lock approved players (changes to name, DOB, jersey or photo need re-approval) *(done early, in 1.5 and 1.6)*
 - [x] 2.6 Role management by **invitation**: More › People and roles (FA admins, referees, invited); the chairman invites FA officials and referees, FA officials invite referees; the invitation is shared on WhatsApp or copied (no automatic email), expires after 14 days; the invited person signs up with that email and accepts or declines; remove role (chairman protected, never yourself); role history. 119 rules tests *(done 24 Oct 2026)*
-- [ ] 2.3c **Possible duplicates** on the FA player review: players at other teams with the same date of birth and a similar name, photos side by side, the FA decides (alongside the name + date-of-birth key)
+- [x] 2.3c **Possible duplicates** on the FA player review: same date of birth and a similar name (word order, "Jnr", 1–2 letters), or the same name with a date of birth up to 2 years apart; photos side by side, the FA decides (alongside the name + date-of-birth key). **What the team changed**: re-submitted players list each change from → to (old and new photo side by side); the FA's review clears the list. 124 rules tests *(done 24 Oct 2026)*
 - [ ] 2.3d **Player profiles** (proposed): the Positions tab becomes Player profiles, with height, preferred foot and more (fields to agree)
 - [ ] 2.7 **FA announcements** (first part of the league feed)
 - [ ] 2.8 **Activity list** behind the app-bar bell: "Player approved", "Player rejected: reason", "Team approved", FA announcements. The bell is already on the team and FA app bars and opens a "Coming soon" page until then
@@ -296,6 +296,7 @@ Work backwards from the GEDFA season start date to decide what the pilot must co
 | 12 Oct 2026 | Renamed to GEDFA Connect; dev/prod projects created |
 | 13 Oct 2026 | Phase 0 complete; added 0.8 design foundation, 1.0 emulators, 1.1a toasts/connectivity/responsive; invite-only roles (2.6); FA announcements (2.7); new Phase 5.5 League feed; navigation, connectivity and responsive standards; pre-pilot checklist |
 | 17 Oct 2026 | 1.1b, 1.2, 1.3 done; new 1.3b Competitions (Division / Juvenile, one registration per club); 1.4 split into Division first, Juvenile after GEDFA answers |
+| 24 Oct 2026 | 2.3c done: possible duplicates and the exact changes on the FA player review |
 | 24 Oct 2026 | 2.6 done (invitations, People and roles, role history, chairman flag). New 2.3c possible duplicates and 2.3d player profiles (proposed) |
 | 24 Oct 2026 | 2.3b and 2.4 done: shared position rows for the FA and the team; team Squad tab filters by status; new Positions tab. Order agreed: 2.6, then 2.7–2.8, then the GEDFA answers and the friend's suggestion **before** Phase 3; 2.10–2.12 before or during the pilot |
 | 22 Oct 2026 | 2.3 done: FA Players tab (by team, then by position), select several and approve, player review, player ID transaction, re-checked players keep their ID; notification bell placeholder; 90 rules tests. New 2.12 FA dashboard. Flutter / React split proposed |

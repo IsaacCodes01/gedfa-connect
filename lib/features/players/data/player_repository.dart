@@ -3,6 +3,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gedfa_connect/core/constants/firestore_paths.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
+import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/core/utils/passport_photo.dart';
 import 'package:gedfa_connect/core/utils/player_code.dart';
 import 'package:gedfa_connect/core/utils/player_key.dart';
@@ -32,6 +33,35 @@ List<String> reapprovalChanges(
     if (before.jerseyNo != after.jerseyNo) 'jersey number',
     if (photoChanged) 'photo',
   ];
+}
+
+/// The team's changes since the FA last reviewed the player, merged with
+/// any changes already waiting. Keeps the first "from" of each field, and
+/// drops a field that was changed back.
+Map<String, PlayerChange> changesSinceReview(
+  Player before,
+  Player after, {
+  String? newPhotoUrl,
+}) {
+  final changes = {...before.changes};
+
+  void note(String field, String from, String to) {
+    if (from == to) return;
+    final original = changes[field]?.from ?? from;
+    if (original == to) {
+      changes.remove(field);
+    } else {
+      changes[field] = PlayerChange(original, to);
+    }
+  }
+
+  String clean(String name) => name.trim().replaceAll(RegExp(r'\s+'), ' ');
+  note('fullName', clean(before.fullName), clean(after.fullName));
+  note('dob', formatDate(before.dob), formatDate(after.dob));
+  note('jerseyNo', '#${before.jerseyNo}', '#${after.jerseyNo}');
+  note('position', before.position.display, after.position.display);
+  if (newPhotoUrl != null) note('photo', before.photoUrl ?? '', newPhotoUrl);
+  return changes;
 }
 
 /// True if a change to an approved player must go back to the FA.
@@ -303,6 +333,20 @@ class PlayerRepository {
             photo: newPhoto,
           );
 
+    // What changed, for the FA (2.3c). Kept while the player waits for
+    // the FA after having been approved or rejected, so the FA sees
+    // everything since their last look, not just the latest save.
+    final recordChanges = !keepApproved &&
+        (before.status != ApprovalStatus.pending || before.changes.isNotEmpty);
+    final changes = recordChanges
+        ? changesSinceReview(before, after, newPhotoUrl: urls?.photoUrl)
+        : const <String, PlayerChange>{};
+    // The FA compares the old and new photo, so the first old photo stays
+    // until they have reviewed it (a leftover file is harmless).
+    final keepOldPhoto = recordChanges &&
+        urls != null &&
+        !before.changes.containsKey('photo');
+
     final batch = _db.batch()
       ..update(_db.doc(FirestorePaths.player(before.id)), {
         ...after.toEditableMap(),
@@ -310,6 +354,10 @@ class PlayerRepository {
         if (urls != null) 'thumbUrl': urls.thumbUrl,
         'status': keepApproved ? 'approved' : 'pending',
         if (!keepApproved) 'rejectionReason': null,
+        if (recordChanges)
+          'changes': changes.isEmpty
+              ? FieldValue.delete()
+              : {for (final e in changes.entries) e.key: e.value.toMap()},
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
@@ -338,8 +386,11 @@ class PlayerRepository {
       rethrow;
     }
 
-    // Saved: the old photo files are no longer used
-    if (urls != null) await _deleteFiles([before.photoUrl, before.thumbUrl]);
+    // Saved: the old photo files are no longer used (unless the FA still
+    // has to compare them, see keepOldPhoto)
+    if (urls != null && !keepOldPhoto) {
+      await _deleteFiles([before.photoUrl, before.thumbUrl]);
+    }
   }
 
   // ---------- FA review ----------
@@ -381,6 +432,7 @@ class PlayerRepository {
         'approvedAt': FieldValue.serverTimestamp(),
         'approvedBy': faUid,
         'rejectionReason': null,
+        'changes': FieldValue.delete(), // reviewed
         'updatedAt': FieldValue.serverTimestamp(),
       });
       return code;
@@ -416,6 +468,7 @@ class PlayerRepository {
       'rejectionReason': reason.trim(),
       'reviewedAt': FieldValue.serverTimestamp(),
       'reviewedBy': faUid,
+      'changes': FieldValue.delete(), // reviewed
       'updatedAt': FieldValue.serverTimestamp(),
     }).timeout(_timeout);
   }
