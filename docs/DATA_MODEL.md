@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v1.6, matches the rules after step 2.3 (22 Oct 2026)
+**Status:** v1.7, matches the rules after step 2.6 (24 Oct 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -86,14 +86,50 @@ One document per person who has been given a role. `{uid}` is the Firebase Auth 
 | `displayName` | string    |                                           |
 | `email`       | string    |                                           |
 | `createdAt`   | timestamp | When the role was given                   |
-| `createdBy`   | string    | `uid` of the FA admin who gave it       |
+| `createdBy`   | string    | `uid` of the FA admin who gave it (team admins) |
+| `name`        | string    | FA officials and referees: full name (for People and roles) |
+| `inviteId`    | string    | FA officials and referees: the accepted invitation (= their email) |
+| `isChairman`  | boolean   | **Set by hand in the console** on the chairman's document only. Never written by the app |
 
 - **No document = no role.** A new sign-up has no document and is routed to "Register your team".
 - Written **only by an FA admin**. A user can `get` their own document (never list or query users) and never write it. FA admins can `get` any user document.
 - **Approving a team** creates the club's document with only `role: teamAdmin`, `teamId`, `createdAt`, `createdBy` (the FA's uid). The rules allow **create only** (never update), **only** the `teamAdmin` role, and only for an admin of the team created in the same batch. **Nobody can be made an FA admin through the app**: FA admins are still created by hand in the console.
 - A person's **full name** lives on their Firebase Auth account (`displayName`), set at sign-up and editable on My profile; `displayName` and `email` here are optional copies.
 - The app listens to this document live: when the FA changes a role, the app moves the user to the matching home screen at once.
-- The first FA admin is created by hand in the Firebase console (see step 0.7).
+- The first FA admin is created by hand in the Firebase console (see step 0.7), with `isChairman: true`, `name` and `email`.
+- **Invitations (2.6):** an invited person creates **their own** document when accepting, with only `role`, `name`, `email`, `inviteId`, `createdAt`. The rules check that their confirmed email has an open invitation for exactly that role, accepted in the same batch. One role per account (create only).
+- **Removing a role** deletes the document (the account stays, now with no role). Referees: any FA admin. FA officials: the chairman only. Never yourself, never the chairman. FA admins can **list** users (People and roles).
+
+### 2.1a `invites/{email}` — invitations (2.6)
+
+The document ID is the invited email in lower case, so an email has at most one invitation and the invited person finds theirs with one `get`.
+
+| Field           | Type      | Notes |
+| --------------- | --------- | ----- |
+| `email`         | string    | Same as the ID |
+| `name`          | string    | 3–80 characters |
+| `role`          | string    | `faAdmin` (FA official) or `referee` |
+| `status`        | string    | `pending`, then `accepted` |
+| `invitedBy`     | string    | FA admin `uid` |
+| `invitedByName` | string    | Shown to the invited person |
+| `createdAt`     | timestamp | |
+| `expiresAt`     | timestamp | 14 days after `createdAt` (the rules allow 13–15 for clock differences) |
+| `acceptedBy`, `acceptedAt` | string, timestamp | Set when accepted |
+
+- Create: FA admins; **FA officials invite referees only, the chairman invites both**. No email is sent: the FA shares a ready-made message on WhatsApp or by text.
+- Accept: only the person whose **confirmed** email is the ID, while pending and not expired.
+- Cancel (delete): FA, same who-can-invite rule. Decline (delete): the invited person. An accepted invitation is deleted when the role is removed, so the person can be invited again.
+
+### 2.1b `roleLog/{id}` — role history (2.6)
+
+| Field | Notes |
+| ----- | ----- |
+| `email`, `name`, `role` | Who and which role |
+| `action` | `invited`, `cancelled`, `removed` (by the FA) or `accepted`, `declined` (by the invited person) |
+| `uid` | The person's uid, once known |
+| `by`, `byName`, `at` | Who did it and when (`at` = server time) |
+
+Written in the **same batch** as every change; FA admins can read it; never edited or deleted.
 
 ### 2.2 `teamRequests/{uid}` — team registration requests
 
@@ -309,11 +345,13 @@ Readable and writable only by FA admins. Created with `next: 2` by the very firs
 
 The security rules enforce this table. Screens hiding a button is **not** security.
 
-**Rules (live on dev)** cover the *No role* and *Team admin* columns, and the FA admin's team-request and player review work, proven by **90 automated tests** in `test/rules/`. The rest of the *FA admin* column (corrections, settings) comes later; the *Referee* column with Phase 4. Anything not listed is refused.
+**Rules (live on dev)** cover the *No role* and *Team admin* columns, and the FA admin's team-request and player review work, and invitations, proven by **119 automated tests** in `test/rules/`. The rest of the *FA admin* column (corrections, settings) comes later; the *Referee* column with Phase 4. Anything not listed is refused.
 
 | Collection          | No role                                                             | Team admin                                                                 | Referee                                       | FA admin *(Phase 2)* |
 | ------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------- | -------------------- |
-| `users`           | Get own (none exists)                                               | Get own                                                                    | Get own                                       | Get any ✓; create a `teamAdmin` role on approval ✓ |
+| `users`           | Get own (none exists)                                               | Get own                                                                    | Get own                                       | Get / list ✓; create a `teamAdmin` role on approval ✓; remove FA official (chairman) / referee roles ✓ |
+| `invites`         | Get own (by confirmed email); accept or decline ✓                  | —                                                                          | —                                            | Create / list / cancel ✓ (officials: referees only) |
+| `roleLog`         | Create own accepted / declined line ✓                               | —                                                                          | —                                            | Read; create ✓; never edit |
 | `teamRequests`    | Create (confirmed email) / get / edit own while pending or rejected | Get own                                                                    | —                                            | Get / list all ✓; approve or reject pending ✓ |
 | `teamNames`       | Get any key; create / delete own                                    | Get any key                                                                | Get any key                                   | Read / delete all    |
 | `teams`           | —                                                                  | Get own team *(editing later)*                                             | Read                                          | Get / list ✓; create on approval ✓; edit later |
@@ -379,8 +417,6 @@ A leftover file is harmless; a player without a photo can't exist.
 | `matchReports/{reportId}` | 4         | fixtureId, homeScore, awayScore, scorers[], cards[], notes, signedSheetPhoto, status                                                                                           |
 | `matchEvents/{eventId}`   | 7         | fixtureId, minute, type, teamId, playerId                                                                                                                                      |
 | `standings/{teamId}`      | 5         | Calculated from approved reports only, updated when a report is approved                                                                                                       |
-| `invites/{email}`         | 2.6       | role (`faAdmin` / `referee`), teamId?, invitedBy, createdAt. Created only by FA admins; used once when the invited person signs up with that confirmed email, then deleted |
-| `roleLog/{logId}`         | 2.6       | action, targetUid, role, byUid, createdAt — history of role changes                                                                                                           |
 | `feedPosts/{postId}`      | 2.7 / 5.5 | type, title, body, teamIds[], fixtureId?, playerIds[]?, imageUrl?, source (`auto` / `fa` / `team`), createdBy, createdAt, hidden (bool), hiddenBy?                       |
 
 ### Feed post types (Phase 5.5)
@@ -433,6 +469,7 @@ Feed rules: never include dates of birth; player photos only if agreed with GEDF
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 24 Oct 2026 | v1.7: invitations (2.6). New `invites/{email}` and `roleLog`; `users` gain `name`, `inviteId` and the hand-set `isChairman`; invited people create their own user document when accepting; roles removed by deleting the document (chairman protected). FA can list users. 119 tests. |
 | 22 Oct 2026 | v1.6: FA review of players (2.3). Players gain `reviewedAt`, `reviewedBy` (rejection). FA may read every player, jersey and player key, and approve or reject pending players; approval is a transaction with `settings/playerCounter`, re-checked players keep their ID, the ID year is the year of first approval. Access table updated (90 tests). |
 | 22 Oct 2026 | v1.5: FA review of team requests. `teamRequests` gain `reviewedBy`, `reviewedAt`, `teamId`; reject needs a 10–500 character reason. Teams are created only by the FA's Approve batch, ID = reserved name key, logo link reused. `users`: the FA can get any and create a `teamAdmin` role on approval (never `faAdmin`). Full name lives on the Auth account. Access table updated (71 tests). |
 | 18 Oct 2026 | v1.4: matches security rules v1. Jersey reservation ID is now `{category}-{number}` (e.g. `division-9`) with only `playerId` and `createdAt` (`playerName` dropped). Players gain `playerKey`; `photoUrl` and `thumbUrl` are now **required** (300×400 and 96×128). Player photos moved to `teams/{teamId}/players/{playerId}/photo-<millis>.jpg` / `thumb-<millis>.jpg`. Team admins may `get` any `playerKeys` key. Section 3 marks what rules v1 cover; Storage rows added. Photo-and-batch order added to Section 4. Storage CORS for the web build. |

@@ -135,9 +135,62 @@ service cloud.firestore {
           && getAfter(playerKeyDoc(data.playerKey)).data.playerId == playerId;
       }
 
+      // ---------- Invitations (2.6) ----------
+
+      function inviteDoc(inviteId) {
+        return /databases/$(database)/documents/districts/$(districtId)/invites/$(inviteId);
+      }
+
+      // The chairman: an FA admin with isChairman: true (set by hand once)
+      function isChairman() {
+        return isFaAdmin()
+          && get(userDoc(request.auth.uid)).data.get('isChairman', false) == true;
+      }
+
+      // My confirmed email in lower case = the ID of my invitation
+      function myEmail() {
+        return request.auth.token.email.lower();
+      }
+
+      // An invitation I may still accept: for my confirmed email,
+      // pending and not expired
+      function isMyOpenInvite(inviteId) {
+        return hasConfirmedEmail()
+          && request.auth.token.email is string
+          && inviteId == myEmail()
+          && exists(inviteDoc(inviteId))
+          && get(inviteDoc(inviteId)).data.status == 'pending'
+          && get(inviteDoc(inviteId)).data.expiresAt > request.time;
+      }
+
       // ---------- users/{uid} ----------
       match /users/{uid} {
         allow get: if isOwner(uid) || isFaAdmin();
+
+        // People and roles: the FA lists FA admins and referees
+        allow list: if isFaAdmin();
+
+        // Accepting an invitation: I create my own user document with the
+        // role from my invitation, in the same batch that marks the
+        // invitation accepted. One role per account (create, not update).
+        allow create: if isOwner(uid)
+          && isMyOpenInvite(request.resource.data.inviteId)
+          && request.resource.data.keys().hasOnly(['role', 'name', 'email', 'inviteId', 'createdAt'])
+          && request.resource.data.role == get(inviteDoc(request.resource.data.inviteId)).data.role
+          && request.resource.data.email == myEmail()
+          && isText(request.resource.data.name, 1, 80)
+          && request.resource.data.createdAt == request.time
+          && getAfter(inviteDoc(request.resource.data.inviteId)).data.status == 'accepted'
+          && getAfter(inviteDoc(request.resource.data.inviteId)).data.acceptedBy == uid;
+
+        // Removing a role: the chairman removes FA officials, any FA admin
+        // removes referees. Nobody removes themselves, and the chairman's
+        // role can't be removed in the app (so there is always an FA admin).
+        allow delete: if isFaAdmin()
+          && uid != request.auth.uid
+          && resource.data.get('isChairman', false) != true
+          && (resource.data.role == 'referee'
+              || (resource.data.role == 'faAdmin' && isChairman()));
 
         // FA approves a team: the club's account becomes its team admin.
         // Only 'teamAdmin' can be given here (never 'faAdmin'), only to an
@@ -149,6 +202,78 @@ service cloud.firestore {
           && request.resource.data.createdBy == request.auth.uid
           && request.resource.data.createdAt == request.time
           && getAfter(teamDoc(request.resource.data.teamId)).data.adminUids.hasAny([uid]);
+      }
+
+      // ---------- invites/{email} ----------
+      // The document ID is the invited email in lower case, so the invited
+      // person can find their invitation with one get, and an email has at
+      // most one invitation at a time.
+      match /invites/{inviteId} {
+        allow get: if isFaAdmin()
+          || (hasConfirmedEmail()
+              && request.auth.token.email is string
+              && inviteId == myEmail());
+        allow list: if isFaAdmin();
+
+        // Create: FA officials invite referees; only the chairman invites
+        // FA officials. Expires in 14 days (a day either way for clocks).
+        allow create: if isFaAdmin()
+          && request.resource.data.keys().hasOnly([
+               'email', 'name', 'role', 'status', 'invitedBy', 'invitedByName',
+               'createdAt', 'expiresAt'
+             ])
+          && request.resource.data.email == inviteId
+          && inviteId.matches('^[^@ ]+@[^@ ]+[.][^@ ]+$')
+          && isText(request.resource.data.name, 3, 80)
+          && (request.resource.data.role == 'referee'
+              || (request.resource.data.role == 'faAdmin' && isChairman()))
+          && request.resource.data.status == 'pending'
+          && request.resource.data.invitedBy == request.auth.uid
+          && isText(request.resource.data.invitedByName, 1, 80)
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.expiresAt is timestamp
+          && request.resource.data.expiresAt > request.time + duration.value(13, 'd')
+          && request.resource.data.expiresAt < request.time + duration.value(15, 'd');
+
+        // Accept: only the invited person, while it is open, and only
+        // together with creating their user document with that role.
+        allow update: if isMyOpenInvite(inviteId)
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['status', 'acceptedBy', 'acceptedAt'])
+          && request.resource.data.status == 'accepted'
+          && request.resource.data.acceptedBy == request.auth.uid
+          && request.resource.data.acceptedAt == request.time
+          && getAfter(userDoc(request.auth.uid)).data.role == resource.data.role;
+
+        // Cancel (FA, same who-can-invite rule), decline (the invited person),
+        // or clear an accepted one when the role is removed (FA).
+        allow delete: if (isFaAdmin()
+              && (resource.data.role == 'referee' || isChairman()))
+          || (hasConfirmedEmail()
+              && request.auth.token.email is string
+              && inviteId == myEmail()
+              && resource.data.status == 'pending');
+      }
+
+      // ---------- roleLog/{entryId} ----------
+      // Role history. Written in the same batch as each change; never
+      // edited or deleted.
+      match /roleLog/{entryId} {
+        allow list, get: if isFaAdmin();
+        allow create: if request.resource.data.keys().hasOnly([
+               'email', 'name', 'role', 'action', 'uid', 'by', 'byName', 'at'
+             ])
+          && request.resource.data.by == request.auth.uid
+          && request.resource.data.at == request.time
+          && request.resource.data.role in ['faAdmin', 'referee']
+          && isText(request.resource.data.email, 3, 120)
+          && isText(request.resource.data.byName, 1, 80)
+          && ((isFaAdmin()
+                && request.resource.data.action in ['invited', 'cancelled', 'removed'])
+              || (hasConfirmedEmail()
+                && request.auth.token.email is string
+                && request.resource.data.email == myEmail()
+                && request.resource.data.action in ['accepted', 'declined']));
       }
 
       // ---------- teamRequests/{uid} ----------

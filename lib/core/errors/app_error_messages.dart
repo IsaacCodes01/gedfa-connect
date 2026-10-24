@@ -26,7 +26,24 @@ class PlayerNotPendingException implements Exception {
   const PlayerNotPendingException();
 }
 
+/// This email already has an open invitation.
+class InviteExistsException implements Exception {
+  const InviteExistsException();
+}
+
+/// This email already belongs to an FA admin or referee.
+class AlreadyMemberException implements Exception {
+  const AlreadyMemberException();
+}
+
 String appErrorMessage(Object error) {
+  if (error is InviteExistsException) {
+    return 'This email already has an open invitation. Share it again from '
+        'the Invited tab, or cancel it first.';
+  }
+  if (error is AlreadyMemberException) {
+    return 'This email already belongs to an FA admin or referee.';
+  }
   if (error is PlayerNotPendingException) {
     return 'This player has already been reviewed or changed. '
         'Go back and open them again.';

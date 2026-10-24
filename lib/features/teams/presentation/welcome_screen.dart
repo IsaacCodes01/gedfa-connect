@@ -9,6 +9,8 @@ import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/core/utils/initials.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/auth/presentation/widgets/auth_widgets.dart';
+import 'package:gedfa_connect/features/people/data/people_repository.dart';
+import 'package:gedfa_connect/features/people/presentation/invite_accept_view.dart';
 import 'package:gedfa_connect/features/teams/data/team_request_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/team_request.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/team_logo.dart';
@@ -21,6 +23,15 @@ class WelcomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authUser = ref.watch(authStateProvider).value;
     final requestAsync = ref.watch(myTeamRequestProvider);
+    final inviteAsync = ref.watch(myOpenInviteProvider);
+
+    // Invited by the FA (2.6)? Then this screen is "Accept invitation",
+    // not "Register your team". Wait for the answer to avoid a flicker.
+    if (!inviteAsync.hasValue && !inviteAsync.hasError) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    final invite = inviteAsync.value;
+    if (invite != null) return InviteAcceptView(invite: invite);
 
 // Still waiting for Firestore's first answer: show a spinner, not the intro
 if (!requestAsync.hasValue && !requestAsync.hasError) {

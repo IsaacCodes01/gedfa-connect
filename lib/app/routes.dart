@@ -16,6 +16,11 @@ class Routes {
   static String adminPlayer(String playerId) =>
       '$adminPlayers/player/$playerId';
   static const adminMore = '/admin/more';
+  static const adminPeople = '/admin/more/people';
+  static const adminInvite = '/admin/more/people/invite';
+  static String adminInviteReady(String email) =>
+      '$adminPeople/invited/${Uri.encodeComponent(email)}';
+  static String adminMember(String uid) => '$adminPeople/member/$uid';
   static const team = '/team';
   static const teamPositions = '/team/positions';
   static const teamMore = '/team/more';

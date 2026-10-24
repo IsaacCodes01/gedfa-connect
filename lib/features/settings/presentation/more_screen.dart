@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gedfa_connect/app/more_paths.dart';
+import 'package:gedfa_connect/app/routes.dart';
 import 'package:gedfa_connect/core/constants/user_role.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
@@ -23,8 +24,9 @@ class MoreScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final paths = MorePaths.of(context);
-    final isTeamAdmin =
-        ref.watch(appUserProvider).value?.role == UserRole.teamAdmin;
+    final role = ref.watch(appUserProvider).value?.role;
+    final isTeamAdmin = role == UserRole.teamAdmin;
+    final isFaAdmin = role == UserRole.faAdmin;
 
     return Scaffold(
       appBar: const GedfaAppBar(title: 'More'),
@@ -37,6 +39,20 @@ class MoreScreen extends ConsumerWidget {
               children: [
                 const _AccountCard(),
                 const SizedBox(height: 22),
+                if (isFaAdmin) ...[
+                  const SectionTitle('District FA'),
+                  TileGroup(
+                    children: [
+                      SettingsTile(
+                        icon: Icons.manage_accounts_outlined,
+                        title: 'People and roles',
+                        subtitle: 'FA officials, referees and invitations',
+                        onTap: () => context.go(Routes.adminPeople),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 22),
+                ],
                 SectionTitle(isTeamAdmin ? 'Team & app' : 'App'),
                 TileGroup(
                   children: [

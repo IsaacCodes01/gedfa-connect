@@ -4,7 +4,15 @@ class FirestorePaths {
   static const districtId = 'gomoa-east';
   static const district = 'districts/$districtId';
 
+  static const users = '$district/users';
   static String user(String uid) => '$district/users/$uid';
+
+  /// Invitations, one per email (the ID is the email in lower case).
+  static const invites = '$district/invites';
+  static String invite(String email) => '$district/invites/$email';
+
+  /// Role history: invited, accepted, declined, cancelled, removed.
+  static const roleLog = '$district/roleLog';
 
   static const teamRequests = '$district/teamRequests';
   static String teamRequest(String uid) => '$district/teamRequests/$uid';

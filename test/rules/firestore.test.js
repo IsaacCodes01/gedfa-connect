@@ -1,4 +1,4 @@
-// Security rules tests for GEDFA Connect (steps 1.7 to 2.3).
+// Security rules tests for GEDFA Connect (steps 1.7 to 2.6).
 //
 // Run while the emulators are running:
 //   cd test/rules
@@ -134,6 +134,23 @@ async function seed() {
     await set(`${D}/users/admin2`, { role: 'teamAdmin', teamId: 'stars' });
     await set(`${D}/users/newbie`, { email: 'newbie@example.com' });
     await set(`${D}/users/fa1`, { role: 'faAdmin' });
+
+    // 2.6: the chairman, an FA official and a referee who joined by
+    // invitation, and invitations (pending, expired, accepted)
+    const days = (n) => Timestamp.fromMillis(Date.now() + n * 86400000);
+    await set(`${D}/users/chair`, { role: 'faAdmin', isChairman: true });
+    await set(`${D}/users/off1`, { role: 'faAdmin', name: 'Ama Boateng', email: 'off1@example.com', inviteId: 'off1@example.com', createdAt: now });
+    await set(`${D}/users/ref1`, { role: 'referee', name: 'Ebo Quaye', email: 'ref1@example.com', inviteId: 'ref1@example.com', createdAt: now });
+    const invite = (email, role, changes = {}) => set(`${D}/invites/${email}`, {
+      email, name: 'Invited Person', role, status: 'pending',
+      invitedBy: 'chair', invitedByName: 'Kofi Mensah',
+      createdAt: now, expiresAt: days(14), ...changes,
+    });
+    await invite('kwesi@example.com', 'referee');
+    await invite('efua@example.com', 'faAdmin');
+    await invite('old@example.com', 'referee', { expiresAt: days(-1) });
+    await invite('off1@example.com', 'faAdmin', { status: 'accepted', acceptedBy: 'off1', acceptedAt: now });
+    await invite('ref1@example.com', 'referee', { status: 'accepted', acceptedBy: 'ref1', acceptedAt: now });
     await set(`${D}/users/other`, { email: 'other@example.com' });
 
     // Teams
@@ -194,6 +211,13 @@ async function seed() {
     await set(`${D}/playerKeys/yaw-boateng_2002-01-01`,
       { playerId: 'p2', teamId: 'stars', createdAt: now });
   });
+}
+
+/** Firestore as a signed-in user whose confirmed email is [email]. */
+function dbAsEmail(uid, email) {
+  return testEnv
+    .authenticatedContext(uid, { email, email_verified: true })
+    .firestore();
 }
 
 /** Firestore as a signed-in user with a confirmed email. */
@@ -848,5 +872,199 @@ describe('FA admin: players', () => {
       reviewedBy: 'fa1',
       updatedAt: serverTimestamp(),
     }));
+  });
+});
+
+// ---------- Invitations (2.6) ----------
+
+/** A new invitation the way the app writes it, plus its role-history line. */
+function invitePerson(db, by, email, role, changes = {}) {
+  const batch = writeBatch(db);
+  batch.set(doc(db, `${D}/invites/${email}`), {
+    email, name: 'Kojo Mensah', role, status: 'pending',
+    invitedBy: by, invitedByName: 'Someone',
+    createdAt: serverTimestamp(),
+    expiresAt: Timestamp.fromMillis(Date.now() + 14 * 86400000),
+    ...changes,
+  });
+  batch.set(doc(collection(db, `${D}/roleLog`)), {
+    email, name: 'Kojo Mensah', role, action: 'invited',
+    by, byName: 'Someone', at: serverTimestamp(),
+  });
+  return batch.commit();
+}
+
+/** Accepting: own user document + invitation accepted + history line. */
+function acceptInvite(db, uid, email, role, changes = {}) {
+  const batch = writeBatch(db);
+  batch.set(doc(db, `${D}/users/${uid}`), {
+    role, name: 'Kwesi Arthur', email, inviteId: email,
+    createdAt: serverTimestamp(), ...changes,
+  });
+  batch.update(doc(db, `${D}/invites/${email}`), {
+    status: 'accepted', acceptedBy: uid, acceptedAt: serverTimestamp(),
+  });
+  batch.set(doc(collection(db, `${D}/roleLog`)), {
+    email, name: 'Kwesi Arthur', role, action: 'accepted', uid,
+    by: uid, byName: 'Kwesi Arthur', at: serverTimestamp(),
+  });
+  return batch.commit();
+}
+
+/** Removing a role: user document + accepted invitation + history line. */
+function removeRole(db, by, uid, email, role) {
+  const batch = writeBatch(db);
+  batch.delete(doc(db, `${D}/users/${uid}`));
+  batch.delete(doc(db, `${D}/invites/${email}`));
+  batch.set(doc(collection(db, `${D}/roleLog`)), {
+    email, name: 'Someone', role, action: 'removed', uid,
+    by, byName: 'Someone', at: serverTimestamp(),
+  });
+  return batch.commit();
+}
+
+describe('Invitations: who can invite', () => {
+  it('an FA official can invite a referee', async () => {
+    await assertSucceeds(invitePerson(dbAs('fa1'), 'fa1', 'new.ref@example.com', 'referee'));
+  });
+
+  it('an FA official cannot invite an FA official', async () => {
+    await assertFails(invitePerson(dbAs('fa1'), 'fa1', 'new.off@example.com', 'faAdmin'));
+  });
+
+  it('the chairman can invite an FA official', async () => {
+    await assertSucceeds(invitePerson(dbAs('chair'), 'chair', 'new.off@example.com', 'faAdmin'));
+  });
+
+  it('nobody can invite a team admin this way', async () => {
+    await assertFails(invitePerson(dbAs('chair'), 'chair', 'x@example.com', 'teamAdmin'));
+  });
+
+  it('a team admin cannot invite anyone', async () => {
+    await assertFails(invitePerson(dbAs('admin1'), 'admin1', 'x@example.com', 'referee'));
+  });
+
+  it('the invitation must expire in about 14 days', async () => {
+    await assertFails(invitePerson(dbAs('chair'), 'chair', 'x@example.com', 'referee', {
+      expiresAt: Timestamp.fromMillis(Date.now() + 90 * 86400000),
+    }));
+  });
+
+  it('the email must be the document ID', async () => {
+    await assertFails(invitePerson(dbAs('chair'), 'chair', 'x@example.com', 'referee', {
+      email: 'someone.else@example.com',
+    }));
+  });
+
+  it('cannot invite an email that already has an invitation', async () => {
+    await assertFails(invitePerson(dbAs('chair'), 'chair', 'kwesi@example.com', 'referee'));
+  });
+
+  it('the FA can list invitations, people and the role history', async () => {
+    const db = dbAs('fa1');
+    await assertSucceeds(getDocs(collection(db, `${D}/invites`)));
+    await assertSucceeds(getDocs(query(collection(db, `${D}/users`),
+      where('role', 'in', ['faAdmin', 'referee']))));
+    await assertSucceeds(getDocs(collection(db, `${D}/roleLog`)));
+  });
+
+  it('a team admin cannot list people or invitations', async () => {
+    await assertFails(getDocs(collection(dbAs('admin1'), `${D}/users`)));
+    await assertFails(getDocs(collection(dbAs('admin1'), `${D}/invites`)));
+  });
+});
+
+describe('Invitations: the invited person', () => {
+  it('can read their own invitation', async () => {
+    await assertSucceeds(getDoc(doc(dbAsEmail('kwesi', 'kwesi@example.com'), `${D}/invites/kwesi@example.com`)));
+  });
+
+  it("cannot read someone else's invitation", async () => {
+    await assertFails(getDoc(doc(dbAsEmail('kwesi', 'kwesi@example.com'), `${D}/invites/efua@example.com`)));
+  });
+
+  it('can accept and gets exactly the invited role', async () => {
+    const db = dbAsEmail('kwesi', 'kwesi@example.com');
+    await assertSucceeds(acceptInvite(db, 'kwesi', 'kwesi@example.com', 'referee'));
+    await assertSucceeds(getDoc(doc(db, `${D}/users/kwesi`)));
+  });
+
+  it('cannot accept with a different role', async () => {
+    await assertFails(acceptInvite(dbAsEmail('kwesi', 'kwesi@example.com'), 'kwesi', 'kwesi@example.com', 'faAdmin'));
+  });
+
+  it('cannot make themselves chairman while accepting', async () => {
+    await assertFails(acceptInvite(dbAsEmail('efua', 'efua@example.com'), 'efua', 'efua@example.com', 'faAdmin', { isChairman: true }));
+  });
+
+  it("cannot accept someone else's invitation", async () => {
+    await assertFails(acceptInvite(dbAsEmail('kwesi', 'kwesi@example.com'), 'kwesi', 'efua@example.com', 'faAdmin'));
+  });
+
+  it('cannot accept without a confirmed email', async () => {
+    const db = testEnv.authenticatedContext('kwesi', { email: 'kwesi@example.com', email_verified: false }).firestore();
+    await assertFails(acceptInvite(db, 'kwesi', 'kwesi@example.com', 'referee'));
+  });
+
+  it('cannot accept an expired invitation', async () => {
+    await assertFails(acceptInvite(dbAsEmail('old', 'old@example.com'), 'old', 'old@example.com', 'referee'));
+  });
+
+  it('cannot accept an invitation twice', async () => {
+    const db = dbAsEmail('kwesi', 'kwesi@example.com');
+    await acceptInvite(db, 'kwesi', 'kwesi@example.com', 'referee');
+    await assertFails(acceptInvite(db, 'kwesi', 'kwesi@example.com', 'referee'));
+  });
+
+  it('cannot give themselves a role without an invitation', async () => {
+    await assertFails(setDoc(doc(dbAsEmail('newbie', 'newbie@example.com'), `${D}/users/newbie`), {
+      role: 'referee', name: 'Newbie', email: 'newbie@example.com',
+      inviteId: 'newbie@example.com', createdAt: serverTimestamp(),
+    }));
+  });
+
+  it('can decline (deletes the invitation)', async () => {
+    await assertSucceeds(deleteDoc(doc(dbAsEmail('kwesi', 'kwesi@example.com'), `${D}/invites/kwesi@example.com`)));
+  });
+});
+
+describe('Invitations: removing roles', () => {
+  it('an FA official can remove a referee', async () => {
+    await assertSucceeds(removeRole(dbAs('fa1'), 'fa1', 'ref1', 'ref1@example.com', 'referee'));
+  });
+
+  it('an FA official cannot remove another FA official', async () => {
+    await assertFails(removeRole(dbAs('fa1'), 'fa1', 'off1', 'off1@example.com', 'faAdmin'));
+  });
+
+  it('the chairman can remove an FA official', async () => {
+    await assertSucceeds(removeRole(dbAs('chair'), 'chair', 'off1', 'off1@example.com', 'faAdmin'));
+  });
+
+  it("nobody can remove the chairman's role", async () => {
+    await assertFails(deleteDoc(doc(dbAs('off1'), `${D}/users/chair`)));
+  });
+
+  it('nobody can remove their own role', async () => {
+    await assertFails(deleteDoc(doc(dbAs('off1'), `${D}/users/off1`)));
+  });
+
+  it("a team admin's role cannot be removed this way", async () => {
+    await assertFails(deleteDoc(doc(dbAs('chair'), `${D}/users/admin1`)));
+  });
+
+  it('an FA official cannot cancel an FA official invitation', async () => {
+    await assertFails(deleteDoc(doc(dbAs('fa1'), `${D}/invites/efua@example.com`)));
+  });
+
+  it('the role history cannot be edited', async () => {
+    const db = dbAs('chair');
+    const ref = doc(collection(db, `${D}/roleLog`));
+    await setDoc(ref, {
+      email: 'x@example.com', role: 'referee', action: 'invited',
+      by: 'chair', byName: 'Kofi', at: serverTimestamp(),
+    });
+    await assertFails(updateDoc(ref, { action: 'removed' }));
+    await assertFails(deleteDoc(ref));
   });
 });

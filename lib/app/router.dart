@@ -20,6 +20,10 @@ import 'package:gedfa_connect/features/auth/presentation/sign_up_screen.dart';
 import 'package:gedfa_connect/features/teams/presentation/welcome_screen.dart';
 import 'package:gedfa_connect/features/teams/presentation/register_team_screen.dart';
 import 'package:gedfa_connect/features/teams/presentation/team_home_screen.dart';
+import 'package:gedfa_connect/features/people/presentation/invite_person_screen.dart';
+import 'package:gedfa_connect/features/people/presentation/invite_ready_screen.dart';
+import 'package:gedfa_connect/features/people/presentation/member_screen.dart';
+import 'package:gedfa_connect/features/people/presentation/people_screen.dart';
 import 'package:gedfa_connect/features/players/presentation/player_details_screen.dart';
 import 'package:gedfa_connect/features/players/presentation/player_form_screen.dart';
 import 'package:gedfa_connect/features/players/presentation/team_positions_screen.dart';
@@ -134,7 +138,32 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: Routes.adminMore,
                 builder: (_, _) => const MoreScreen(),
-                routes: _moreChildren(),
+                routes: [
+                  ..._moreChildren(),
+                  // FA only: People and roles (2.6). Inside the More tab.
+                  GoRoute(
+                    path: 'people',
+                    builder: (_, _) => const PeopleScreen(),
+                    routes: [
+                      GoRoute(
+                        path: 'invite',
+                        builder: (_, _) => const InvitePersonScreen(),
+                      ),
+                      GoRoute(
+                        path: 'invited/:email',
+                        builder: (_, state) => InviteReadyScreen(
+                          email: state.pathParameters['email']!,
+                        ),
+                      ),
+                      GoRoute(
+                        path: 'member/:uid',
+                        builder: (_, state) => MemberScreen(
+                          uid: state.pathParameters['uid']!,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ],
           ),
