@@ -450,7 +450,7 @@ class _PlayerCard extends ConsumerWidget {
     // Data saver: show initials instead of downloading photos
     // Grid cards are big: the 96×128 thumbnail looks blurry here,
     // so use the 300×400 photo (Data saver still turns photos off).
-    final thumb = ref.watch(dataSaverProvider) ? null : player.photoUrl;
+  final thumb = ref.watch(dataSaverProvider) ? null : player.photoUrl;
     final silhouette = ColoredBox(
       color: isDark ? const Color(0xFF1E3A5F) : const Color(0xFFDCEAF9),
       child: Center(
@@ -496,6 +496,9 @@ class _PlayerCard extends ConsumerWidget {
                           : Image.network(
                               thumb,
                               fit: BoxFit.cover,
+                              // Sharper shrinking: the default (medium) blends in smaller copies
+                              // of the photo, which looks soft on these grid cards.
+                              filterQuality: FilterQuality.high,
                               errorBuilder: (_, _, _) => silhouette,
                             ),
                       Positioned(

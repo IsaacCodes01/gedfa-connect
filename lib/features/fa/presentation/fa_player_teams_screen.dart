@@ -412,6 +412,9 @@ class _ProgressBar extends StatelessWidget {
           height: 6,
           color: isDark ? AppColors.darkBorder : const Color(0xFFE3EAF2),
           child: Row(
+            // Make each coloured part fill the bar's 6 px height.
+            // Without this, an empty ColoredBox is 0 px tall and invisible.
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               part(stats.approved,
                   isDark ? AppColors.darkGreen : AppColors.ghanaGreen),
