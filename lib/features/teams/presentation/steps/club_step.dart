@@ -74,6 +74,10 @@ class ClubStep extends StatelessWidget {
     return Validators.email(value);
   }
 
+  /// The logo is required (2.13): red once they tried to continue.
+  bool get showLogoError =>
+      showErrors && logoBytes == null && (logoUrl ?? '').isEmpty;
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -116,12 +120,17 @@ class ClubStep extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: scheme.surface,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: scheme.outline),
+                    border: Border.all(
+                      color: showLogoError ? scheme.error : scheme.outline,
+                      width: showLogoError ? 1.5 : 1,
+                    ),
                   ),
                   child: LogoPicker(
                     label: initialsFor(teamName.text),
                     color: logoColor,
                     bytes: logoBytes,
+                    url: logoUrl,
+                    showError: showLogoError,
                     enabled: enabled,
                     onPicked: onLogoPicked,
                     onRemoved: onLogoRemoved,

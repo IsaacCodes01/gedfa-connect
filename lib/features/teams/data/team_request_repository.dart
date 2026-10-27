@@ -89,6 +89,9 @@ class TeamRequestRepository {
           'email',
           'logoUrl',
           'categories',
+          'clubStatus',
+          'licenceUrl',
+          'licenceType',
           'kits',
           'officials',
         ])
@@ -145,6 +148,21 @@ class TeamRequestRepository {
     String contentType = 'image/jpeg',
   }) async {
     final ref = _storage.ref(StoragePaths.teamRequestLogo(uid));
+    await ref
+        .putData(bytes, SettableMetadata(contentType: contentType))
+        .timeout(_uploadTimeout);
+    return ref.getDownloadURL();
+  }
+
+  /// Uploads the new club's letter or the licence (2.13).
+  /// [fileName] is 'letter.pdf', 'licence.pdf' or 'licence.jpg'.
+  Future<String> uploadFile({
+    required String uid,
+    required String fileName,
+    required Uint8List bytes,
+    required String contentType,
+  }) async {
+    final ref = _storage.ref(StoragePaths.teamRequestFile(uid, fileName));
     await ref
         .putData(bytes, SettableMetadata(contentType: contentType))
         .timeout(_uploadTimeout);

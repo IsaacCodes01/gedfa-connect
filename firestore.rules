@@ -383,13 +383,34 @@ service cloud.firestore {
       }
 
       // ---------- teamRequests/{uid} ----------
+
+      // In the district already: no league, no letter. A new club: the
+      // league it played in last season and a letter to the chairman.
+      // Either may add a licence (a photo or a PDF). (2.13)
+      function isValidClubStatus(data) {
+        let isNew = data.get('clubStatus', '') == 'new';
+        return data.get('clubStatus', '') in ['existing', 'new']
+          && ((isNew
+                 && isText(data.get('lastLeague', null), 2, 80)
+                 && isText(data.get('letterUrl', null), 10, 2000))
+              || (!isNew
+                 && data.get('lastLeague', null) == null
+                 && data.get('letterUrl', null) == null))
+          && isOptionalText(data, 'licenceUrl', 2000)
+          && ((data.get('licenceUrl', null) == null
+                 && data.get('licenceType', null) == null)
+              || (data.get('licenceUrl', null) != null
+                 && data.get('licenceType', null) in ['pdf', 'image']));
+      }
+
       function isValidTeamRequest(data, uid) {
         return data.keys().hasOnly([
             'teamName', 'teamNameLower', 'nameKey', 'shortName', 'town',
             'homeGround', 'categories', 'homeGroundDirections', 'yearFounded', 'email',
             'logoUrl', 'kits', 'officials', 'agreedToRules', 'status',
             'rejectionReason', 'createdAt', 'updatedAt',
-            'reviewedAt', 'reviewedBy', 'teamId'
+            'reviewedAt', 'reviewedBy', 'teamId',
+            'clubStatus', 'lastLeague', 'letterUrl', 'licenceUrl', 'licenceType'
           ])
           && isText(data.teamName, 2, 60)
           && data.teamNameLower == data.teamName.lower()
@@ -401,7 +422,9 @@ service cloud.firestore {
           && isText(data.homeGround, 2, 80)
           && isOptionalText(data, 'homeGroundDirections', 300)
           && isOptionalText(data, 'email', 120)
-          && isOptionalText(data, 'logoUrl', 2000)
+          // The logo is required (2.13)
+          && isText(data.logoUrl, 10, 2000)
+          && isValidClubStatus(data)
           && data.categories is list
           && data.categories.size() >= 1
           && data.categories.size() <= 2
@@ -415,7 +438,7 @@ service cloud.firestore {
           && data.kits.keys().hasOnly(['home', 'away', 'third', 'goalkeeper', 'goalkeeper2'])
           && data.officials is list
           && data.officials.size() >= 2
-          && data.officials.size() <= 10
+          && data.officials.size() <= 7
           && data.agreedToRules == true
           && data.status == 'pending'
           && (!('rejectionReason' in data) || data.rejectionReason == null)

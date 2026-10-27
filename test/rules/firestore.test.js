@@ -1,4 +1,4 @@
-// Security rules tests for GEDFA Connect (steps 1.7 to 2.8).
+// Security rules tests for GEDFA Connect (steps 1.7 to 2.13).
 //
 // Run while the emulators are running:
 //   cd test/rules
@@ -104,6 +104,8 @@ function sendTeamRequest(db, uid, changes = {}) {
     town: 'Afransi',
     homeGround: 'Afransi Park',
     categories: ['division'],
+    logoUrl: 'https://example.com/logo.jpg',
+    clubStatus: 'existing',
     kits: {
       home: { shirt: '#D32F2F' },
       away: { shirt: '#FFFFFF' },
@@ -579,6 +581,64 @@ describe('FA admin: team requests', () => {
 
   it('a role-less user cannot list teams', async () => {
     await assertFails(getDocs(collection(dbAs('newbie'), `${D}/teams`)));
+  });
+});
+
+// ---------- Team requests: club status, logo, officials (2.13) ----------
+
+const LETTER = 'https://example.com/letter.pdf';
+const SEVEN = Array.from({ length: 7 }, (_, i) => ({ name: `Official ${i + 1}` }));
+
+describe('Team requests: club status, logo and officials', () => {
+  it('a club already in the district needs no letter', async () => {
+    await assertSucceeds(sendTeamRequest(dbAs('newbie'), 'newbie'));
+  });
+
+  it('a new club can send its last league and letter', async () => {
+    await assertSucceeds(sendTeamRequest(dbAs('newbie'), 'newbie', {
+      clubStatus: 'new', lastLeague: 'Awutu Senya Division Three', letterUrl: LETTER,
+    }));
+  });
+
+  it('a new club must upload the letter', async () => {
+    await assertFails(sendTeamRequest(dbAs('newbie'), 'newbie', {
+      clubStatus: 'new', lastLeague: 'Awutu Senya Division Three',
+    }));
+  });
+
+  it('a new club must give its last league', async () => {
+    await assertFails(sendTeamRequest(dbAs('newbie'), 'newbie', {
+      clubStatus: 'new', letterUrl: LETTER,
+    }));
+  });
+
+  it('a club in the district cannot keep a letter or league', async () => {
+    await assertFails(sendTeamRequest(dbAs('newbie'), 'newbie', { letterUrl: LETTER }));
+    await assertFails(sendTeamRequest(dbAs('newbie'), 'newbie', { lastLeague: 'Some League' }));
+  });
+
+  it('the club status must be one of the two', async () => {
+    await assertFails(sendTeamRequest(dbAs('newbie'), 'newbie', { clubStatus: 'maybe' }));
+    await assertFails(sendTeamRequest(dbAs('newbie'), 'newbie', { clubStatus: null }));
+  });
+
+  it('the logo is required', async () => {
+    await assertFails(sendTeamRequest(dbAs('newbie'), 'newbie', { logoUrl: null }));
+  });
+
+  it('a licence needs its type (photo or PDF)', async () => {
+    const licenceUrl = 'https://example.com/licence.pdf';
+    await assertSucceeds(sendTeamRequest(dbAs('newbie'), 'newbie', { licenceUrl, licenceType: 'pdf' }));
+    await assertFails(sendTeamRequest(dbAs('newbie'), 'newbie', { licenceUrl }));
+    await assertFails(sendTeamRequest(dbAs('newbie'), 'newbie', { licenceUrl, licenceType: 'word' }));
+    await assertFails(sendTeamRequest(dbAs('newbie'), 'newbie', { licenceType: 'pdf' }));
+  });
+
+  it('allows 7 officials but not 8', async () => {
+    await assertSucceeds(sendTeamRequest(dbAs('newbie'), 'newbie', { officials: SEVEN }));
+    await assertFails(sendTeamRequest(dbAs('newbie'), 'newbie', {
+      officials: [...SEVEN, { name: 'Official 8' }],
+    }));
   });
 });
 

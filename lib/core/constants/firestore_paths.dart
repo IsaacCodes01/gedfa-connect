@@ -60,6 +60,11 @@ class StoragePaths {
   static String teamRequestLogo(String uid) =>
   '${FirestorePaths.district}/teamRequests/$uid/logo.jpg';
 
-    static String playerFile(String teamId, String playerId, String fileName) =>
+  /// The new club's letter (letter.pdf) and the licence
+  /// (licence.pdf or licence.jpg), next to the request's logo.
+  static String teamRequestFile(String uid, String fileName) =>
+      '${FirestorePaths.district}/teamRequests/$uid/$fileName';
+
+  static String playerFile(String teamId, String playerId, String fileName) =>
     '${FirestorePaths.district}/teams/$teamId/players/$playerId/$fileName';
 }

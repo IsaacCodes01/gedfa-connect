@@ -70,6 +70,8 @@ String appErrorMessage(Object error) {
         "You're not allowed to do that. If you just confirmed your email, log out and log in again.",
       'unavailable' || 'network-request-failed' || 'retry-limit-exceeded' =>
         'No internet connection. Check your data or Wi-Fi and try again.',
+      'failed-precondition' =>
+        'The database is still being set up. Please try again in a few minutes.',
       'canceled' => 'The upload was cancelled.',
       _ => 'Something went wrong. Please try again.',
     };

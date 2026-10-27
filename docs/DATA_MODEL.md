@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.0, matches the rules after step 2.8 (24 Oct 2026)
+**Status:** v2.1, matches the rules after step 2.13a (27 Oct 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -53,9 +53,12 @@ Used for every kit (home, away, third, goalkeeper, goalkeeper 2). Colours come f
 
 ```
 { role: "headCoach", name: "Kofi Mensah", phone: "+233241234567", licence: "CAF D" | null }
+{ role: "other", title: "Welfare officer", name: "Yaw Darko", phone: "+233201112222", licence: null }
 ```
 
-- `teamManager` and `headCoach` are required on every team request and team.
+- `role`: `teamManager`, `headCoach`, `assistantCoach`, `chairman`, `secretary`, `kitManager`, `medicalOfficer` or `other`.
+- `teamManager` and `headCoach` are required on every team request and team. **At most 7 officials** (2 required + up to 5).
+- `other` means the role isn't in the list: `title` holds the role the club typed (2–40 characters). Only `other` can appear more than once.
 - `licence` is used for the head coach (whether it is required is pending GEDFA).
 
 ### Position → group
@@ -147,13 +150,19 @@ Keyed by the requester's `uid`, so each person can have at most one request.
 | `homeGroundDirections` | string?          | Optional                                                                                                                          |
 | `yearFounded`          | number?          | Optional                                                                                                                          |
 | `email`                | string?          | Optional                                                                                                                          |
-| `logoUrl`              | string?          | Optional; Storage download URL. The app shows the team's initials until a logo is added                                           |
+| `logoUrl`              | string           | **Required** (2.13); Storage download URL                                                                                         |
 | **Competitions**   |                  |                                                                                                                                   |
 | `categories`           | array of strings | Required. 1 or 2 items from`division`, `juvenile`, no repeats. `juvenile` always means all three age groups (U13, U15, U17) |
+| **Club status** (2.13) |              |                                                                                                                                   |
+| `clubStatus`           | string           | Required: `existing` (already in Gomoa East) or `new` (joining the district). Older requests are read as `existing`               |
+| `lastLeague`           | string?          | `new` only, required: the league played in last season (2–80 characters). Must be empty for `existing`                           |
+| `letterUrl`            | string?          | `new` only, required: the letter to the GEDFA chairman (PDF, Storage download URL). Must be empty for `existing`                   |
+| `licenceUrl`           | string?          | Optional club licence (photo or PDF)                                                                                              |
+| `licenceType`          | string?          | `pdf` or `image`; set exactly when `licenceUrl` is set                                                                            |
+| **Officials**      |                  |                                                                                                                                   |
+| `officials`            | array of maps    | Officials (see Official shape); must include`teamManager` and `headCoach`; 2 to 7                                              |
 | **Kits**           |                  |                                                                                                                                   |
 | `kits`                 | map              | `home`, `away`, `goalkeeper` required; `third`, `goalkeeper2` optional. Each value is a Kit (see Kit shape)             |
-| **Officials**      |                  |                                                                                                                                   |
-| `officials`            | array of maps    | Officials (see Official shape); must include`teamManager` and `headCoach`; at most 10                                         |
 | **Declaration**    |                  |                                                                                                                                   |
 | `agreedToRules`        | boolean          | Must be`true`                                                                                                                   |
 | **Review**         |                  |                                                                                                                                   |
@@ -176,7 +185,9 @@ Keyed by the requester's `uid`, so each person can have at most one request.
 - **Approve:** see Section 4. An approved request is never edited again; later changes to the team go through change requests (planned, ROADMAP 2.10–2.11).
 - One club = one request, whatever it plays in. A club in both competitions registers **once** and ticks both; name, logo, kits and officials are shared.
 - Requests saved before `categories` existed are read as `["division"]` by the app; the next edit saves the field.
-- **Pending GEDFA:** registration fee payment reference, supporting documents, previous league. These fields will be added when GEDFA answers (see the *Team Registration Requirements* document).
+- The registration steps are: Club details › Club status › Officials › Kits › Colours › Payment, then Review (2.13).
+- On approval the team also gets `clubStatus`, `licenceUrl` and `licenceType`. The letter and last league stay on the request.
+- **Coming in 2.13b–c:** kit photos or designed kits, team colours, juvenile kits; the season fee (GH₵ 1,000, paid in parts, confirmed by the FA, receipt numbers).
 
 ### 2.2a `teamNames/{nameKey}` — team name reservations
 
@@ -454,6 +465,8 @@ A leftover file is harmless; a player without a photo can't exist.
 | Path                                                                        | Contents                                  |
 | --------------------------------------------------------------------------- | ----------------------------------------- |
 | `districts/gomoa-east/teamRequests/{uid}/logo.jpg`                        | Logo sent with a request                  |
+| `districts/gomoa-east/teamRequests/{uid}/letter.pdf`                      | New club's letter to the chairman (PDF, under 5 MB) |
+| `districts/gomoa-east/teamRequests/{uid}/licence.pdf` or `licence.jpg`    | Optional club licence (PDF or photo, under 5 MB)    |
 | `districts/gomoa-east/teams/{teamId}/logo.jpg`                            | Approved team logo *(Phase 2)*            |
 | `districts/gomoa-east/teams/{teamId}/players/{playerId}/photo-<millis>.jpg` | Passport photo, 300×400, JPEG quality 85  |
 | `districts/gomoa-east/teams/{teamId}/players/{playerId}/thumb-<millis>.jpg` | Thumbnail, 96×128, JPEG quality 80        |
@@ -497,11 +510,13 @@ Feed rules: never include dates of birth; player photos only if agreed with GEDF
 
 ## 7. Open questions for GEDFA
 
-- Squad size, matchday substitutes
-- Juvenile: separate kits or the same as the Division side?
+**Answered by GEDFA (27 Oct 2026):** squad up to 30 (fewer is fine); matchday squad up to 16 (fewer is fine); 5 substitutes; normal jersey rules; registration window not open yet; tie-breakers as the English Premier League; officials up to 7 (team manager and head coach required); logo required; licence and owners optional; third kit and second goalkeeper kit optional; new clubs send a letter and their last league; season fee GH₵ 1,000 every season, paid in parts, the FA confirms each payment (no payment is rejected unless it can't be found or is false), reminders every 3 days until paid; juvenile kits are separate; juvenile age group = season **start** year − birth year; younger players may play up (as the GFA); overage players are not allowed.
+
+Still open:
+
+
 - Juvenile: coach per age group? Welfare or child-safety officer required?
 - Juvenile: age cut-off date per age group, per season
-- Juvenile: can a player play up an age group (e.g. U13 in U15)?
 - Juvenile: must a club field all three age groups?
 - Separate registration fees for Division and Juvenile?
 - Registration window; adding players mid-season
@@ -526,6 +541,7 @@ Feed rules: never include dates of birth; player photos only if agreed with GEDF
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 27 Oct 2026 | v2.1 (2.13a): `teamRequests` gain `clubStatus`, `lastLeague`, `letterUrl`, `licenceUrl`, `licenceType`; logo required; officials at most 7, new role `other` with `title`. Storage: `letter.pdf`, `licence.pdf` / `licence.jpg`. GEDFA's answers recorded in Section 7. |
 | 24 Oct 2026 | v2.0: `announcements` (+ `seen`), grouped `notifications`, `readMarks` (2.7 – 2.8); composite indexes. 149 tests. |
 | 24 Oct 2026 | v1.9.1: `playerProfiles.unavailableReason`; the availability tiles filter the Player profiles tab. 137 tests. |
 | 24 Oct 2026 | v1.9: new `playerProfiles` and `teams/*/armbands` (2.3d). 136 tests. |

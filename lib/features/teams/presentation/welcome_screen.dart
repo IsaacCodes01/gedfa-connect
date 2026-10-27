@@ -207,7 +207,7 @@ class _IntroCard extends StatelessWidget {
         const _HowStep(
           number: 1,
           title: 'Register your team',
-          text: 'Club details, kits and officials · about 5 minutes',
+          text: 'Club details, status, officials and kits · about 5 minutes',
         ),
         const SizedBox(height: 14),
         const _HowStep(

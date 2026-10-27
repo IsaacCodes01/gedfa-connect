@@ -18,6 +18,7 @@ class LogoPicker extends StatelessWidget {
     this.bytes,
     this.url,
     this.enabled = true,
+    this.showError = false,
   });
 
   final String label;
@@ -25,6 +26,9 @@ class LogoPicker extends StatelessWidget {
   final Uint8List? bytes;
   final String? url;
   final bool enabled;
+
+  /// Red hint: the logo is required and still missing (2.13).
+  final bool showError;
   final void Function(Uint8List bytes, String contentType) onPicked;
   final VoidCallback onRemoved;
 
@@ -110,12 +114,15 @@ class LogoPicker extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Team logo', style: textTheme.titleSmall),
+              Text('Team logo *', style: textTheme.titleSmall),
               const SizedBox(height: 2),
               Text(
-                'Optional. A square image works best.',
-                style: textTheme.bodySmall
-                    ?.copyWith(color: scheme.onSurfaceVariant),
+                showError
+                    ? 'Add your logo to continue.'
+                    : 'Required. A square image works best.',
+                style: textTheme.bodySmall?.copyWith(
+                  color: showError ? scheme.error : scheme.onSurfaceVariant,
+                ),
               ),
               const SizedBox(height: 8),
               Wrap(

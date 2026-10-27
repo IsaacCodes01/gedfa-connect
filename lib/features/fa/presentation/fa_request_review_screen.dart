@@ -8,6 +8,7 @@ import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/core/utils/initials.dart';
+import 'package:gedfa_connect/core/utils/open_link.dart';
 import 'package:gedfa_connect/core/utils/phone_call.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
@@ -17,10 +18,12 @@ import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/fa/presentation/widgets/review_widgets.dart';
 import 'package:gedfa_connect/features/settings/presentation/widgets/settings_widgets.dart';
 import 'package:gedfa_connect/features/teams/data/team_request_repository.dart';
+import 'package:gedfa_connect/features/teams/domain/club_status.dart';
 import 'package:gedfa_connect/features/teams/domain/kit.dart';
 import 'package:gedfa_connect/features/teams/domain/official.dart';
 import 'package:gedfa_connect/features/teams/domain/team_request.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/competition_picker.dart';
+import 'package:gedfa_connect/features/teams/presentation/widgets/file_upload_row.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/kit_preview.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/team_logo.dart';
 import 'package:go_router/go_router.dart';
@@ -83,6 +86,10 @@ class _ReviewBody extends StatelessWidget {
               _Header(request: request),
               const SizedBox(height: 16),
               _Checks(request: request),
+              const SizedBox(height: 22),
+
+              const SectionTitle('Club status'),
+              _ClubStatus(request: request),
               const SizedBox(height: 22),
 
               const SectionTitle('Club details'),
@@ -234,10 +241,69 @@ class _Checks extends ConsumerWidget {
           ok: true,
           okText: 'Sent from a confirmed email address',
         ),
+        if (request.clubStatus == ClubStatus.newClub)
+          CheckLine(
+            ok: request.letterUrl != null,
+            okText: 'New club: letter to the chairman attached',
+            badText: 'New club, but the letter is missing',
+          ),
         CheckLine(
           ok: hasRequiredOfficials,
           okText: 'Team manager and head coach given',
           badText: 'Team manager or head coach is missing',
+        ),
+      ],
+    );
+  }
+}
+
+// ── Club status (2.13): in the district or new, letter, licence ─────────
+
+class _ClubStatus extends StatelessWidget {
+  const _ClubStatus({required this.request});
+
+  final TeamRequest request;
+
+  @override
+  Widget build(BuildContext context) {
+    final isNew = request.clubStatus == ClubStatus.newClub;
+    final letter = request.letterUrl;
+    final licence = request.licenceUrl;
+
+    return TileGroup(
+      children: [
+        DetailRow('Type', request.clubStatus.shortLabel),
+        if (isNew) DetailRow('Last season', request.lastLeague),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+          child: Column(
+            children: [
+              if (isNew) ...[
+                FileUploadRow(
+                  title: 'Letter to the chairman',
+                  subtitle: letter == null ? 'Not sent' : 'PDF',
+                  buttonLabel: 'Open',
+                  hasFile: letter != null,
+                  showError: letter == null,
+                  // openLink straight from the tap (iPhone Safari needs it)
+                  onPressed: letter == null ? null : () => openLink(letter),
+                ),
+                const SizedBox(height: 10),
+              ],
+              FileUploadRow(
+                title: 'Club licence',
+                subtitle: licence == null
+                    ? 'Not given (optional)'
+                    : request.licenceIsPdf
+                        ? 'PDF'
+                        : 'Photo',
+                buttonLabel: 'Open',
+                isPdf: licence == null || request.licenceIsPdf,
+                hasFile: licence != null,
+                onPressed: licence == null ? null : () => openLink(licence),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -328,7 +394,7 @@ class _OfficialRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  official.role.label,
+                  official.roleText,
                   style: textTheme.bodySmall
                       ?.copyWith(color: scheme.onSurfaceVariant),
                 ),
@@ -428,6 +494,7 @@ class _ReviewActionsState extends ConsumerState<_ReviewActions> {
       fieldLabel: 'Reason for the club',
       quickReasons: const [
         'Logo is not clear',
+        'The letter to the chairman is missing or unclear',
         'Team name is already used in the district',
         "Officials' phone numbers are missing",
         'Home ground is not approved by the FA',

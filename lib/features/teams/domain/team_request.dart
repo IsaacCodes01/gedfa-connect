@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:gedfa_connect/core/constants/approval_status.dart';
+import 'package:gedfa_connect/features/teams/domain/club_status.dart';
 import 'package:gedfa_connect/features/teams/domain/kit.dart';
 import 'package:gedfa_connect/features/teams/domain/official.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
@@ -19,6 +20,11 @@ class TeamRequest {
     required this.status,
     this.homeGroundDirections,
     required this.categories,
+    this.clubStatus = ClubStatus.existing,
+    this.lastLeague,
+    this.letterUrl,
+    this.licenceUrl,
+    this.licenceIsPdf = false,
     this.yearFounded,
     this.email,
     this.logoUrl,
@@ -39,17 +45,30 @@ class TeamRequest {
   final int? yearFounded;
   final String? email;
   final String? logoUrl;
-    // Competitions: division, juvenile, or both
+  // Competitions: division, juvenile, or both
   final Set<Competition> categories;
 
-  // Section 2: kits
+  // Section 2: club status (2.13)
+  final ClubStatus clubStatus;
+
+  /// New clubs only: the league they played in last season.
+  final String? lastLeague;
+
+  /// New clubs only: their letter to the GEDFA chairman (PDF).
+  final String? letterUrl;
+
+  /// Optional club licence, a photo or a PDF.
+  final String? licenceUrl;
+  final bool licenceIsPdf;
+
+  // Section 3: kits
   final Kit homeKit;
   final Kit awayKit;
   final Kit? thirdKit;
   final Kit goalkeeperKit;
   final Kit? goalkeeperKit2;
 
-  // Section 3: officials
+  // Section 4: officials
   final List<Official> officials;
 
   // Review
@@ -68,7 +87,7 @@ class TeamRequest {
     return null;
   }
 
-    Map<String, dynamic> toEditableMap() {
+  Map<String, dynamic> toEditableMap() {
     String? blankToNull(String? value) {
       final trimmed = value?.trim();
       return (trimmed == null || trimmed.isEmpty) ? null : trimmed;
@@ -84,6 +103,14 @@ class TeamRequest {
       'email': blankToNull(email),
       'logoUrl': logoUrl,
       'categories': Competition.toList(categories),
+      'clubStatus': clubStatus.value,
+      // Only new clubs keep a league and a letter
+      'lastLeague':
+          clubStatus == ClubStatus.newClub ? blankToNull(lastLeague) : null,
+      'letterUrl': clubStatus == ClubStatus.newClub ? letterUrl : null,
+      'licenceUrl': licenceUrl,
+      'licenceType':
+          licenceUrl == null ? null : (licenceIsPdf ? 'pdf' : 'image'),
       'kits': {
         'home': homeKit.toMap(),
         'away': awayKit.toMap(),
@@ -123,6 +150,11 @@ class TeamRequest {
       email: data['email'] as String?,
       logoUrl: data['logoUrl'] as String?,
       categories: Competition.fromList(data['categories'] as List<dynamic>?),
+      clubStatus: ClubStatus.fromString(data['clubStatus'] as String?),
+      lastLeague: data['lastLeague'] as String?,
+      letterUrl: data['letterUrl'] as String?,
+      licenceUrl: data['licenceUrl'] as String?,
+      licenceIsPdf: data['licenceType'] == 'pdf',
       homeKit: kitOrWhite('home'),
       awayKit: kitOrWhite('away'),
       thirdKit: Kit.fromMap(kits?['third'] as Map<String, dynamic>?),

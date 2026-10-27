@@ -8,6 +8,7 @@ import 'package:gedfa_connect/app/theme.dart';
 import 'package:gedfa_connect/core/connectivity/connectivity_provider.dart';
 import 'package:gedfa_connect/core/constants/approval_status.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
+import 'package:gedfa_connect/core/files/picked_document.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/short_name.dart';
 import 'package:gedfa_connect/core/utils/team_name_key.dart';
@@ -15,11 +16,13 @@ import 'package:gedfa_connect/core/widgets/app_toast.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/teams/data/team_request_repository.dart';
+import 'package:gedfa_connect/features/teams/domain/club_status.dart';
 import 'package:gedfa_connect/features/teams/domain/kit.dart';
 import 'package:gedfa_connect/features/teams/domain/kit_slot.dart';
 import 'package:gedfa_connect/features/teams/domain/official.dart';
 import 'package:gedfa_connect/features/teams/domain/team_request.dart';
 import 'package:gedfa_connect/features/teams/presentation/kit_editor_screen.dart';
+import 'package:gedfa_connect/features/teams/presentation/steps/club_status_step.dart';
 import 'package:gedfa_connect/features/teams/presentation/steps/club_step.dart';
 import 'package:gedfa_connect/features/teams/presentation/steps/kits_step.dart';
 import 'package:gedfa_connect/features/teams/presentation/steps/officials_step.dart';
@@ -27,8 +30,22 @@ import 'package:gedfa_connect/features/teams/presentation/steps/review_step.dart
 import 'package:gedfa_connect/features/teams/presentation/widgets/officials_editor.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
 
+/// The steps in order (2.13: officials before kits). The last one,
+/// Review & submit, is not counted in "Step 2 of 4".
+const _stepTitles = [
+  'Club details',
+  'Club status',
+  'Officials',
+  'Kits',
+  'Review & submit',
+];
+const _countedSteps = 4;
 
-const _stepTitles = ['Club details', 'Kits', 'Officials', 'Review & submit'];
+// Step numbers, so the code reads clearly
+const _clubStep = 0;
+const _statusStep = 1;
+const _officialsStep = 2;
+const _kitsStep = 3;
 
 class RegisterTeamScreen extends ConsumerStatefulWidget {
   const RegisterTeamScreen({super.key});
@@ -47,7 +64,7 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
   final Set<int> _showErrors = {};
 
   final _clubFormKey = GlobalKey<FormState>();
-  final _officialsFormKey = GlobalKey<FormState>();
+  final _statusFormKey = GlobalKey<FormState>();
 
   // Step 1: club details
   final _teamName = TextEditingController();
@@ -62,26 +79,34 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
   Uint8List? _logoBytes;
   String _logoType = 'image/jpeg';
 
-  // Step 2: kits
-  final Map<KitSlot, Kit?> _kits = {
-    for (final slot in KitSlot.values) slot: null,
-  };
+  // Step 2: club status (2.13)
+  ClubStatus _clubStatus = ClubStatus.existing;
+  final _lastLeague = TextEditingController();
+  PickedDocument? _letter;
+  PickedDocument? _licence;
 
   // Step 3: officials
   late final List<OfficialDraft> _officials;
 
-  // Step 4: declaration
+  // Step 4: kits
+  final Map<KitSlot, Kit?> _kits = {
+    for (final slot in KitSlot.values) slot: null,
+  };
+
+  // Review: declaration
   bool _agreed = false;
 
-    // Competitions (step 1)
+  // Competitions (step 1)
   Set<Competition> _competitions = {Competition.division};
 
-    // Editing an existing request
+  // Editing an existing request: the files already uploaded
   TeamRequest? _existing;
   String? _existingLogoUrl;
+  String? _existingLetterUrl;
+  String? _existingLicenceUrl;
+  bool _existingLicenceIsPdf = false;
 
   @override
-    @override
   void initState() {
     super.initState();
     final existing = ref.read(myTeamRequestProvider).value;
@@ -98,6 +123,11 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
       _shortNameEdited = true;
       _existingLogoUrl = existing.logoUrl;
       _competitions = {...existing.categories};
+      _clubStatus = existing.clubStatus;
+      _lastLeague.text = existing.lastLeague ?? '';
+      _existingLetterUrl = existing.letterUrl;
+      _existingLicenceUrl = existing.licenceUrl;
+      _existingLicenceIsPdf = existing.licenceIsPdf;
       _kits[KitSlot.home] = existing.homeKit;
       _kits[KitSlot.away] = existing.awayKit;
       _kits[KitSlot.goalkeeper] = existing.goalkeeperKit;
@@ -124,6 +154,7 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
       _directions,
       _yearFounded,
       _email,
+      _lastLeague,
     ]) {
       controller.dispose();
     }
@@ -176,7 +207,45 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
     }
   }
 
-  // ---------- Step 2 helpers ----------
+  bool get _hasLogo =>
+      _logoBytes != null || (_existingLogoUrl ?? '').isNotEmpty;
+
+  // ---------- Step 2 helpers (club status) ----------
+
+  bool get _hasLetter => _letter != null || _existingLetterUrl != null;
+
+  Future<void> _pickLetter() async {
+    final file = await pickDocument(context, allowPhoto: false);
+    if (file != null && mounted) setState(() => _letter = file);
+  }
+
+  Future<void> _pickLicence() async {
+    final file = await pickDocument(context, allowPhoto: true);
+    if (file != null && mounted) setState(() => _licence = file);
+  }
+
+  void _removeLicence() => setState(() {
+        _licence = null;
+        _existingLicenceUrl = null;
+      });
+
+  // ---------- Step 3 helpers (officials) ----------
+
+  void _addOfficial(OfficialDraft draft) {
+    setState(() {
+      _officials
+        ..add(draft)
+        // Same order as the list of roles; "Other" ones stay last
+        ..sort((a, b) => a.role.index.compareTo(b.role.index));
+    });
+  }
+
+  void _removeOfficial(OfficialDraft draft) {
+    setState(() => _officials.remove(draft));
+    draft.dispose();
+  }
+
+  // ---------- Step 4 helpers (kits) ----------
 
   Future<void> _editKit(KitSlot slot) async {
     final result = await KitEditorScreen.open(
@@ -187,57 +256,50 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
     if (result != null && mounted) setState(() => _kits[slot] = result);
   }
 
-  // ---------- Step 3 helpers ----------
-
-  void _addOfficial(OfficialRole role) {
-    setState(() {
-      _officials
-        ..add(OfficialDraft(role))
-        ..sort((a, b) => a.role.index.compareTo(b.role.index));
-    });
-  }
-
-  void _removeOfficial(OfficialDraft draft) {
-    setState(() => _officials.remove(draft));
-    draft.dispose();
-  }
-
   // ---------- Navigation ----------
 
   Future<bool> _validateCurrentStep() async {
     switch (_step) {
-      case 0:
-        if (!_clubFormKey.currentState!.validate()) return false;
+      case _clubStep:
+        final fieldsOk = _clubFormKey.currentState!.validate();
+        if (!fieldsOk || !_hasLogo) return false;
         return _isNameAvailable();
-      case 1:
+      case _statusStep:
+        final fieldsOk = _statusFormKey.currentState!.validate();
+        return fieldsOk &&
+            (_clubStatus == ClubStatus.existing || _hasLetter);
+      case _officialsStep:
+        return _officials.every((draft) => draft.isComplete);
+      case _kitsStep:
         return KitSlot.values
             .where((slot) => slot.isRequired)
             .every((slot) => _kits[slot] != null);
-      case 2:
-        return _officialsFormKey.currentState!.validate();
       default:
         return true;
     }
   }
 
-    Future<void> _next() async {
+  Future<void> _next() async {
     FocusScope.of(context).unfocus();
 
     // Only step 1 waits for the internet (team name check).
     // The other steps check instantly, so nothing turns grey.
-    if (_step == 0) setState(() => _checking = true);
+    if (_step == _clubStep) setState(() => _checking = true);
     final ok = await _validateCurrentStep();
     if (!mounted) return;
-    if (_step == 0) setState(() => _checking = false);
+    if (_step == _clubStep) setState(() => _checking = false);
 
     if (!ok) {
       setState(() => _showErrors.add(_step));
-      AppToast.warning(
-        context,
-        _step == 1
-            ? 'Set the home, away and goalkeeper kits to continue.'
-            : 'Please fix the highlighted fields.',
-      );
+      AppToast.warning(context, switch (_step) {
+        _clubStep when !_hasLogo => 'Add your team logo to continue.',
+        _statusStep when _clubStatus == ClubStatus.newClub && !_hasLetter =>
+          'Upload your letter to the chairman to continue.',
+        _officialsStep =>
+          'Add the name and phone of every official (tap a row).',
+        _kitsStep => 'Set the home, away and goalkeeper kits to continue.',
+        _ => 'Please fix the highlighted fields.',
+      });
       return;
     }
     setState(() {
@@ -251,11 +313,11 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
     });
   }
 
-    void _back() {
+  void _back() {
     FocusScope.of(context).unfocus();
     if (_editingFromReview) {
       _next();
-    } else if (_step == 0) {
+    } else if (_step == _clubStep) {
       context.go(Routes.welcome);
     } else {
       setState(() {
@@ -267,7 +329,13 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
 
   // ---------- Submit ----------
 
-  TeamRequest _buildRequest(String uid, String? logoUrl) {
+  TeamRequest _buildRequest(
+    String uid, {
+    required String? logoUrl,
+    required String? letterUrl,
+    required String? licenceUrl,
+    required bool licenceIsPdf,
+  }) {
     return TeamRequest(
       uid: uid,
       teamName: _teamName.text,
@@ -279,6 +347,11 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
       email: _email.text,
       logoUrl: logoUrl,
       categories: _competitions,
+      clubStatus: _clubStatus,
+      lastLeague: _lastLeague.text,
+      letterUrl: letterUrl,
+      licenceUrl: licenceUrl,
+      licenceIsPdf: licenceIsPdf,
       homeKit: _kits[KitSlot.home]!,
       awayKit: _kits[KitSlot.away]!,
       goalkeeperKit: _kits[KitSlot.goalkeeper]!,
@@ -308,7 +381,7 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
     try {
       final repository = ref.read(teamRequestRepositoryProvider);
 
-            String? logoUrl = _existingLogoUrl;
+      String? logoUrl = _existingLogoUrl;
       final logo = _logoBytes;
       if (logo != null) {
         logoUrl = await repository.uploadLogo(
@@ -318,7 +391,41 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
         );
       }
 
-      final request = _buildRequest(uid, logoUrl);
+      // The letter only matters for a new club
+      String? letterUrl;
+      if (_clubStatus == ClubStatus.newClub) {
+        letterUrl = _existingLetterUrl;
+        final letter = _letter;
+        if (letter != null) {
+          letterUrl = await repository.uploadFile(
+            uid: uid,
+            fileName: 'letter.pdf',
+            bytes: letter.bytes,
+            contentType: letter.contentType,
+          );
+        }
+      }
+
+      String? licenceUrl = _existingLicenceUrl;
+      var licenceIsPdf = _existingLicenceIsPdf;
+      final licence = _licence;
+      if (licence != null) {
+        licenceUrl = await repository.uploadFile(
+          uid: uid,
+          fileName: licence.isPdf ? 'licence.pdf' : 'licence.jpg',
+          bytes: licence.bytes,
+          contentType: licence.contentType,
+        );
+        licenceIsPdf = licence.isPdf;
+      }
+
+      final request = _buildRequest(
+        uid,
+        logoUrl: logoUrl,
+        letterUrl: letterUrl,
+        licenceUrl: licenceUrl,
+        licenceIsPdf: licenceIsPdf,
+      );
       final existing = _existing;
       if (existing == null) {
         await repository.create(request);
@@ -341,8 +448,8 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
       if (!mounted) return;
       setState(() {
         _nameTakenError = 'Another team already uses this name';
-        _showErrors.add(0);
-        _step = 0;
+        _showErrors.add(_clubStep);
+        _step = _clubStep;
       });
       AppToast.error(context, appErrorMessage(const TeamNameTakenException()));
     } catch (error) {
@@ -358,9 +465,9 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
   Widget _buildStep() {
     final enabled = !_busy;
     return switch (_step) {
-      0 => ClubStep(
+      _clubStep => ClubStep(
           formKey: _clubFormKey,
-          showErrors: _showErrors.contains(0),
+          showErrors: _showErrors.contains(_clubStep),
           enabled: enabled,
           teamName: _teamName,
           shortName: _shortName,
@@ -387,20 +494,36 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
           onCompetitionsChanged: (value) =>
               setState(() => _competitions = value),
         ),
-      1 => KitsStep(
-          kits: _kits,
-          showErrors: _showErrors.contains(1),
+      _statusStep => ClubStatusStep(
+          formKey: _statusFormKey,
+          showErrors: _showErrors.contains(_statusStep),
           enabled: enabled,
-          onEdit: _editKit,
-          onRemove: (slot) => setState(() => _kits[slot] = null),
+          status: _clubStatus,
+          onStatusChanged: (value) => setState(() => _clubStatus = value),
+          lastLeague: _lastLeague,
+          letter: _letter,
+          letterUrl: _existingLetterUrl,
+          onPickLetter: _pickLetter,
+          licence: _licence,
+          licenceUrl: _existingLicenceUrl,
+          licenceIsPdf: _existingLicenceIsPdf,
+          onPickLicence: _pickLicence,
+          onRemoveLicence: _removeLicence,
         ),
-      2 => OfficialsStep(
-          formKey: _officialsFormKey,
-          showErrors: _showErrors.contains(2),
+      _officialsStep => OfficialsStep(
+          showErrors: _showErrors.contains(_officialsStep),
           enabled: enabled,
           drafts: _officials,
           onAdd: _addOfficial,
           onRemove: _removeOfficial,
+          onChanged: () => setState(() {}),
+        ),
+      _kitsStep => KitsStep(
+          kits: _kits,
+          showErrors: _showErrors.contains(_kitsStep),
+          enabled: enabled,
+          onEdit: _editKit,
+          onRemove: (slot) => setState(() => _kits[slot] = null),
         ),
       _ => ReviewStep(
           teamName: _teamName.text.trim(),
@@ -414,6 +537,12 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
           officials: _officials,
           logoUrl: _existingLogoUrl,
           competitions: _competitions,
+          clubStatus: _clubStatus,
+          lastLeague: _lastLeague.text.trim(),
+          letterName: _letter?.name ??
+              (_existingLetterUrl != null ? 'Uploaded' : null),
+          licenceName: _licence?.name ??
+              (_existingLicenceUrl != null ? 'Uploaded' : null),
           agreed: _agreed,
           directions: _directions.text.trim(),
           email: _email.text.trim(),
@@ -441,6 +570,10 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
       child: Scaffold(
         appBar: GedfaAppBar(
           title: _existing == null ? 'Register your team' : 'Edit registration',
+          // "Step 2 of 4 · Club status"
+          subtitle: _step < _countedSteps
+              ? 'Step ${_step + 1} of $_countedSteps · ${_stepTitles[_step]}'
+              : _stepTitles[_step],
         ),
         body: Column(
           children: [
@@ -477,7 +610,9 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
               ? (_existing == null ? 'Submit registration' : 'Send changes')
               : _editingFromReview
                   ? 'Save & review'
-              : 'Next: ${_stepTitles[_step + 1].split(' ').first}',
+                  : _step + 1 == _countedSteps
+                      ? 'Review and submit'
+                      : 'Next: ${_stepTitles[_step + 1].toLowerCase()}',
           busy: _busy || _checking,
           onBack: _back,
           onNext: isLast ? (_agreed ? _submit : null) : _next,
@@ -487,6 +622,7 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
   }
 }
 
+/// Board R1: the step bars, then "Club details › **Club status** › …".
 class _ProgressHeader extends StatelessWidget {
   const _ProgressHeader({required this.step});
 
@@ -496,50 +632,62 @@ class _ProgressHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final emptyBar =
+        isDark ? const Color(0xFF13233A) : const Color(0xFFDCE6F2);
+    final style = textTheme.bodySmall
+        ?.copyWith(fontSize: 12, color: scheme.onSurfaceVariant);
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: ResponsiveCenter(
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    _stepTitles[step],
-                    style: textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w600, fontSize: 15),
-                  ),
-                ),
-                Text(
-                  'Step ${step + 1} of ${_stepTitles.length}',
-                  style: textTheme.bodySmall
-                      ?.copyWith(color: scheme.onSurfaceVariant),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                for (var i = 0; i < _stepTitles.length; i++)
-                  Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.only(
-                        right: i < _stepTitles.length - 1 ? 6 : 0,
-                      ),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 250),
-                        height: 6,
-                        decoration: BoxDecoration(
-                          color: i <= step
-                              ? scheme.primary
-                              : scheme.outline.withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(3),
+            ExcludeSemantics(
+              child: Row(
+                children: [
+                  for (var i = 0; i < _countedSteps; i++)
+                    Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.only(
+                          right: i < _countedSteps - 1 ? 6 : 0,
+                        ),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 250),
+                          height: 5,
+                          decoration: BoxDecoration(
+                            color: i <= step ? scheme.primary : emptyBar,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 6),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    for (var i = 0; i < _countedSteps; i++) ...[
+                      if (i > 0) const TextSpan(text: ' › '),
+                      TextSpan(
+                        text: _stepTitles[i],
+                        style: i == step
+                            ? TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: scheme.onSurface,
+                              )
+                            : null,
+                      ),
+                    ],
+                  ],
+                ),
+                style: style,
+              ),
             ),
           ],
         ),

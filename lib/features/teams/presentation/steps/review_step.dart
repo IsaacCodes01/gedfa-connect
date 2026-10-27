@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/initials.dart';
+import 'package:gedfa_connect/features/teams/domain/club_status.dart';
 import 'package:gedfa_connect/features/teams/domain/kit.dart';
 import 'package:gedfa_connect/features/teams/domain/kit_slot.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/kit_preview.dart';
@@ -31,6 +32,10 @@ class ReviewStep extends StatelessWidget {
     required this.email,
     this.logoUrl,
     required this.competitions,
+    required this.clubStatus,
+    required this.lastLeague,
+    this.letterName,
+    this.licenceName,
   });
 
   final String teamName;
@@ -50,6 +55,12 @@ class ReviewStep extends StatelessWidget {
   final String email;
   final String? logoUrl;
   final Set<Competition> competitions;
+  final ClubStatus clubStatus;
+  final String lastLeague;
+
+  /// The file's name, "Uploaded" when editing, or null when missing.
+  final String? letterName;
+  final String? licenceName;
 
   @override
   Widget build(BuildContext context) {
@@ -132,8 +143,40 @@ class ReviewStep extends StatelessWidget {
               ),
               const SizedBox(height: 14),
               _ReviewCard(
-                title: 'Kits',
+                title: 'Club status',
                 onEdit: enabled ? () => onEdit(1) : null,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _ReviewRow(label: 'Type', value: clubStatus.shortLabel),
+                    if (clubStatus == ClubStatus.newClub) ...[
+                      _ReviewRow(label: 'Last season', value: lastLeague),
+                      _ReviewRow(label: 'Letter', value: letterName ?? ''),
+                    ],
+                    _ReviewRow(label: 'Licence', value: licenceName ?? ''),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              _ReviewCard(
+                title: 'Officials',
+                onEdit: enabled ? () => onEdit(2) : null,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final draft in officials)
+                      _ReviewRow(
+                        label: draft.roleText,
+                        value:
+                            '${draft.name.text.trim()} · ${draft.phone.text.trim()}',
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              _ReviewCard(
+                title: 'Kits',
+                onEdit: enabled ? () => onEdit(3) : null,
                 child: Wrap(
                   spacing: 12,
                   runSpacing: 12,
@@ -154,23 +197,7 @@ class ReviewStep extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 14),
-              _ReviewCard(
-                title: 'Officials',
-                onEdit: enabled ? () => onEdit(2) : null,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    for (final draft in officials)
-                      _ReviewRow(
-                        label: draft.role.label,
-                        value:
-                            '${draft.name.text.trim()} · ${draft.phone.text.trim()}',
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 14),
-                            Material(
+              Material(
                 color: scheme.surface,
                 clipBehavior: Clip.antiAlias,
                 shape: RoundedRectangleBorder(

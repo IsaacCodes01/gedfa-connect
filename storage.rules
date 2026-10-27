@@ -30,6 +30,18 @@ service firebase.storage {
       allow delete: if isOwner(uid);
     }
 
+    // A new club's letter to the chairman, and the optional licence
+    // (photo or PDF), up to 5 MB (2.13)
+    match /districts/{districtId}/teamRequests/{uid}/{fileName} {
+      allow read, delete: if isOwner(uid);
+      allow create, update: if isOwner(uid)
+        && request.resource.size < 5 * 1024 * 1024
+        && ((fileName in ['letter.pdf', 'licence.pdf']
+              && request.resource.contentType == 'application/pdf')
+            || (fileName == 'licence.jpg'
+              && request.resource.contentType.matches('image/.*')));
+    }
+
     // Player passport photos: photo-<time>.jpg and thumb-<time>.jpg
     match /districts/{districtId}/teams/{teamId}/players/{playerId}/{fileName} {
       allow read, delete: if isTeamAdminOf(districtId, teamId);
