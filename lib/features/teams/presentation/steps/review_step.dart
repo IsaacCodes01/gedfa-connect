@@ -6,7 +6,9 @@ import 'package:gedfa_connect/core/utils/initials.dart';
 import 'package:gedfa_connect/features/teams/domain/club_status.dart';
 import 'package:gedfa_connect/features/teams/domain/kit.dart';
 import 'package:gedfa_connect/features/teams/domain/kit_slot.dart';
-import 'package:gedfa_connect/features/teams/presentation/widgets/kit_preview.dart';
+import 'package:gedfa_connect/features/teams/domain/team_colours.dart';
+import 'package:gedfa_connect/features/teams/presentation/widgets/colour_pair_row.dart';
+import 'package:gedfa_connect/features/teams/presentation/widgets/kit_thumb.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/officials_editor.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/team_logo.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
@@ -22,7 +24,8 @@ class ReviewStep extends StatelessWidget {
     required this.yearFounded,
     required this.logoBytes,
     required this.logoColor,
-    required this.kits,
+    required this.kitSets,
+    required this.colours,
     required this.officials,
     required this.agreed,
     required this.enabled,
@@ -45,7 +48,9 @@ class ReviewStep extends StatelessWidget {
   final String yearFounded;
   final Uint8List? logoBytes;
   final Color logoColor;
-  final Map<KitSlot, Kit?> kits;
+  /// One set, or Division and Juvenile for a club in both.
+  final Map<Competition, Map<KitSlot, Kit?>> kitSets;
+  final TeamColours? colours;
   final List<OfficialDraft> officials;
   final bool agreed;
   final bool enabled;
@@ -68,10 +73,6 @@ class ReviewStep extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final hasLogo =
         logoBytes != null || (logoUrl != null && logoUrl!.isNotEmpty);
-    final setKits = [
-      for (final slot in KitSlot.values)
-        if (kits[slot] != null) (slot, kits[slot]!),
-    ];
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
@@ -177,22 +178,61 @@ class ReviewStep extends StatelessWidget {
               _ReviewCard(
                 title: 'Kits',
                 onEdit: enabled ? () => onEdit(3) : null,
-                child: Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    for (final (slot, kit) in setKits)
-                      Column(
-                        children: [
-                          KitPreview(kit: kit, width: 52),
-                          const SizedBox(height: 4),
-                          Text(
-                            slot.label.replaceAll(' kit', ''),
-                            style: textTheme.labelSmall
-                                ?.copyWith(color: scheme.onSurfaceVariant),
+                    for (final MapEntry(key: competition, value: kits)
+                        in kitSets.entries) ...[
+                      if (kitSets.length > 1)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4, bottom: 8),
+                          child: Text(
+                            competition.label,
+                            style: textTheme.bodySmall
+                                ?.copyWith(fontWeight: FontWeight.w600),
                           ),
+                        ),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: [
+                          for (final slot in KitSlot.values)
+                            if (kits[slot] case final kit?)
+                              Column(
+                                children: [
+                                  KitThumb(
+                                    kit: kit,
+                                    height: kit.isPhotos ? 44 : 68,
+                                    semanticLabel: slot.label,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    slot.label.replaceAll(' kit', ''),
+                                    style: textTheme.labelSmall?.copyWith(
+                                      color: scheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
                         ],
                       ),
+                      const SizedBox(height: 10),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              _ReviewCard(
+                title: 'Colours',
+                onEdit: enabled ? () => onEdit(4) : null,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (colours case final colours?) ...[
+                      ColourPairRow(label: 'Home', pair: colours.home),
+                      ColourPairRow(label: 'Away', pair: colours.away),
+                    ] else
+                      const _ReviewRow(label: 'Colours', value: ''),
                   ],
                 ),
               ),

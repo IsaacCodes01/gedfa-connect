@@ -25,3 +25,12 @@ const kitColors = <KitColor>[
   KitColor('Purple', Color(0xFF5B2A86)),
   KitColor('Brown', Color(0xFF6B4226)),
 ];
+
+/// "Red", or the hex code for a colour that isn't in the list.
+String kitColorName(Color color) {
+  for (final kitColor in kitColors) {
+    if (kitColor.color.toARGB32() == color.toARGB32()) return kitColor.name;
+  }
+  final rgb = color.toARGB32() & 0xFFFFFF;
+  return '#${rgb.toRadixString(16).padLeft(6, '0').toUpperCase()}';
+}

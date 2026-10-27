@@ -4,7 +4,7 @@
 **Platforms:** Flutter app: Android (APK) and web (iPhone users via "Add to Home Screen"); native iOS later (see Section 4, Distribution); separate React website by a colleague
 **Backend:** Firebase (Auth, Firestore, Cloud Storage, Hosting) on the Blaze plan
 **Projects:** `gedfa-connect-dev` (building/testing) and `gedfa-connect-prod` (real GEDFA data)
-**Status:** Phase 0 and Phase 1 complete · Phase 2: 2.0–2.8 done; GEDFA's answers in: 2.13 registration update in progress (2.13a done), then 2.14 Juvenile, then Phase 3 · web test link live on dev (27 Oct 2026)
+**Status:** Phase 0 and Phase 1 complete · Phase 2: 2.0–2.8 done; GEDFA's answers in: 2.13 registration update in progress (2.13a–b done), then 2.14 Juvenile, then Phase 3 · web test link live on dev (27 Oct 2026)
 
 See also: `docs/DATA_MODEL.md` (the data contract).
 
@@ -203,7 +203,7 @@ Time estimates assume part-time work and are rough guides.
 
 - [ ] 2.13 **Registration update** from GEDFA's answers (mockups R1–R8 on the design canvas). Steps: Club details › Club status › Officials › Kits › Colours › Payment, then Review
   - [x] 2.13a **Club status and officials:** already in the district or a new club (last league + letter to the chairman, PDF); optional licence (photo or PDF); logo required; officials 2 required + up to 5, "Other" with a typed role; FA review shows the letter and licence *(done 27 Oct 2026)*
-  - [ ] 2.13b **Kits and colours:** upload photos (shirt › shorts › socks, preview) or design the kit; Team colours (home and away, main and second); juvenile kits separate
+  - [x] 2.13b **Kits and colours:** upload photos (shirt › shorts › socks, cropped and shrunk on the phone, preview) or design the kit; Team colours step (home and away, main and second, suggested from the designed kits); clubs in both competitions set Division and Juvenile kits apart; FA review shows photos and colours. 166 rules tests *(done 27 Oct 2026)*
   - [ ] 2.13c **Season fee:** GH₵ 1,000 every season, MoMo 0244-\*\*\*-\*\*\* (number to come), paid in parts; MoMo/bank, cash, or paid before the app; the FA confirms each payment (green tick) or marks it "not found" with a reason; receipt number per confirmed payment (`GEDFA-2026-0014`); Approve after the first confirmed payment; team Season fee screen; FA "Send reminder" (automatic push every 3 days comes with phone push before the pilot)
   - [ ] 2.13d **League settings:** registration window open / closed; squad 30, matchday 16, substitutes 5
 - [ ] 2.14 **Juvenile:** age group = season start year − birth year (U13 / U15 / U17); play up allowed (GFA limits on the team sheet), overage blocked; parent or guardian required; screening days (announcement + push, a card that disappears after screening); FA decisions: pass, move up automatically, or "not eligible for Juvenile" with a reason
@@ -303,6 +303,7 @@ Work backwards from the GEDFA season start date to decide what the pilot must co
 | 12 Oct 2026 | Renamed to GEDFA Connect; dev/prod projects created |
 | 13 Oct 2026 | Phase 0 complete; added 0.8 design foundation, 1.0 emulators, 1.1a toasts/connectivity/responsive; invite-only roles (2.6); FA announcements (2.7); new Phase 5.5 League feed; navigation, connectivity and responsive standards; pre-pilot checklist |
 | 17 Oct 2026 | 1.1b, 1.2, 1.3 done; new 1.3b Competitions (Division / Juvenile, one registration per club); 1.4 split into Division first, Juvenile after GEDFA answers |
+| 27 Oct 2026 | 2.13b done: kit photos or designed kits, Team colours, separate juvenile kits |
 | 27 Oct 2026 | GEDFA's answers received; new 2.13 Registration update (2.13a done: club status, letter, licence, logo required, officials up to 7 with "Other") and 2.14 Juvenile |
 | 24 Oct 2026 | 2.7 and 2.8 done: announcements, notifications (grouped), bell count, pinned card, who has seen it. Phase 2 core done |
 | 24 Oct 2026 | 2.3d done: Player profiles, availability and armbands |

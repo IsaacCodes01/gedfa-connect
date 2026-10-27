@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:gedfa_connect/core/constants/approval_status.dart';
 import 'package:gedfa_connect/features/teams/domain/club_status.dart';
 import 'package:gedfa_connect/features/teams/domain/kit.dart';
+import 'package:gedfa_connect/features/teams/domain/kit_slot.dart';
+import 'package:gedfa_connect/features/teams/domain/team_colours.dart';
 import 'package:gedfa_connect/features/teams/domain/official.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
 
@@ -30,6 +32,8 @@ class TeamRequest {
     this.logoUrl,
     this.thirdKit,
     this.goalkeeperKit2,
+    this.juvenileKits = const {},
+    this.colours,
     this.rejectionReason,
     this.createdAt,
     this.updatedAt,
@@ -67,6 +71,28 @@ class TeamRequest {
   final Kit? thirdKit;
   final Kit goalkeeperKit;
   final Kit? goalkeeperKit2;
+
+  /// A club in both competitions: the juvenile sides' own kits (2.13b).
+  /// Empty otherwise: a club in one competition has only `kits`.
+  final Map<KitSlot, Kit> juvenileKits;
+
+  bool get hasSeparateJuvenileKits => categories.length > 1;
+
+  /// Behind the initials when the logo can't load: the home colour, or
+  /// the home shirt on requests sent before team colours.
+  Color get logoColor => colours?.home.main ?? homeKit.primary;
+
+  /// Home and away colours (2.13b). Null on requests sent before.
+  final TeamColours? colours;
+
+  /// The Division kits as one map, like [juvenileKits].
+  Map<KitSlot, Kit> get divisionKits => {
+        KitSlot.home: homeKit,
+        KitSlot.away: awayKit,
+        KitSlot.goalkeeper: goalkeeperKit,
+        KitSlot.third: ?thirdKit,
+        KitSlot.goalkeeper2: ?goalkeeperKit2,
+      };
 
   // Section 4: officials
   final List<Official> officials;
@@ -118,6 +144,15 @@ class TeamRequest {
         if (thirdKit != null) 'third': thirdKit!.toMap(),
         if (goalkeeperKit2 != null) 'goalkeeper2': goalkeeperKit2!.toMap(),
       },
+      // A club in both competitions keeps separate juvenile kits.
+      // A club in one competition has just `kits`.
+      'juvenileKits': hasSeparateJuvenileKits
+          ? {
+              for (final entry in juvenileKits.entries)
+                entry.key.name: entry.value.toMap(),
+            }
+          : null,
+      'colours': colours?.toMap(),
       'officials': officials.map((official) => official.toMap()).toList(),
     };
   }
@@ -132,6 +167,8 @@ class TeamRequest {
           shorts: Color(0xFFFFFFFF),
           socks: Color(0xFFFFFFFF),
         );
+
+    final juvenile = data['juvenileKits'] as Map<String, dynamic>?;
 
     final officials = (data['officials'] as List<dynamic>? ?? [])
         .whereType<Map<String, dynamic>>()
@@ -160,6 +197,11 @@ class TeamRequest {
       thirdKit: Kit.fromMap(kits?['third'] as Map<String, dynamic>?),
       goalkeeperKit: kitOrWhite('goalkeeper'),
       goalkeeperKit2: Kit.fromMap(kits?['goalkeeper2'] as Map<String, dynamic>?),
+      juvenileKits: {
+          for (final slot in KitSlot.values)
+          slot: ?Kit.fromMap(juvenile?[slot.name] as Map<String, dynamic>?),
+      },
+      colours: TeamColours.fromMap(data['colours'] as Map<String, dynamic>?),
       officials: officials,
       status: ApprovalStatus.fromString(data['status'] as String? ?? 'pending'),
       rejectionReason: data['rejectionReason'] as String?,

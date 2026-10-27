@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.1, matches the rules after step 2.13a (27 Oct 2026)
+**Status:** v2.2, matches the rules after step 2.13b (27 Oct 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -48,6 +48,8 @@ Used for every kit (home, away, third, goalkeeper, goalkeeper 2). Colours come f
 
 - A `pattern` other than `plain` requires `secondary`.
 - `shoulderStripes`, `collarAndCuffs` and `shortsStripe` are optional trims. If any of them is `true`, `trim` (the trim colour) is required; if all are `false`, `trim` is `null`.
+
+- **Photo kits (2.13b):** instead of a design, a kit can be photos of the real shirt, shorts and socks: `photos: { shirt, shorts, socks }` (download links). Its colours are saved as white; the team's colours come from `colours`.
 
 ### Official shape
 
@@ -162,7 +164,10 @@ Keyed by the requester's `uid`, so each person can have at most one request.
 | **Officials**      |                  |                                                                                                                                   |
 | `officials`            | array of maps    | Officials (see Official shape); must include`teamManager` and `headCoach`; 2 to 7                                              |
 | **Kits**           |                  |                                                                                                                                   |
-| `kits`                 | map              | `home`, `away`, `goalkeeper` required; `third`, `goalkeeper2` optional. Each value is a Kit (see Kit shape)             |
+| `kits`                 | map              | `home`, `away`, `goalkeeper` required; `third`, `goalkeeper2` optional. Each value is a Kit (see Kit shape), designed or photos. A club in one competition (Division **or** Juvenile) has only these |
+| `juvenileKits`         | map?             | **Clubs in both competitions only, required** (2.13b): the juvenile sides' own kits, same keys as `kits`. Must be empty for a club in one competition |
+| **Colours** (2.13b)  |                  |                                                                                                                                   |
+| `colours`              | map              | Required: `{ home: { main, second }, away: { main, second } }`, each `#RRGGBB`. Suggested from the designed home and away kits |
 | **Declaration**    |                  |                                                                                                                                   |
 | `agreedToRules`        | boolean          | Must be`true`                                                                                                                   |
 | **Review**         |                  |                                                                                                                                   |
@@ -186,8 +191,8 @@ Keyed by the requester's `uid`, so each person can have at most one request.
 - One club = one request, whatever it plays in. A club in both competitions registers **once** and ticks both; name, logo, kits and officials are shared.
 - Requests saved before `categories` existed are read as `["division"]` by the app; the next edit saves the field.
 - The registration steps are: Club details › Club status › Officials › Kits › Colours › Payment, then Review (2.13).
-- On approval the team also gets `clubStatus`, `licenceUrl` and `licenceType`. The letter and last league stay on the request.
-- **Coming in 2.13b–c:** kit photos or designed kits, team colours, juvenile kits; the season fee (GH₵ 1,000, paid in parts, confirmed by the FA, receipt numbers).
+- On approval the team also gets `clubStatus`, `licenceUrl`, `licenceType`, `juvenileKits` and `colours`. The letter and last league stay on the request.
+- **Coming in 2.13c:** the season fee (GH₵ 1,000, paid in parts, confirmed by the FA, receipt numbers).
 
 ### 2.2a `teamNames/{nameKey}` — team name reservations
 
@@ -467,6 +472,7 @@ A leftover file is harmless; a player without a photo can't exist.
 | `districts/gomoa-east/teamRequests/{uid}/logo.jpg`                        | Logo sent with a request                  |
 | `districts/gomoa-east/teamRequests/{uid}/letter.pdf`                      | New club's letter to the chairman (PDF, under 5 MB) |
 | `districts/gomoa-east/teamRequests/{uid}/licence.pdf` or `licence.jpg`    | Optional club licence (PDF or photo, under 5 MB)    |
+| `districts/gomoa-east/teamRequests/{uid}/kits/<set>-<slot>-<part>-<millis>.jpg` | Kit photo, e.g. `division-home-shirt-…`; shirt 600×600, shorts 600×360, socks 360×600, JPEG, under 1 MB |
 | `districts/gomoa-east/teams/{teamId}/logo.jpg`                            | Approved team logo *(Phase 2)*            |
 | `districts/gomoa-east/teams/{teamId}/players/{playerId}/photo-<millis>.jpg` | Passport photo, 300×400, JPEG quality 85  |
 | `districts/gomoa-east/teams/{teamId}/players/{playerId}/thumb-<millis>.jpg` | Thumbnail, 96×128, JPEG quality 80        |
@@ -541,6 +547,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 27 Oct 2026 | v2.2 (2.13b): kits can be photos (`photos`); `juvenileKits` for clubs in both competitions; `colours` (home / away, main / second) required. Storage: `kits/` photos. 166 tests. |
 | 27 Oct 2026 | v2.1 (2.13a): `teamRequests` gain `clubStatus`, `lastLeague`, `letterUrl`, `licenceUrl`, `licenceType`; logo required; officials at most 7, new role `other` with `title`. Storage: `letter.pdf`, `licence.pdf` / `licence.jpg`. GEDFA's answers recorded in Section 7. |
 | 24 Oct 2026 | v2.0: `announcements` (+ `seen`), grouped `notifications`, `readMarks` (2.7 – 2.8); composite indexes. 149 tests. |
 | 24 Oct 2026 | v1.9.1: `playerProfiles.unavailableReason`; the availability tiles filter the Player profiles tab. 137 tests. |

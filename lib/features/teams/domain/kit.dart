@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:gedfa_connect/core/utils/color_hex.dart';
+import 'package:gedfa_connect/features/teams/domain/kit_photos.dart';
 
 enum KitPattern {
   plain,
@@ -33,7 +34,21 @@ class Kit {
     this.shoulderStripes = false,
     this.collarAndCuffs = false,
     this.shortsStripe = false,
+    this.photos,
   });
+
+  /// A kit made from photos of the real shirt, shorts and socks (2.13b).
+  /// Its colours are white; the team's colours come from Team colours.
+  const Kit.fromPhotos(KitPhotos this.photos)
+      : primary = Colors.white,
+        secondary = null,
+        pattern = KitPattern.plain,
+        shorts = Colors.white,
+        socks = Colors.white,
+        trim = null,
+        shoulderStripes = false,
+        collarAndCuffs = false,
+        shortsStripe = false;
 
   final Color primary;
   final Color? secondary;
@@ -44,6 +59,11 @@ class Kit {
   final bool shoulderStripes;
   final bool collarAndCuffs;
   final bool shortsStripe;
+
+  /// Set when the club uploaded photos instead of designing the kit.
+  final KitPhotos? photos;
+
+  bool get isPhotos => photos != null;
 
   bool get needsSecondary => pattern != KitPattern.plain;
   bool get hasTrim => shoulderStripes || collarAndCuffs || shortsStripe;
@@ -84,6 +104,7 @@ class Kit {
         'shoulderStripes': shoulderStripes,
         'collarAndCuffs': collarAndCuffs,
         'shortsStripe': shortsStripe,
+        if (photos != null) 'photos': photos!.toMap(),
       };
 
   static Kit? fromMap(Map<String, dynamic>? map) {
@@ -98,6 +119,7 @@ class Kit {
       shoulderStripes: map['shoulderStripes'] as bool? ?? false,
       collarAndCuffs: map['collarAndCuffs'] as bool? ?? false,
       shortsStripe: map['shortsStripe'] as bool? ?? false,
+      photos: KitPhotos.fromMap(map['photos'] as Map<String, dynamic>?),
     );
   }
 }

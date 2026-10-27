@@ -93,6 +93,8 @@ class TeamRequestRepository {
           'licenceUrl',
           'licenceType',
           'kits',
+          'juvenileKits',
+          'colours',
           'officials',
         ])
           key: details[key],
@@ -165,6 +167,24 @@ class TeamRequestRepository {
     final ref = _storage.ref(StoragePaths.teamRequestFile(uid, fileName));
     await ref
         .putData(bytes, SettableMetadata(contentType: contentType))
+        .timeout(_uploadTimeout);
+    return ref.getDownloadURL();
+  }
+
+  /// Uploads one kit photo (2.13b), e.g.
+  /// `kits/division-home-shirt-1730000000000.jpg`. Every photo gets a new
+  /// name, so phones never show an old cached picture.
+  Future<String> uploadKitPhoto({
+    required String uid,
+    required String set,
+    required String slot,
+    required String part,
+    required Uint8List bytes,
+  }) async {
+    final name = '$set-$slot-$part-${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final ref = _storage.ref(StoragePaths.teamRequestKitPhoto(uid, name));
+    await ref
+        .putData(bytes, SettableMetadata(contentType: 'image/jpeg'))
         .timeout(_uploadTimeout);
     return ref.getDownloadURL();
   }

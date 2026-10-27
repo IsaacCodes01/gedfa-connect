@@ -207,7 +207,7 @@ class _IntroCard extends StatelessWidget {
         const _HowStep(
           number: 1,
           title: 'Register your team',
-          text: 'Club details, status, officials and kits · about 5 minutes',
+          text: 'Club, officials, kits and colours · about 5 minutes',
         ),
         const SizedBox(height: 14),
         const _HowStep(
@@ -316,7 +316,7 @@ class _StatusCard extends StatelessWidget {
         Center(
           child: TeamLogo(
             label: initialsFor(request.teamName),
-            color: request.homeKit.primary,
+            color: request.logoColor,
             url: request.logoUrl,
             size: 76,
           ),

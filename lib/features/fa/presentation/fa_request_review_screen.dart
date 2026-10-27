@@ -20,11 +20,13 @@ import 'package:gedfa_connect/features/settings/presentation/widgets/settings_wi
 import 'package:gedfa_connect/features/teams/data/team_request_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/club_status.dart';
 import 'package:gedfa_connect/features/teams/domain/kit.dart';
+import 'package:gedfa_connect/features/teams/domain/kit_slot.dart';
 import 'package:gedfa_connect/features/teams/domain/official.dart';
 import 'package:gedfa_connect/features/teams/domain/team_request.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/competition_picker.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/file_upload_row.dart';
-import 'package:gedfa_connect/features/teams/presentation/widgets/kit_preview.dart';
+import 'package:gedfa_connect/features/teams/presentation/widgets/colour_pair_row.dart';
+import 'package:gedfa_connect/features/teams/presentation/widgets/kit_thumb.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/team_logo.dart';
 import 'package:go_router/go_router.dart';
 
@@ -154,7 +156,7 @@ class _Header extends StatelessWidget {
             children: [
               TeamLogo(
                 label: initialsFor(request.teamName),
-                color: request.homeKit.primary,
+                color: request.logoColor,
                 url: request.logoUrl,
                 size: 76,
               ),
@@ -322,45 +324,69 @@ class _Kits extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
 
-    final kits = <(String, Kit)>[
-      ('Home', request.homeKit),
-      ('Away', request.awayKit),
-      if (request.thirdKit case final kit?) ('Third', kit),
-      ('Goalkeeper', request.goalkeeperKit),
-      if (request.goalkeeperKit2 case final kit?) ('GK 2', kit),
+    // A club in both competitions has separate juvenile kits (2.13b)
+    final sets = <(String?, Map<KitSlot, Kit>)>[
+      (
+        request.hasSeparateJuvenileKits ? 'Division' : null,
+        request.divisionKits,
+      ),
+      if (request.hasSeparateJuvenileKits) ('Juvenile', request.juvenileKits),
     ];
+    final colours = request.colours;
 
     return TileGroup(
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
-          child: Wrap(
-            alignment: WrapAlignment.spaceEvenly,
-            spacing: 8,
-            runSpacing: 12,
-            children: [
-              for (final (label, kit) in kits)
-                SizedBox(
-                  width: 76,
-                  child: Column(
-                    children: [
-                      KitPreview(
-                        kit: kit,
-                        width: 60,
-                        semanticLabel: '$label kit',
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        label,
-                        style: textTheme.bodySmall
-                            ?.copyWith(color: scheme.onSurfaceVariant),
-                      ),
-                    ],
+        for (final (title, kits) in sets)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 14, 12, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (title != null)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4, bottom: 10),
+                    child: Text(
+                      '$title kits',
+                      style: textTheme.titleSmall
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                    ),
                   ),
+                Wrap(
+                  spacing: 14,
+                  runSpacing: 14,
+                  children: [
+                    for (final MapEntry(key: slot, value: kit) in kits.entries)
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          KitThumb(
+                            kit: kit,
+                            height: kit.isPhotos ? 56 : 78,
+                            semanticLabel: slot.label,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            slot.label.replaceAll(' kit', ''),
+                            style: textTheme.bodySmall
+                                ?.copyWith(color: scheme.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
+                  ],
                 ),
-            ],
+              ],
+            ),
           ),
-        ),
+        if (colours != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+            child: Column(
+              children: [
+                ColourPairRow(label: 'Home', pair: colours.home),
+                ColourPairRow(label: 'Away', pair: colours.away),
+              ],
+            ),
+          ),
       ],
     );
   }
@@ -495,6 +521,7 @@ class _ReviewActionsState extends ConsumerState<_ReviewActions> {
       quickReasons: const [
         'Logo is not clear',
         'The letter to the chairman is missing or unclear',
+        'Kit photos are not clear',
         'Team name is already used in the district',
         "Officials' phone numbers are missing",
         'Home ground is not approved by the FA',

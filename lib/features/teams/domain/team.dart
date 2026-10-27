@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/teams/domain/kit.dart';
+import 'package:gedfa_connect/features/teams/domain/team_colours.dart';
 
 /// An approved team (`teams/{teamId}`).
 class Team {
@@ -13,6 +14,7 @@ class Team {
     required this.adminUids,
     this.logoUrl,
     this.homeKit,
+    this.colours,
   });
 
   final String id;
@@ -24,8 +26,12 @@ class Team {
   final String? logoUrl;
   final Kit? homeKit;
 
+  /// Home and away colours (2.13b); null for teams approved before.
+  final TeamColours? colours;
+
   /// Colour behind the initials when there is no logo.
-  Color get logoColor => homeKit?.primary ?? const Color(0xFF1E88E5);
+  Color get logoColor =>
+      colours?.home.main ?? homeKit?.primary ?? const Color(0xFF1E88E5);
 
   bool get hasBoth => categories.length > 1;
 
@@ -43,6 +49,7 @@ class Team {
       ],
       logoUrl: data['logoUrl'] as String?,
       homeKit: Kit.fromMap(kits?['home'] as Map<String, dynamic>?),
+      colours: TeamColours.fromMap(data['colours'] as Map<String, dynamic>?),
     );
   }
 }

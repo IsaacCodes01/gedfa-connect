@@ -192,7 +192,7 @@ class _RequestCard extends StatelessWidget {
             children: [
               TeamLogo(
                 label: initialsFor(request.teamName),
-                color: request.homeKit.primary,
+                color: request.logoColor,
                 url: request.logoUrl,
                 size: 46,
               ),

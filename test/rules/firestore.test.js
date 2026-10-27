@@ -1,4 +1,4 @@
-// Security rules tests for GEDFA Connect (steps 1.7 to 2.13).
+// Security rules tests for GEDFA Connect (steps 1.7 to 2.13b).
 //
 // Run while the emulators are running:
 //   cd test/rules
@@ -94,6 +94,19 @@ function addPlayer(db, playerId, data) {
   return batch.commit();
 }
 
+/** Team colours: red / white at home, white / red away (2.13b). */
+const COLOURS = {
+  home: { main: '#D71920', second: '#FFFFFF' },
+  away: { main: '#FFFFFF', second: '#D71920' },
+};
+
+/** A full set of kits, e.g. for the juvenile sides. */
+const KITS = {
+  home: { primary: '#1E5BC6' },
+  away: { primary: '#FFFFFF' },
+  goalkeeper: { primary: '#009A44', photos: { shirt: 'https://e.com/s.jpg', shorts: 'https://e.com/sh.jpg', socks: 'https://e.com/so.jpg' } },
+};
+
 /** Sends a team request the way the app does: request + name reservation. */
 function sendTeamRequest(db, uid, changes = {}) {
   const data = {
@@ -111,6 +124,7 @@ function sendTeamRequest(db, uid, changes = {}) {
       away: { shirt: '#FFFFFF' },
       goalkeeper: { shirt: '#388E3C' },
     },
+    colours: COLOURS,
     officials: [{ name: 'Kofi Mensah' }, { name: 'Ama Boateng' }],
     agreedToRules: true,
     status: 'pending',
@@ -638,6 +652,56 @@ describe('Team requests: club status, logo and officials', () => {
     await assertSucceeds(sendTeamRequest(dbAs('newbie'), 'newbie', { officials: SEVEN }));
     await assertFails(sendTeamRequest(dbAs('newbie'), 'newbie', {
       officials: [...SEVEN, { name: 'Official 8' }],
+    }));
+  });
+});
+
+// ---------- Team requests: kits and colours (2.13b) ----------
+
+describe('Team requests: kits and colours', () => {
+  it('a club in both competitions sends separate juvenile kits', async () => {
+    await assertSucceeds(sendTeamRequest(dbAs('newbie'), 'newbie', {
+      categories: ['division', 'juvenile'], juvenileKits: KITS,
+    }));
+  });
+
+  it('a club in both competitions must send juvenile kits', async () => {
+    await assertFails(sendTeamRequest(dbAs('newbie'), 'newbie', {
+      categories: ['division', 'juvenile'],
+    }));
+  });
+
+  it('juvenile kits need home, away and goalkeeper', async () => {
+    await assertFails(sendTeamRequest(dbAs('newbie'), 'newbie', {
+      categories: ['division', 'juvenile'],
+      juvenileKits: { home: KITS.home, away: KITS.away },
+    }));
+  });
+
+  it('a club in one competition has no separate juvenile kits', async () => {
+    await assertFails(sendTeamRequest(dbAs('newbie'), 'newbie', { juvenileKits: KITS }));
+  });
+
+  it('a juvenile-only club uses kits, like everyone', async () => {
+    await assertSucceeds(sendTeamRequest(dbAs('newbie'), 'newbie', { categories: ['juvenile'] }));
+  });
+
+  it('team colours are required', async () => {
+    await assertFails(sendTeamRequest(dbAs('newbie'), 'newbie', { colours: null }));
+  });
+
+  it('team colours need home and away, each main and second', async () => {
+    await assertFails(sendTeamRequest(dbAs('newbie'), 'newbie', {
+      colours: { home: COLOURS.home },
+    }));
+    await assertFails(sendTeamRequest(dbAs('newbie'), 'newbie', {
+      colours: { ...COLOURS, away: { main: '#FFFFFF' } },
+    }));
+  });
+
+  it('colours must be #RRGGBB', async () => {
+    await assertFails(sendTeamRequest(dbAs('newbie'), 'newbie', {
+      colours: { ...COLOURS, home: { main: 'red', second: '#FFFFFF' } },
     }));
   });
 });

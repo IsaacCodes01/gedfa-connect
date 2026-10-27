@@ -42,6 +42,14 @@ service firebase.storage {
               && request.resource.contentType.matches('image/.*')));
     }
 
+    // Kit photos (2.13b): e.g. kits/division-home-shirt-1730000000000.jpg
+    match /districts/{districtId}/teamRequests/{uid}/kits/{fileName} {
+      allow read, delete: if isOwner(uid);
+      allow create: if isOwner(uid)
+        && fileName.matches('(division|juvenile)-(home|away|third|goalkeeper|goalkeeper2)-(shirt|shorts|socks)-[0-9]+[.]jpg')
+        && isSmallImage();
+    }
+
     // Player passport photos: photo-<time>.jpg and thumb-<time>.jpg
     match /districts/{districtId}/teams/{teamId}/players/{playerId}/{fileName} {
       allow read, delete: if isTeamAdminOf(districtId, teamId);

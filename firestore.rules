@@ -384,6 +384,33 @@ service cloud.firestore {
 
       // ---------- teamRequests/{uid} ----------
 
+      // Home, away and goalkeeper kits, plus an optional third kit and
+      // second goalkeeper kit. Each kit is designed or made of photos.
+      function isValidKitSet(kits) {
+        return kits is map
+          && kits.keys().hasAll(['home', 'away', 'goalkeeper'])
+          && kits.keys().hasOnly(['home', 'away', 'third', 'goalkeeper', 'goalkeeper2']);
+      }
+
+      function isHexColour(value) {
+        return value is string && value.matches('^#[0-9A-Fa-f]{6}$');
+      }
+
+      // Team colours (2.13b): home and away, a main and a second colour each.
+      function isColourPair(pair) {
+        return pair is map
+          && pair.keys().hasOnly(['main', 'second'])
+          && isHexColour(pair.get('main', null))
+          && isHexColour(pair.get('second', null));
+      }
+
+      function isValidTeamColours(colours) {
+        return colours is map
+          && colours.keys().hasOnly(['home', 'away'])
+          && isColourPair(colours.get('home', null))
+          && isColourPair(colours.get('away', null));
+      }
+
       // In the district already: no league, no letter. A new club: the
       // league it played in last season and a letter to the chairman.
       // Either may add a licence (a photo or a PDF). (2.13)
@@ -410,7 +437,8 @@ service cloud.firestore {
             'logoUrl', 'kits', 'officials', 'agreedToRules', 'status',
             'rejectionReason', 'createdAt', 'updatedAt',
             'reviewedAt', 'reviewedBy', 'teamId',
-            'clubStatus', 'lastLeague', 'letterUrl', 'licenceUrl', 'licenceType'
+            'clubStatus', 'lastLeague', 'letterUrl', 'licenceUrl', 'licenceType',
+            'juvenileKits', 'colours'
           ])
           && isText(data.teamName, 2, 60)
           && data.teamNameLower == data.teamName.lower()
@@ -433,9 +461,13 @@ service cloud.firestore {
           && (!('yearFounded' in data) || data.yearFounded == null
               || (data.yearFounded is int
                   && data.yearFounded >= 1900 && data.yearFounded <= 2100))
-          && data.kits is map
-          && data.kits.keys().hasAll(['home', 'away', 'goalkeeper'])
-          && data.kits.keys().hasOnly(['home', 'away', 'third', 'goalkeeper', 'goalkeeper2'])
+          && isValidKitSet(data.kits)
+          // A club in both competitions has separate juvenile kits (2.13b)
+          && ((data.categories.size() == 2
+                 && isValidKitSet(data.get('juvenileKits', null)))
+              || (data.categories.size() == 1
+                 && data.get('juvenileKits', null) == null))
+          && isValidTeamColours(data.get('colours', null))
           && data.officials is list
           && data.officials.size() >= 2
           && data.officials.size() <= 7

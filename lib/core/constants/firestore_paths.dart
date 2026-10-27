@@ -65,6 +65,10 @@ class StoragePaths {
   static String teamRequestFile(String uid, String fileName) =>
       '${FirestorePaths.district}/teamRequests/$uid/$fileName';
 
+  /// Kit photos (2.13b): `kits/<set>-<slot>-<part>-<millis>.jpg`.
+  static String teamRequestKitPhoto(String uid, String fileName) =>
+      '${FirestorePaths.district}/teamRequests/$uid/kits/$fileName';
+
   static String playerFile(String teamId, String playerId, String fileName) =>
     '${FirestorePaths.district}/teams/$teamId/players/$playerId/$fileName';
 }

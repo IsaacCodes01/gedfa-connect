@@ -10,6 +10,7 @@ import 'package:gedfa_connect/core/constants/approval_status.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/files/picked_document.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
+import 'package:gedfa_connect/core/utils/initials.dart';
 import 'package:gedfa_connect/core/utils/short_name.dart';
 import 'package:gedfa_connect/core/utils/team_name_key.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
@@ -18,12 +19,16 @@ import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/teams/data/team_request_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/club_status.dart';
 import 'package:gedfa_connect/features/teams/domain/kit.dart';
+import 'package:gedfa_connect/features/teams/domain/kit_photos.dart';
 import 'package:gedfa_connect/features/teams/domain/kit_slot.dart';
 import 'package:gedfa_connect/features/teams/domain/official.dart';
+import 'package:gedfa_connect/features/teams/domain/team_colours.dart';
 import 'package:gedfa_connect/features/teams/domain/team_request.dart';
 import 'package:gedfa_connect/features/teams/presentation/kit_editor_screen.dart';
+import 'package:gedfa_connect/features/teams/presentation/kit_photos_screen.dart';
 import 'package:gedfa_connect/features/teams/presentation/steps/club_status_step.dart';
 import 'package:gedfa_connect/features/teams/presentation/steps/club_step.dart';
+import 'package:gedfa_connect/features/teams/presentation/steps/colours_step.dart';
 import 'package:gedfa_connect/features/teams/presentation/steps/kits_step.dart';
 import 'package:gedfa_connect/features/teams/presentation/steps/officials_step.dart';
 import 'package:gedfa_connect/features/teams/presentation/steps/review_step.dart';
@@ -37,15 +42,17 @@ const _stepTitles = [
   'Club status',
   'Officials',
   'Kits',
+  'Colours',
   'Review & submit',
 ];
-const _countedSteps = 4;
+const _countedSteps = 5;
 
 // Step numbers, so the code reads clearly
 const _clubStep = 0;
 const _statusStep = 1;
 const _officialsStep = 2;
 const _kitsStep = 3;
+const _coloursStep = 4;
 
 class RegisterTeamScreen extends ConsumerStatefulWidget {
   const RegisterTeamScreen({super.key});
@@ -88,10 +95,14 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
   // Step 3: officials
   late final List<OfficialDraft> _officials;
 
-  // Step 4: kits
-  final Map<KitSlot, Kit?> _kits = {
+  // Step 4: kits. A club in both competitions also sets juvenile kits.
+  final KitSet _kits = {for (final slot in KitSlot.values) slot: null};
+  final KitSet _juvenileKits = {
     for (final slot in KitSlot.values) slot: null,
   };
+
+  // Step 5: team colours, suggested from the kits when first opened
+  TeamColours? _colours;
 
   // Review: declaration
   bool _agreed = false;
@@ -133,6 +144,8 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
       _kits[KitSlot.goalkeeper] = existing.goalkeeperKit;
       _kits[KitSlot.third] = existing.thirdKit;
       _kits[KitSlot.goalkeeper2] = existing.goalkeeperKit2;
+      _juvenileKits.addAll(existing.juvenileKits);
+      _colours = existing.colours;
       _officials =
           existing.officials.map(OfficialDraft.fromOfficial).toList();
     } else {
@@ -170,7 +183,7 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
       };
 
   Color get _logoColor =>
-      _kits[KitSlot.home]?.primary ?? AppColors.brandBlue;
+      _colours?.home.main ?? _kits[KitSlot.home]?.primary ?? AppColors.brandBlue;
 
   // ---------- Step 1 helpers ----------
 
@@ -247,14 +260,54 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
 
   // ---------- Step 4 helpers (kits) ----------
 
-  Future<void> _editKit(KitSlot slot) async {
+  bool get _bothCompetitions => _competitions.length > 1;
+
+  /// The kit sets the Kits step shows: one, or Division and Juvenile.
+  Map<Competition, KitSet> get _kitSets => _bothCompetitions
+      ? {Competition.division: _kits, Competition.juvenile: _juvenileKits}
+      : {_competitions.first: _kits};
+
+  KitSet _setFor(Competition competition) =>
+      _bothCompetitions && competition == Competition.juvenile
+          ? _juvenileKits
+          : _kits;
+
+  /// "Home kit", or "Juvenile home kit" for a club in both.
+  String _kitTitle(Competition competition, KitSlot slot) =>
+      _bothCompetitions && competition == Competition.juvenile
+          ? 'Juvenile ${slot.label.toLowerCase()}'
+          : slot.label;
+
+  bool get _kitsComplete =>
+      kitSetComplete(_kits) &&
+      (!_bothCompetitions || kitSetComplete(_juvenileKits));
+
+  Future<void> _uploadKit(Competition competition, KitSlot slot) async {
+    final kits = _setFor(competition);
+    final result = await KitPhotosScreen.open(
+      context,
+      title: _kitTitle(competition, slot),
+      initial: kits[slot]?.photos,
+    );
+    if (result != null && mounted) {
+      setState(() => kits[slot] = Kit.fromPhotos(result));
+    }
+  }
+
+  Future<void> _designKit(Competition competition, KitSlot slot) async {
+    final kits = _setFor(competition);
+    final current = kits[slot];
     final result = await KitEditorScreen.open(
       context,
-      title: slot.label,
-      initial: _kits[slot],
+      title: _kitTitle(competition, slot),
+      // A photo kit starts the design from blank
+      initial: current == null || current.isPhotos ? null : current,
     );
-    if (result != null && mounted) setState(() => _kits[slot] = result);
+    if (result != null && mounted) setState(() => kits[slot] = result);
   }
+
+  void _removeKit(Competition competition, KitSlot slot) =>
+      setState(() => _setFor(competition)[slot] = null);
 
   // ---------- Navigation ----------
 
@@ -271,9 +324,7 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
       case _officialsStep:
         return _officials.every((draft) => draft.isComplete);
       case _kitsStep:
-        return KitSlot.values
-            .where((slot) => slot.isRequired)
-            .every((slot) => _kits[slot] != null);
+        return _kitsComplete;
       default:
         return true;
     }
@@ -297,13 +348,23 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
           'Upload your letter to the chairman to continue.',
         _officialsStep =>
           'Add the name and phone of every official (tap a row).',
-        _kitsStep => 'Set the home, away and goalkeeper kits to continue.',
+        _kitsStep => _bothCompetitions
+            ? 'Set the home, away and goalkeeper kits for Division and '
+                'Juvenile.'
+            : 'Set the home, away and goalkeeper kits to continue.',
         _ => 'Please fix the highlighted fields.',
       });
       return;
     }
     setState(() {
       _forward = true;
+      // Team colours start from the designed kits, once they are set
+      if (_step == _kitsStep) {
+        _colours ??= TeamColours.suggested(
+          homeKit: _kits[KitSlot.home],
+          awayKit: _kits[KitSlot.away],
+        );
+      }
       if (_editingFromReview) {
         _editingFromReview = false;
         _step = _stepTitles.length - 1;
@@ -331,6 +392,8 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
 
   TeamRequest _buildRequest(
     String uid, {
+    required KitSet kits,
+    required KitSet juvenileKits,
     required String? logoUrl,
     required String? letterUrl,
     required String? licenceUrl,
@@ -352,14 +415,55 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
       letterUrl: letterUrl,
       licenceUrl: licenceUrl,
       licenceIsPdf: licenceIsPdf,
-      homeKit: _kits[KitSlot.home]!,
-      awayKit: _kits[KitSlot.away]!,
-      goalkeeperKit: _kits[KitSlot.goalkeeper]!,
-      thirdKit: _kits[KitSlot.third],
-      goalkeeperKit2: _kits[KitSlot.goalkeeper2],
+      homeKit: kits[KitSlot.home]!,
+      awayKit: kits[KitSlot.away]!,
+      goalkeeperKit: kits[KitSlot.goalkeeper]!,
+      thirdKit: kits[KitSlot.third],
+      goalkeeperKit2: kits[KitSlot.goalkeeper2],
+      juvenileKits: _bothCompetitions
+          ? {
+                for (final entry in juvenileKits.entries)
+                entry.key: ?entry.value,
+            }
+          : const {},
+      colours: _colours,
       officials: _officials.map((draft) => draft.toOfficial()).toList(),
       status: ApprovalStatus.pending,
     );
+  }
+
+  /// Uploads every kit photo picked on this phone and returns the kits
+  /// with download links in their place. [set] is 'division' or
+  /// 'juvenile' (part of the file name).
+  Future<KitSet> _uploadKitPhotos(
+    TeamRequestRepository repository,
+    String uid,
+    KitSet kits, {
+    required String set,
+  }) async {
+    final result = <KitSlot, Kit?>{};
+    for (final MapEntry(key: slot, value: kit) in kits.entries) {
+      final photos = kit?.photos;
+      if (kit == null || photos == null || !photos.hasNewPhotos) {
+        result[slot] = kit;
+        continue;
+      }
+      var uploaded = photos;
+      for (final part in KitPart.values) {
+        final bytes = photos[part].bytes;
+        if (bytes == null) continue;
+        final url = await repository.uploadKitPhoto(
+          uid: uid,
+          set: set,
+          slot: slot.name,
+          part: part.name,
+          bytes: bytes,
+        );
+        uploaded = uploaded.withPart(part, KitPhoto(url: url));
+      }
+      result[slot] = Kit.fromPhotos(uploaded);
+    }
+    return result;
   }
 
   Future<void> _submit() async {
@@ -419,8 +523,28 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
         licenceIsPdf = licence.isPdf;
       }
 
+      // New kit photos go up now; the kits then keep their links
+      final kits = await _uploadKitPhotos(
+        repository,
+        uid,
+        _kits,
+        set: _bothCompetitions || _competitions.contains(Competition.division)
+            ? 'division'
+            : 'juvenile',
+      );
+      final juvenileKits = _bothCompetitions
+          ? await _uploadKitPhotos(
+              repository,
+              uid,
+              _juvenileKits,
+              set: 'juvenile',
+            )
+          : _juvenileKits;
+
       final request = _buildRequest(
         uid,
+        kits: kits,
+        juvenileKits: juvenileKits,
         logoUrl: logoUrl,
         letterUrl: letterUrl,
         licenceUrl: licenceUrl,
@@ -519,11 +643,23 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
           onChanged: () => setState(() {}),
         ),
       _kitsStep => KitsStep(
-          kits: _kits,
+          competitions: _competitions,
+          kits: _kitSets,
           showErrors: _showErrors.contains(_kitsStep),
           enabled: enabled,
-          onEdit: _editKit,
-          onRemove: (slot) => setState(() => _kits[slot] = null),
+          onUpload: _uploadKit,
+          onDesign: _designKit,
+          onRemove: _removeKit,
+        ),
+      _coloursStep => ColoursStep(
+          colours: _colours ??
+              TeamColours.suggested(
+                homeKit: _kits[KitSlot.home],
+                awayKit: _kits[KitSlot.away],
+              ),
+          initials: initialsFor(_teamName.text),
+          enabled: enabled,
+          onChanged: (value) => setState(() => _colours = value),
         ),
       _ => ReviewStep(
           teamName: _teamName.text.trim(),
@@ -533,7 +669,8 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
           yearFounded: _yearFounded.text.trim(),
           logoBytes: _logoBytes,
           logoColor: _logoColor,
-          kits: _kits,
+          kitSets: _kitSets,
+          colours: _colours,
           officials: _officials,
           logoUrl: _existingLogoUrl,
           competitions: _competitions,
