@@ -55,21 +55,27 @@ class AppNotification {
 
   String _players(int n) => n == 1 ? '1 player' : '$n players';
 
+  /// How many different players / clubs / people. Saving the same one
+  /// twice adds 1 to `count` but not a second name, so the names decide.
+  int get people => names.isEmpty ? count : names.length;
+
   String get title => switch (kind) {
-        NotificationKind.playersApproved => '${_players(count)} approved',
-        NotificationKind.playersRejected => '${_players(count)} rejected',
+        NotificationKind.playersApproved => '${_players(people)} approved',
+        NotificationKind.playersRejected => '${_players(people)} rejected',
         NotificationKind.teamApproved => '$teamName approved',
-        NotificationKind.teamRequest => 'New team request: $teamName',
+        NotificationKind.teamRequest => people == 1
+            ? 'New team request: ${names.firstOrNull ?? teamName}'
+            : '$people new team requests',
         NotificationKind.playersSubmitted =>
-          count == 1
+          people == 1
               ? 'New player from $teamName'
-              : '$count new players from $teamName',
+              : '$people new players from $teamName',
         NotificationKind.playersResubmitted =>
-          count == 1
+          people == 1
               ? 'Player resubmitted ($teamName)'
-              : '$count players resubmitted ($teamName)',
+              : '$people players resubmitted ($teamName)',
         NotificationKind.inviteAccepted =>
-          count == 1 ? 'Invitation accepted' : '$count invitations accepted',
+          people == 1 ? 'Invitation accepted' : '$people invitations accepted',
       };
 
   String get body => switch (kind) {
@@ -80,8 +86,9 @@ class AppNotification {
               'them.',
         NotificationKind.teamApproved =>
           'Welcome to the league. You can now add your Division players.',
-        NotificationKind.teamRequest =>
-          'Sent by the club. Open it in Teams to review.',
+        NotificationKind.teamRequest => people == 1
+            ? 'Sent by the club. Open it in Teams to review.'
+            : '$namesText. Open Teams to review them.',
         NotificationKind.playersSubmitted =>
           '$namesText. Waiting for your review in Players.',
         NotificationKind.playersResubmitted =>

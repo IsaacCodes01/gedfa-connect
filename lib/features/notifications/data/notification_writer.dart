@@ -29,10 +29,13 @@ class NotificationWriter {
     required String teamId,
     required String teamName,
     required String name,
+    String? groupKey,
   }) {
     final day = dayKey();
     final safeAudience = audience.replaceAll(':', '-');
-    final id = '${safeAudience}_${kind.name}_${teamId}_$day';
+    // Usually one notification per team; [groupKey] groups several teams
+    // (e.g. all of today's team requests in one).
+    final id = '${safeAudience}_${kind.name}_${groupKey ?? teamId}_$day';
     return (
       ref: _db.doc(FirestorePaths.notification(id)),
       data: {
@@ -84,6 +87,8 @@ class NotificationWriter {
   }
 
   /// For the FA's bell (written by teams, clubs and invited people).
+  /// Team requests from every club are grouped into one a day:
+  /// "3 new team requests: Afransi Stars, Royal Unique FC and Golden Unity".
   void forFaInBatch(
     WriteBatch batch, {
     required NotificationKind kind,
@@ -97,6 +102,7 @@ class NotificationWriter {
       teamId: teamId,
       teamName: teamName,
       name: name,
+      groupKey: kind == NotificationKind.teamRequest ? 'all' : null,
     );
     batch.set(e.ref, e.data, SetOptions(merge: true));
   }

@@ -48,6 +48,17 @@ class FirestorePaths {
   static String notification(String id) => '$district/notifications/$id';
   static String readMark(String uid) => '$district/readMarks/$uid';
 
+  // Season fee (2.13c)
+  static const payments = '$district/payments';
+  static String payment(String id) => '$district/payments/$id';
+
+  /// Confirmed total for one club and season, e.g. `fees/2026-27_<uid>`.
+  static String fee(String season, String requestUid) =>
+      '$district/fees/${season}_$requestUid';
+
+  /// The next receipt number: `{ next: 15 }`. FA only.
+  static const receiptCounter = '$district/settings/receiptCounter';
+
   static const leagueSettings = '$district/settings/league';
 
   /// The next player-ID number: `{ next: 43 }`. FA only.
@@ -68,6 +79,10 @@ class StoragePaths {
   /// Kit photos (2.13b): `kits/<set>-<slot>-<part>-<millis>.jpg`.
   static String teamRequestKitPhoto(String uid, String fileName) =>
       '${FirestorePaths.district}/teamRequests/$uid/kits/$fileName';
+
+  /// Screenshot of a payment message (2.13c): `proof-<millis>.jpg`.
+  static String paymentProof(String uid, String fileName) =>
+      '${FirestorePaths.district}/payments/$uid/$fileName';
 
   static String playerFile(String teamId, String playerId, String fileName) =>
     '${FirestorePaths.district}/teams/$teamId/players/$playerId/$fileName';

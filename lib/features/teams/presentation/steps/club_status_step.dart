@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:gedfa_connect/core/files/picked_document.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/features/teams/domain/club_status.dart';
+import 'package:gedfa_connect/features/teams/presentation/widgets/choice_card.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/file_upload_row.dart';
 
 /// Step 2 (board R1): already in the district, or a new club?
@@ -69,7 +70,7 @@ class ClubStatusStep extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const _Heading('Is your club already in Gomoa East?', top: 2),
+                const StepHeading('Is your club already in Gomoa East?', top: 2),
                 RadioGroup<ClubStatus>(
                   groupValue: status,
                   onChanged: (value) {
@@ -80,9 +81,11 @@ class ClubStatusStep extends StatelessWidget {
                       for (final option in ClubStatus.values)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 8),
-                          child: _ChoiceCard(
-                            option: option,
+                          child: ChoiceCard<ClubStatus>(
+                            value: option,
                             selected: status == option,
+                            title: option.label,
+                            description: option.description,
                             onTap: enabled
                                 ? () => onStatusChanged(option)
                                 : null,
@@ -122,7 +125,7 @@ class ClubStatusStep extends StatelessWidget {
                     onPressed: enabled ? onPickLetter : null,
                   ),
                 ],
-                const _Heading('Club licence (optional)', top: 22),
+                const StepHeading('Club licence (optional)', top: 22),
                 FileUploadRow(
                   title: 'Licence',
                   subtitle: licence != null
@@ -168,106 +171,6 @@ class ClubStatusStep extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// "IS YOUR CLUB ALREADY IN GOMOA EAST?" (small, capitals, grey).
-class _Heading extends StatelessWidget {
-  const _Heading(this.text, {required this.top});
-
-  final String text;
-  final double top;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(4, top, 4, 10),
-      child: Semantics(
-        header: true,
-        child: Text(
-          text.toUpperCase(),
-          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.6,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-        ),
-      ),
-    );
-  }
-}
-
-/// One of the two big choices, with a round dot on the left.
-class _ChoiceCard extends StatelessWidget {
-  const _ChoiceCard({
-    required this.option,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final ClubStatus option;
-  final bool selected;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final scheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final selectedBg =
-        isDark ? const Color(0xFF16304F) : const Color(0xFFF2F7FD);
-
-    return Material(
-      color: selected ? selectedBg : scheme.surface,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: selected ? scheme.primary : scheme.outline,
-          width: selected ? 2 : 1.5,
-        ),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // The real radio, for screen readers and the keyboard
-              Radio<ClubStatus>(
-                value: option,
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                visualDensity: VisualDensity.compact,
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      option.label,
-                      style: textTheme.titleSmall
-                          ?.copyWith(fontWeight: FontWeight.w600, fontSize: 15),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      option.description,
-                      style: textTheme.bodySmall?.copyWith(
-                        fontSize: 12.5,
-                        height: 1.45,
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

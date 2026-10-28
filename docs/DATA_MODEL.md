@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.2, matches the rules after step 2.13b (27 Oct 2026)
+**Status:** v2.3, matches the rules after step 2.13c-1 (27 Oct 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -192,7 +192,7 @@ Keyed by the requester's `uid`, so each person can have at most one request.
 - Requests saved before `categories` existed are read as `["division"]` by the app; the next edit saves the field.
 - The registration steps are: Club details › Club status › Officials › Kits › Colours › Payment, then Review (2.13).
 - On approval the team also gets `clubStatus`, `licenceUrl`, `licenceType`, `juvenileKits` and `colours`. The letter and last league stay on the request.
-- **Coming in 2.13c:** the season fee (GH₵ 1,000, paid in parts, confirmed by the FA, receipt numbers).
+- `season` (`2026-27`): the season this registration is for; its fee must be started before approval (Section 2.11).
 
 ### 2.2a `teamNames/{nameKey}` — team name reservations
 
@@ -396,7 +396,7 @@ Readable and writable only by FA admins. Created with `next: 2` by the very firs
 
 ### 2.9 `notifications/{id}` — the bell (2.8)
 
-**One document per audience, kind, team and day**, e.g. `team-royal_playersApproved_royal_2026-10-24`. Each event updates it with `count + 1` and one more name, so 20 approvals = 1 notification.
+**One document per audience, kind, team and day**, e.g. `team-royal_playersApproved_royal_2026-10-24`. Each event updates it with `count + 1` and one more name, so 20 approvals = 1 notification. **Team requests** for the FA are grouped across clubs: `fa_teamRequest_all_<day>` ("3 new team requests"). The app counts **different names**, so saving the same player twice still reads "1 player".
 
 | Field | Notes |
 | ----- | ----- |
@@ -413,6 +413,43 @@ Readable and writable only by FA admins. Created with `next: 2` by the very firs
 ### 2.10 `readMarks/{uid}` — my bell
 
 `notificationsSeenAt` (Mark all read) and `hiddenAnnouncements` (pinned cards I closed, up to 30). Mine only.
+
+### 2.11 `payments/{id}` — season fee payments (2.13c)
+
+The affiliation fee is **GH₵ 1,000 every season**, paid to GEDFA's MoMo (number to come: `0244-***-***`), **in parts if needed**. The club sends each payment; the FA confirms it against its own records. Payments are never rejected: "not found" is only for an ID that isn't on the FA's statement, or details that are false.
+
+| Field        | Type       | Notes |
+| ------------ | ---------- | ----- |
+| `requestUid` | string     | The club's account (its `teamRequests` ID) |
+| `teamId`     | string?    | Set on payments made after approval |
+| `teamName`   | string     | |
+| `season`     | string     | `2026-27` |
+| `method`     | string     | `momo` (MoMo or bank), `cash`, `before` (already paid before the app) |
+| `amount`     | number?    | Whole cedis, 1–1,000. Required for `momo` and `cash`; for `before` the FA fills it in when confirming |
+| `reference`  | string?    | `momo` only, required: the transaction ID (4–30 characters) |
+| `paidOn`     | timestamp? | `momo` only, required: the day it was paid |
+| `paidWhen`   | string?    | `cash`: "about when", optional |
+| `paidTo`     | string?    | `cash`: who received it, optional |
+| `proofUrl`   | string?    | Screenshot of the payment message, optional |
+| `status`     | string     | `waiting` → `confirmed` or `notFound` |
+| `receiptNo`  | string?    | Set when confirmed: `GEDFA-2026-0014` (season start year + 4 digits from `settings/receiptCounter`) |
+| `reason`     | string?    | `notFound` only (5–300 characters); the club sees it and can send again |
+| `recordedBy` | string     | `club`, or `fa` for cash the FA recorded itself (confirmed straight away) |
+| `createdBy`, `createdAt`, `reviewedBy`, `reviewedAt` | | |
+| `editedBy`, `editedAt` | | FA-recorded cash only: the FA corrected the amount (receipt unchanged, total changed by the difference) |
+
+- The first payment is sent in the **same batch** as the team request.
+- **Confirm** is one transaction: the payment (`confirmed`, `receiptNo`, `amount`), `settings/receiptCounter` + 1, and `fees/{season}_{uid}.confirmed` + amount. The rules check the receipt number and the new total.
+- **Not found** on a pending registration with nothing confirmed yet also **rejects the request** in the same batch (`rejectionReason`: "Payment not found: …"); the club must send a new payment when it resends.
+- The FA can **approve a team only after a payment is confirmed** (`fees/{season}_{uid}.confirmed > 0`; checked by the rules). The approval adds `teamId` to that fees document.
+
+### 2.12 `fees/{season}_{uid}` — confirmed total per club and season
+
+`{ season, requestUid, teamName, teamId?, confirmed, updatedAt }`. Written only by the FA, in the same transaction as each confirmation. The club can read its own (even before it exists). Balance = 1,000 − `confirmed`.
+
+### 2.13 `settings/receiptCounter` — receipt numbering
+
+`{ next: 15 }`. FA only; moves on by exactly 1 per receipt, like `settings/playerCounter`.
 
 ## 3. Who can do what (summary)
 
@@ -472,6 +509,7 @@ A leftover file is harmless; a player without a photo can't exist.
 | `districts/gomoa-east/teamRequests/{uid}/logo.jpg`                        | Logo sent with a request                  |
 | `districts/gomoa-east/teamRequests/{uid}/letter.pdf`                      | New club's letter to the chairman (PDF, under 5 MB) |
 | `districts/gomoa-east/teamRequests/{uid}/licence.pdf` or `licence.jpg`    | Optional club licence (PDF or photo, under 5 MB)    |
+| `districts/gomoa-east/payments/{uid}/proof-<millis>.jpg`                 | Payment screenshot (optional), under 1 MB |
 | `districts/gomoa-east/teamRequests/{uid}/kits/<set>-<slot>-<part>-<millis>.jpg` | Kit photo, e.g. `division-home-shirt-…`; shirt 600×600, shorts 600×360, socks 360×600, JPEG, under 1 MB |
 | `districts/gomoa-east/teams/{teamId}/logo.jpg`                            | Approved team logo *(Phase 2)*            |
 | `districts/gomoa-east/teams/{teamId}/players/{playerId}/photo-<millis>.jpg` | Passport photo, 300×400, JPEG quality 85  |
@@ -547,6 +585,8 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 28 Oct 2026 | v2.3.1: "not found" sends a pending registration back; FA can correct recorded cash (`editedBy`, `editedAt`); FA team-request notifications grouped into one a day. 190 tests. |
+| 27 Oct 2026 | v2.3 (2.13c-1): `payments`, `fees`, `settings/receiptCounter`; `teamRequests.season`; approval needs a confirmed payment. Storage: payment proof. 187 tests. |
 | 27 Oct 2026 | v2.2 (2.13b): kits can be photos (`photos`); `juvenileKits` for clubs in both competitions; `colours` (home / away, main / second) required. Storage: `kits/` photos. 166 tests. |
 | 27 Oct 2026 | v2.1 (2.13a): `teamRequests` gain `clubStatus`, `lastLeague`, `letterUrl`, `licenceUrl`, `licenceType`; logo required; officials at most 7, new role `other` with `title`. Storage: `letter.pdf`, `licence.pdf` / `licence.jpg`. GEDFA's answers recorded in Section 7. |
 | 24 Oct 2026 | v2.0: `announcements` (+ `seen`), grouped `notifications`, `readMarks` (2.7 – 2.8); composite indexes. 149 tests. |

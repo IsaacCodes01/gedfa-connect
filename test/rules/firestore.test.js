@@ -1,4 +1,4 @@
-// Security rules tests for GEDFA Connect (steps 1.7 to 2.13b).
+// Security rules tests for GEDFA Connect (steps 1.7 to 2.13c).
 //
 // Run while the emulators are running:
 //   cd test/rules
@@ -190,6 +190,10 @@ async function seed() {
       updatedAt: now,
     });
     await set(`${D}/teamNames/gomoa-united-fc`, { uid: 'applicant', createdAt: now });
+    // The applicant's season fee is started, so the FA may approve (2.13c)
+    await set(`${D}/fees/2026-27_applicant`, {
+      season: '2026-27', requestUid: 'applicant', teamName: 'Gomoa United FC', confirmed: 500,
+    });
 
     // p1: Royal, approved, #10
     await set(`${D}/players/p1`, playerData({
@@ -703,6 +707,242 @@ describe('Team requests: kits and colours', () => {
     await assertFails(sendTeamRequest(dbAs('newbie'), 'newbie', {
       colours: { ...COLOURS, home: { main: 'red', second: '#FFFFFF' } },
     }));
+  });
+});
+
+// ---------- Season fee: payments, receipts, totals (2.13c) ----------
+
+const SEASON = '2026-27';
+
+/** A MoMo payment as the club sends it. Pass changes to break it. */
+function momoPayment(changes = {}) {
+  return {
+    requestUid: 'newbie',
+    teamId: null,
+    teamName: 'Test United',
+    season: SEASON,
+    method: 'momo',
+    amount: 500,
+    reference: '8123456789',
+    paidOn: Timestamp.fromDate(new Date(Date.UTC(2026, 9, 12))),
+    proofUrl: null,
+    status: 'waiting',
+    recordedBy: 'club',
+    createdBy: 'newbie',
+    createdAt: serverTimestamp(),
+    ...changes,
+  };
+}
+
+function sendPayment(db, id = 'pay1', changes = {}) {
+  return setDoc(doc(db, `${D}/payments/${id}`), momoPayment(changes));
+}
+
+/**
+ * The FA confirms a payment the way the app does: the payment, the
+ * receipt counter and the club's total in one batch.
+ */
+function confirmPayment(db, { id = 'pay1', uid = 'newbie', amount = 500,
+  receipt = 'GEDFA-2026-0001', next = 2, total = 500, skipTotal = false, by = 'fa1' } = {}) {
+  const batch = writeBatch(db);
+  batch.update(doc(db, `${D}/payments/${id}`), {
+    status: 'confirmed',
+    amount,
+    receiptNo: receipt,
+    reviewedBy: by,
+    reviewedAt: serverTimestamp(),
+  });
+  batch.set(doc(db, `${D}/settings/receiptCounter`), { next });
+  if (!skipTotal) {
+    batch.set(doc(db, `${D}/fees/${SEASON}_${uid}`), {
+      season: SEASON, requestUid: uid, teamName: 'Test United', confirmed: total,
+      updatedAt: serverTimestamp(),
+    });
+  }
+  return batch.commit();
+}
+
+describe('Season fee: the club', () => {
+  beforeEach(async () => {
+    await sendTeamRequest(dbAs('newbie'), 'newbie');
+  });
+
+  it('can send a MoMo payment', async () => {
+    await assertSucceeds(sendPayment(dbAs('newbie')));
+  });
+
+  it('can send a cash payment, and "already paid" without an amount', async () => {
+    await assertSucceeds(sendPayment(dbAs('newbie'), 'cash1',
+      { method: 'cash', reference: null, paidOn: null, paidWhen: 'September 2026' }));
+    await assertSucceeds(sendPayment(dbAs('newbie'), 'before1',
+      { method: 'before', amount: null, reference: null, paidOn: null }));
+  });
+
+  it('MoMo needs the transaction ID and the date', async () => {
+    await assertFails(sendPayment(dbAs('newbie'), 'p', { reference: null }));
+    await assertFails(sendPayment(dbAs('newbie'), 'p', { paidOn: null }));
+  });
+
+  it('the amount is 1 to 1,000 whole cedis', async () => {
+    await assertFails(sendPayment(dbAs('newbie'), 'p', { amount: 1001 }));
+    await assertFails(sendPayment(dbAs('newbie'), 'p', { amount: 0 }));
+    await assertFails(sendPayment(dbAs('newbie'), 'p', { amount: 99.5 }));
+  });
+
+  it('"already paid" has no amount (the FA fills it in)', async () => {
+    await assertFails(sendPayment(dbAs('newbie'), 'p',
+      { method: 'before', amount: 500, reference: null, paidOn: null }));
+  });
+
+  it('cannot send a payment as confirmed, or with a receipt', async () => {
+    await assertFails(sendPayment(dbAs('newbie'), 'p', { status: 'confirmed' }));
+    await assertFails(sendPayment(dbAs('newbie'), 'p', { receiptNo: 'GEDFA-2026-0001' }));
+  });
+
+  it('cannot send a payment for another club', async () => {
+    await assertFails(sendPayment(dbAs('newbie'), 'p', { requestUid: 'other', createdBy: 'other' }));
+  });
+
+  it('cannot confirm its own payment', async () => {
+    await sendPayment(dbAs('newbie'));
+    await assertFails(confirmPayment(dbAs('newbie'), { by: 'newbie' }));
+  });
+
+  it('reads its own total, even before anything is confirmed', async () => {
+    await assertSucceeds(getDoc(doc(dbAs('newbie'), `${D}/fees/${SEASON}_newbie`)));
+    await assertFails(getDoc(doc(dbAs('newbie'), `${D}/fees/${SEASON}_applicant`)));
+  });
+
+  it('cannot write its own total', async () => {
+    await assertFails(setDoc(doc(dbAs('newbie'), `${D}/fees/${SEASON}_newbie`),
+      { season: SEASON, requestUid: 'newbie', teamName: 'Test United', confirmed: 1000 }));
+  });
+});
+
+describe('Season fee: without a registration', () => {
+  it('cannot send a payment', async () => {
+    await assertFails(sendPayment(dbAs('newbie')));
+  });
+});
+
+describe('Season fee: the FA', () => {
+  beforeEach(async () => {
+    await sendTeamRequest(dbAs('newbie'), 'newbie');
+    await sendPayment(dbAs('newbie'));
+  });
+
+  it('confirms with the next receipt number and adds it to the total', async () => {
+    await assertSucceeds(confirmPayment(dbAs('fa1')));
+  });
+
+  it('cannot skip a receipt number', async () => {
+    await assertFails(confirmPayment(dbAs('fa1'), { receipt: 'GEDFA-2026-0002' }));
+  });
+
+  it("cannot confirm without adding to the club's total", async () => {
+    await assertFails(confirmPayment(dbAs('fa1'), { skipTotal: true }));
+    await assertFails(confirmPayment(dbAs('fa1'), { total: 1000 }));
+  });
+
+  it("cannot change the club's amount", async () => {
+    await assertFails(confirmPayment(dbAs('fa1'), { amount: 600, total: 600 }));
+  });
+
+  it('cannot confirm the same payment twice', async () => {
+    await confirmPayment(dbAs('fa1'));
+    await assertFails(confirmPayment(dbAs('fa1'), { receipt: 'GEDFA-2026-0002', next: 3, total: 1000 }));
+  });
+
+  it('can mark a payment not found, with a reason', async () => {
+    await assertSucceeds(updateDoc(doc(dbAs('fa1'), `${D}/payments/pay1`), {
+      status: 'notFound', reason: 'ID not on our statement',
+      reviewedBy: 'fa1', reviewedAt: serverTimestamp(),
+    }));
+  });
+
+  it('cannot mark it not found without a reason', async () => {
+    await assertFails(updateDoc(doc(dbAs('fa1'), `${D}/payments/pay1`), {
+      status: 'notFound', reviewedBy: 'fa1', reviewedAt: serverTimestamp(),
+    }));
+  });
+
+  it('can record cash: confirmed straight away, with a receipt', async () => {
+    // One database handle for the whole batch: each dbAs() call makes a
+    // new Firestore instance, and a batch can't mix them.
+    const db = dbAs('fa1');
+    const batch = writeBatch(db);
+    batch.set(doc(db, `${D}/payments/cash9`), {
+      requestUid: 'newbie', teamId: null, teamName: 'Test United', season: SEASON,
+      method: 'cash', amount: 300, paidWhen: 'at the meeting', status: 'confirmed',
+      receiptNo: 'GEDFA-2026-0001', recordedBy: 'fa', createdBy: 'fa1',
+      createdAt: serverTimestamp(), reviewedBy: 'fa1', reviewedAt: serverTimestamp(),
+    });
+    batch.set(doc(db, `${D}/settings/receiptCounter`), { next: 2 });
+    batch.set(doc(db, `${D}/fees/${SEASON}_newbie`), {
+      season: SEASON, requestUid: 'newbie', teamName: 'Test United', confirmed: 300,
+      updatedAt: serverTimestamp(),
+    });
+    await assertSucceeds(batch.commit());
+  });
+
+  it('"not found" can send the registration back to the club, in one batch', async () => {
+    const db = dbAs('fa1');
+    const batch = writeBatch(db);
+    batch.update(doc(db, `${D}/payments/pay1`), {
+      status: 'notFound', reason: 'ID not on our statement',
+      reviewedBy: 'fa1', reviewedAt: serverTimestamp(),
+    });
+    batch.update(doc(db, `${D}/teamRequests/newbie`), {
+      status: 'rejected', rejectionReason: 'Payment not found: ID not on our statement',
+      reviewedBy: 'fa1', reviewedAt: serverTimestamp(), updatedAt: serverTimestamp(),
+    });
+    await assertSucceeds(batch.commit());
+  });
+
+  it('can correct the amount of cash it recorded (the total follows)', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, `${D}/payments/cash8`), {
+        requestUid: 'newbie', teamName: 'Test United', season: SEASON, method: 'cash',
+        amount: 300, status: 'confirmed', receiptNo: 'GEDFA-2026-0001', recordedBy: 'fa',
+      });
+      await setDoc(doc(db, `${D}/fees/${SEASON}_newbie`), {
+        season: SEASON, requestUid: 'newbie', teamName: 'Test United', confirmed: 300,
+      });
+    });
+    const correct = (total) => {
+      const db = dbAs('fa1');
+      const batch = writeBatch(db);
+      batch.update(doc(db, `${D}/payments/cash8`), {
+        amount: 200, editedBy: 'fa1', editedAt: serverTimestamp(),
+      });
+      batch.set(doc(db, `${D}/fees/${SEASON}_newbie`), { confirmed: total }, { merge: true });
+      return batch.commit();
+    };
+    await assertFails(correct(300));   // total not corrected
+    await assertSucceeds(correct(200));
+  });
+
+  it("cannot change the amount of a payment the club sent", async () => {
+    await confirmPayment(dbAs('fa1'));
+    const db = dbAs('fa1');
+    const batch = writeBatch(db);
+    batch.update(doc(db, `${D}/payments/pay1`), {
+      amount: 400, editedBy: 'fa1', editedAt: serverTimestamp(),
+    });
+    batch.set(doc(db, `${D}/fees/${SEASON}_newbie`), { confirmed: 400 }, { merge: true });
+    await assertFails(batch.commit());
+  });
+
+  it('a team admin cannot confirm payments', async () => {
+    await assertFails(confirmPayment(dbAs('admin1'), { by: 'admin1' }));
+  });
+
+  it('cannot approve a team before a payment is confirmed', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await deleteDoc(doc(context.firestore(), `${D}/fees/2026-27_applicant`));
+    });
+    await assertFails(approve(dbAs('fa1')));
   });
 });
 

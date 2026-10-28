@@ -115,12 +115,18 @@ class ReviewActionsBar extends StatelessWidget {
     required this.busy,
     required this.onReject,
     required this.onApprove,
+    this.blockedText,
   });
 
   final String approveLabel;
   final bool busy;
   final VoidCallback onReject;
-  final VoidCallback onApprove;
+
+  /// Null greys out Approve (e.g. no payment confirmed yet).
+  final VoidCallback? onApprove;
+
+  /// Red line above the buttons saying why Approve is greyed out.
+  final String? blockedText;
 
   @override
   Widget build(BuildContext context) {
@@ -139,41 +145,63 @@ class ReviewActionsBar extends StatelessWidget {
             heightFactor: 1,
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 560),
-              child: Row(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: busy ? null : onReject,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: scheme.error,
-                        side: BorderSide(color: scheme.error, width: 1.5),
-                        minimumSize: const Size.fromHeight(50),
+                  if (blockedText case final text?)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        text,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: scheme.error,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12.5,
+                        ),
                       ),
-                      child: const Text('Reject'),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 2,
-                    child: FilledButton.icon(
-                      onPressed: busy ? null : onApprove,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: approveGreen(context),
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size.fromHeight(50),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: busy ? null : onReject,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: scheme.error,
+                            side: BorderSide(color: scheme.error, width: 1.5),
+                            minimumSize: const Size.fromHeight(50),
+                          ),
+                          child: const Text('Reject'),
+                        ),
                       ),
-                      icon: busy
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Icon(Icons.check_rounded),
-                      label: Text(approveLabel),
-                    ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: FilledButton.icon(
+                          onPressed: busy ? null : onApprove,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: approveGreen(context),
+                            foregroundColor: Colors.white,
+                            // Greyed out = the same green, faded
+                            disabledBackgroundColor:
+                                approveGreen(context).withValues(alpha: 0.45),
+                            disabledForegroundColor: Colors.white,
+                            minimumSize: const Size.fromHeight(50),
+                          ),
+                          icon: busy
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.check_rounded),
+                          label: Text(approveLabel),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gedfa_connect/app/routes.dart';
 import 'package:gedfa_connect/core/constants/approval_status.dart';
+import 'package:gedfa_connect/core/constants/season.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
@@ -16,6 +17,8 @@ import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/core/widgets/status_badge.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/fa/presentation/widgets/review_widgets.dart';
+import 'package:gedfa_connect/features/payments/data/payment_repository.dart';
+import 'package:gedfa_connect/features/payments/presentation/widgets/fa_payment_card.dart';
 import 'package:gedfa_connect/features/settings/presentation/widgets/settings_widgets.dart';
 import 'package:gedfa_connect/features/teams/data/team_request_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/club_status.dart';
@@ -88,6 +91,14 @@ class _ReviewBody extends StatelessWidget {
               _Header(request: request),
               const SizedBox(height: 16),
               _Checks(request: request),
+              const SizedBox(height: 22),
+
+              SectionTitle('${Season.label(Season.current)} season fee'),
+              FaPaymentCard(
+                requestUid: request.uid,
+                teamName: request.teamName,
+                requestPending: request.status == ApprovalStatus.pending,
+              ),
               const SizedBox(height: 22),
 
               const SectionTitle('Club status'),
@@ -550,11 +561,20 @@ class _ReviewActionsState extends ConsumerState<_ReviewActions> {
 
   @override
   Widget build(BuildContext context) {
+    // Approve unlocks once the first payment is confirmed (2.13c).
+    // The security rules check the same thing.
+    final feeStarted = ref
+            .watch(feeSummaryProvider(widget.request.uid))
+            .value
+            ?.hasStarted ??
+        false;
+
     return ReviewActionsBar(
       approveLabel: 'Approve team',
       busy: _busy,
       onReject: _reject,
-      onApprove: _approve,
+      onApprove: feeStarted ? _approve : null,
+      blockedText: feeStarted ? null : 'Confirm a payment first.',
     );
   }
 }

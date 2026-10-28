@@ -2,7 +2,10 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
+import 'package:gedfa_connect/core/constants/season.dart';
+import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/core/utils/initials.dart';
+import 'package:gedfa_connect/features/payments/domain/payment.dart';
 import 'package:gedfa_connect/features/teams/domain/club_status.dart';
 import 'package:gedfa_connect/features/teams/domain/kit.dart';
 import 'package:gedfa_connect/features/teams/domain/kit_slot.dart';
@@ -26,6 +29,7 @@ class ReviewStep extends StatelessWidget {
     required this.logoColor,
     required this.kitSets,
     required this.colours,
+    required this.payment,
     required this.officials,
     required this.agreed,
     required this.enabled,
@@ -51,6 +55,9 @@ class ReviewStep extends StatelessWidget {
   /// One set, or Division and Juvenile for a club in both.
   final Map<Competition, Map<KitSlot, Kit?>> kitSets;
   final TeamColours? colours;
+
+  /// The payment sent with this registration, or null (none new).
+  final PaymentDraft? payment;
   final List<OfficialDraft> officials;
   final bool agreed;
   final bool enabled;
@@ -233,6 +240,42 @@ class ReviewStep extends StatelessWidget {
                       ColourPairRow(label: 'Away', pair: colours.away),
                     ] else
                       const _ReviewRow(label: 'Colours', value: ''),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              _ReviewCard(
+                title: 'Payment',
+                onEdit: enabled ? () => onEdit(5) : null,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (payment case final payment?) ...[
+                      _ReviewRow(label: 'How', value: payment.method.label),
+                      if (payment.amount case final amount?)
+                        _ReviewRow(label: 'Amount', value: cedis(amount)),
+                      if (payment.method == PaymentMethod.momo) ...[
+                        _ReviewRow(
+                          label: 'Transaction ID',
+                          value: payment.reference?.trim() ?? '',
+                        ),
+                        _ReviewRow(
+                          label: 'Date paid',
+                          value: payment.paidOn == null
+                              ? ''
+                              : formatDate(payment.paidOn!),
+                        ),
+                      ],
+                      if (payment.method == PaymentMethod.before)
+                        const _ReviewRow(
+                          label: 'Amount',
+                          value: 'From the FA records',
+                        ),
+                    ] else
+                      const _ReviewRow(
+                        label: 'New payment',
+                        value: 'None (payments already sent)',
+                      ),
                   ],
                 ),
               ),

@@ -1,8 +1,10 @@
 import 'dart:typed_data';
 
+import 'package:cloud_firestore/cloud_firestore.dart' show WriteBatch;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:gedfa_connect/app/routes.dart';
 import 'package:gedfa_connect/app/theme.dart';
 import 'package:gedfa_connect/core/connectivity/connectivity_provider.dart';
@@ -16,6 +18,8 @@ import 'package:gedfa_connect/core/utils/team_name_key.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
+import 'package:gedfa_connect/features/payments/data/payment_repository.dart';
+import 'package:gedfa_connect/features/payments/domain/payment.dart';
 import 'package:gedfa_connect/features/teams/data/team_request_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/club_status.dart';
 import 'package:gedfa_connect/features/teams/domain/kit.dart';
@@ -31,6 +35,7 @@ import 'package:gedfa_connect/features/teams/presentation/steps/club_step.dart';
 import 'package:gedfa_connect/features/teams/presentation/steps/colours_step.dart';
 import 'package:gedfa_connect/features/teams/presentation/steps/kits_step.dart';
 import 'package:gedfa_connect/features/teams/presentation/steps/officials_step.dart';
+import 'package:gedfa_connect/features/teams/presentation/steps/payment_step.dart';
 import 'package:gedfa_connect/features/teams/presentation/steps/review_step.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/officials_editor.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
@@ -43,9 +48,10 @@ const _stepTitles = [
   'Officials',
   'Kits',
   'Colours',
+  'Payment',
   'Review & submit',
 ];
-const _countedSteps = 5;
+const _countedSteps = 6;
 
 // Step numbers, so the code reads clearly
 const _clubStep = 0;
@@ -53,6 +59,7 @@ const _statusStep = 1;
 const _officialsStep = 2;
 const _kitsStep = 3;
 const _coloursStep = 4;
+const _paymentStep = 5;
 
 class RegisterTeamScreen extends ConsumerStatefulWidget {
   const RegisterTeamScreen({super.key});
@@ -72,6 +79,7 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
 
   final _clubFormKey = GlobalKey<FormState>();
   final _statusFormKey = GlobalKey<FormState>();
+  final _paymentFormKey = GlobalKey<FormState>();
 
   // Step 1: club details
   final _teamName = TextEditingController();
@@ -103,6 +111,19 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
 
   // Step 5: team colours, suggested from the kits when first opened
   TeamColours? _colours;
+
+  // Step 6: the season fee (2.13c)
+  PaymentMethod _payMethod = PaymentMethod.momo;
+  final _payReference = TextEditingController();
+  final _payAmount = TextEditingController();
+  final _payWhen = TextEditingController();
+  final _payTo = TextEditingController();
+  DateTime? _paidOn;
+  PickedDocument? _proof;
+
+  /// When editing a registration that already has payments, a new one
+  /// is optional.
+  bool _addAnotherPayment = false;
 
   // Review: declaration
   bool _agreed = false;
@@ -168,6 +189,10 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
       _yearFounded,
       _email,
       _lastLeague,
+      _payReference,
+      _payAmount,
+      _payWhen,
+      _payTo,
     ]) {
       controller.dispose();
     }
@@ -231,6 +256,72 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
     final file = await pickDocument(context, allowPhoto: false);
     if (file != null && mounted) setState(() => _letter = file);
   }
+
+  // ---------- Step 6 helpers (payment) ----------
+
+  /// Payments already sent with this registration (when editing).
+  List<Payment> get _sentPayments {
+    final uid = ref.read(authStateProvider).value?.uid;
+    if (_existing == null || uid == null) return const [];
+    return ref.read(clubPaymentsProvider(uid)).value ?? const [];
+  }
+
+  /// A new payment is required unless one is still waiting or confirmed
+  /// (a "not found" one doesn't count).
+  bool get _hasActivePayment => _sentPayments.any((p) => p.isActive);
+
+  bool get _sendsPayment => !_hasActivePayment || _addAnotherPayment;
+
+  Future<void> _pickPaidOn() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _paidOn ?? now,
+      firstDate: DateTime(now.year - 1),
+      lastDate: now,
+      helpText: 'Date paid',
+    );
+    if (picked != null && mounted) setState(() => _paidOn = picked);
+  }
+
+  Future<void> _pickProof() async {
+    try {
+      final file = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1200,
+        maxHeight: 1600,
+        imageQuality: 80,
+      );
+      if (file == null || !mounted) return;
+      final bytes = await file.readAsBytes();
+      if (!mounted) return;
+      if (bytes.length > 1024 * 1024) {
+        AppToast.error(context, 'That image is too large. Choose a smaller one.');
+        return;
+      }
+      setState(() => _proof = PickedDocument(
+            bytes: bytes,
+            name: file.name,
+            isPdf: false,
+          ));
+    } catch (_) {
+      if (mounted) {
+        AppToast.error(context, "Couldn't open that image. Try another one.");
+      }
+    }
+  }
+
+  PaymentDraft get _paymentDraft => PaymentDraft(
+        method: _payMethod,
+        amount: _payMethod == PaymentMethod.before
+            ? null
+            : int.tryParse(_payAmount.text.trim()),
+        reference:
+            _payMethod == PaymentMethod.momo ? _payReference.text : null,
+        paidOn: _payMethod == PaymentMethod.momo ? _paidOn : null,
+        paidWhen: _payMethod == PaymentMethod.cash ? _payWhen.text : null,
+        paidTo: _payMethod == PaymentMethod.cash ? _payTo.text : null,
+      );
 
   Future<void> _pickLicence() async {
     final file = await pickDocument(context, allowPhoto: true);
@@ -325,6 +416,8 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
         return _officials.every((draft) => draft.isComplete);
       case _kitsStep:
         return _kitsComplete;
+      case _paymentStep:
+        return !_sendsPayment || _paymentFormKey.currentState!.validate();
       default:
         return true;
     }
@@ -550,13 +643,33 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
         licenceUrl: licenceUrl,
         licenceIsPdf: licenceIsPdf,
       );
+      // The payment goes in the same batch as the request (2.13c)
+      final payments = ref.read(paymentRepositoryProvider);
+      final sendsPayment = _sendsPayment;
+      final proof = _proof;
+      String? proofUrl;
+      if (sendsPayment && _payMethod == PaymentMethod.momo && proof != null) {
+        proofUrl = await payments.uploadProof(uid: uid, bytes: proof.bytes);
+      }
+      void addPayment(WriteBatch batch) {
+        if (!sendsPayment) return;
+        payments.addInBatch(
+          batch,
+          requestUid: uid,
+          teamName: request.teamName,
+          draft: _paymentDraft,
+          proofUrl: proofUrl,
+        );
+      }
+
       final existing = _existing;
       if (existing == null) {
-        await repository.create(request);
+        await repository.create(request, alsoInBatch: addPayment);
       } else {
         await repository.update(
           request,
           previousNameKey: teamNameKey(existing.teamName),
+          alsoInBatch: addPayment,
         );
       }
 
@@ -661,6 +774,27 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
           enabled: enabled,
           onChanged: (value) => setState(() => _colours = value),
         ),
+      _paymentStep => PaymentStep(
+          formKey: _paymentFormKey,
+          showErrors: _showErrors.contains(_paymentStep),
+          enabled: enabled,
+          method: _payMethod,
+          onMethodChanged: (value) => setState(() => _payMethod = value),
+          reference: _payReference,
+          amount: _payAmount,
+          paidOn: _paidOn,
+          onPickDate: _pickPaidOn,
+          paidWhen: _payWhen,
+          paidTo: _payTo,
+          proof: _proof,
+          onPickProof: _pickProof,
+          onRemoveProof: () => setState(() => _proof = null),
+          sent: _sentPayments,
+          canSkip: _hasActivePayment,
+          addAnother: _addAnotherPayment,
+          onAddAnotherChanged: (value) =>
+              setState(() => _addAnotherPayment = value),
+        ),
       _ => ReviewStep(
           teamName: _teamName.text.trim(),
           shortName: _shortName.text.trim().toUpperCase(),
@@ -671,6 +805,7 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
           logoColor: _logoColor,
           kitSets: _kitSets,
           colours: _colours,
+          payment: _sendsPayment ? _paymentDraft : null,
           officials: _officials,
           logoUrl: _existingLogoUrl,
           competitions: _competitions,
@@ -697,6 +832,11 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
   @override
   Widget build(BuildContext context) {
     final isLast = _step == _stepTitles.length - 1;
+    // Editing: load the payments already sent (shown on the Payment step)
+    final uid = ref.watch(authStateProvider).value?.uid;
+    if (_existing != null && uid != null) {
+      ref.watch(clubPaymentsProvider(uid));
+    }
 
     return PopScope(
       canPop: _step == 0 && !_busy && !_editingFromReview,

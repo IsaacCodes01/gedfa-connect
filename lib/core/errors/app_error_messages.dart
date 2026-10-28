@@ -26,6 +26,12 @@ class PlayerNotPendingException implements Exception {
   const PlayerNotPendingException();
 }
 
+/// The FA tried to confirm a payment that is no longer waiting
+/// (another FA official reviewed it first).
+class PaymentNotWaitingException implements Exception {
+  const PaymentNotWaitingException();
+}
+
 /// This email already has an open invitation.
 class InviteExistsException implements Exception {
   const InviteExistsException();
@@ -43,6 +49,9 @@ String appErrorMessage(Object error) {
   }
   if (error is AlreadyMemberException) {
     return 'This email already belongs to an FA admin or referee.';
+  }
+  if (error is PaymentNotWaitingException) {
+    return 'This payment has already been reviewed. Go back and open it again.';
   }
   if (error is PlayerNotPendingException) {
     return 'This player has already been reviewed or changed. '

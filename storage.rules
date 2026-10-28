@@ -50,6 +50,14 @@ service firebase.storage {
         && isSmallImage();
     }
 
+    // Payment proof: a screenshot of the MoMo message (2.13c)
+    match /districts/{districtId}/payments/{uid}/{fileName} {
+      allow read, delete: if isOwner(uid);
+      allow create: if isOwner(uid)
+        && fileName.matches('proof-[0-9]+[.]jpg')
+        && isSmallImage();
+    }
+
     // Player passport photos: photo-<time>.jpg and thumb-<time>.jpg
     match /districts/{districtId}/teams/{teamId}/players/{playerId}/{fileName} {
       allow read, delete: if isTeamAdminOf(districtId, teamId);

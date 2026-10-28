@@ -5,6 +5,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gedfa_connect/core/constants/approval_status.dart';
 import 'package:gedfa_connect/core/constants/firestore_paths.dart';
+import 'package:gedfa_connect/core/constants/season.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/utils/team_name_key.dart';
 import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
@@ -60,7 +61,8 @@ class TeamRequestRepository {
   /// FA approves [request]. In ONE batch (all or nothing):
   /// 1. the request becomes 'approved' and remembers its team ID,
   /// 2. the team is created from the request's details,
-  /// 3. the club's account becomes the team's admin.
+  /// 3. the club's account becomes the team's admin,
+  /// 4. the club's season fee gets the team ID.
   /// The team ID is the reserved team-name key, e.g. 'gomoa-united-fc'.
   Future<String> approve(TeamRequest request, {required String faUid}) async {
     final teamId = teamNameKey(request.teamName);
@@ -109,6 +111,13 @@ class TeamRequestRepository {
         'createdBy': faUid,
         'createdAt': FieldValue.serverTimestamp(),
       });
+    // The club's season fee now belongs to the team too (2.13c). The
+    // rules only approve a request whose fee has been started.
+    batch.set(
+      _db.doc(FirestorePaths.fee(Season.current, request.uid)),
+      {'teamId': teamId, 'updatedAt': FieldValue.serverTimestamp()},
+      SetOptions(merge: true),
+    );
     // The new team's bell: "Gomoa United FC approved"
     NotificationWriter(_db).forTeamInBatch(
       batch,
@@ -195,6 +204,9 @@ class TeamRequestRepository {
       'teamNameLower': request.teamName.trim().toLowerCase(),
       'nameKey': teamNameKey(request.teamName),
       'agreedToRules': true,
+      // The season this registration is for (its fee must be started
+      // before the FA can approve, 2.13c)
+      'season': Season.current,
       'status': ApprovalStatus.pending.name,
       'rejectionReason': null,
       'updatedAt': FieldValue.serverTimestamp(),
@@ -206,7 +218,12 @@ class TeamRequestRepository {
         'createdAt': FieldValue.serverTimestamp(),
       };
 
-  Future<void> create(TeamRequest request) async {
+  /// [alsoInBatch] adds more writes to the same batch, e.g. the first
+  /// payment (2.13c), so they all arrive together or not at all.
+  Future<void> create(
+    TeamRequest request, {
+    void Function(WriteBatch batch)? alsoInBatch,
+  }) async {
     final uid = request.uid;
     if (!await isNameAvailable(request.teamName, uid: uid)) {
       throw const TeamNameTakenException();
@@ -227,6 +244,7 @@ class TeamRequestRepository {
       teamName: request.teamName.trim(),
       name: request.teamName.trim(),
     );
+    alsoInBatch?.call(batch);
 
     await batch.commit().timeout(_timeout);
   }
@@ -234,6 +252,7 @@ class TeamRequestRepository {
   Future<void> update(
     TeamRequest request, {
     required String previousNameKey,
+    void Function(WriteBatch batch)? alsoInBatch,
   }) async {
     final uid = request.uid;
     final key = teamNameKey(request.teamName);
@@ -249,6 +268,7 @@ class TeamRequestRepository {
         ..delete(_nameRef(previousNameKey))
         ..set(_nameRef(key), _reservation(uid));
     }
+    alsoInBatch?.call(batch);
 
     await batch.commit().timeout(_timeout);
   }

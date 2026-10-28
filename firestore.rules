@@ -382,6 +382,213 @@ service cloud.firestore {
           && request.resource.data.get('hiddenAnnouncements', []).size() <= 30;
       }
 
+      // ---------- Season fee: payments, fees, receipts (2.13c) ----------
+
+      // '2026-27'
+      function isSeason(value) {
+        return value is string && value.matches('^20[0-9]{2}-[0-9]{2}$');
+      }
+
+      // Whole cedis, 1 to the fee (GH₵ 1,000). Must match season.dart.
+      function isFeeAmount(value) {
+        return value is int && value >= 1 && value <= 1000;
+      }
+
+      function paymentDoc(id) {
+        return /databases/$(database)/documents/districts/$(districtId)/payments/$(id);
+      }
+
+      // One club's confirmed total for a season: fees/2026-27_<uid>
+      function feeDoc(season, uid) {
+        return /databases/$(database)/documents/districts/$(districtId)/fees/$(season + '_' + uid);
+      }
+
+      function confirmedSoFar(season, uid) {
+        return exists(feeDoc(season, uid)) ? get(feeDoc(season, uid)).data.confirmed : 0;
+      }
+
+      function isFeeStarted(season, uid) {
+        return confirmedSoFar(season, uid) > 0;
+      }
+
+      // The FA's confirmation adds exactly this payment to the club's total
+      function addsToTotal(season, uid, amount) {
+        return getAfter(feeDoc(season, uid)).data.confirmed
+          == confirmedSoFar(season, uid) + amount;
+      }
+
+      function receiptCounterDoc() {
+        return /databases/$(database)/documents/districts/$(districtId)/settings/receiptCounter;
+      }
+
+      // The number the next receipt gets (1 if no counter yet)
+      function nextReceipt() {
+        return exists(receiptCounterDoc()) ? get(receiptCounterDoc()).data.next : 1;
+      }
+
+      // 14 in season 2026-27 -> 'GEDFA-2026-0014'. Must match payment.dart.
+      function receiptNoFor(n, season) {
+        return 'GEDFA-' + season.split('-')[0] + '-'
+          + (n < 10 ? '000' : (n < 100 ? '00' : (n < 1000 ? '0' : '')))
+          + string(n);
+      }
+
+      // A receipt takes the counter's number; the counter moves on by 1
+      function takesNextReceipt(receiptNo, season) {
+        return receiptNo == receiptNoFor(nextReceipt(), season)
+          && getAfter(receiptCounterDoc()).data.next == nextReceipt() + 1;
+      }
+
+      // What a club sends: waiting for the FA. MoMo needs the transaction
+      // ID, the amount and the date; cash the amount; "already paid"
+      // neither (the FA fills in the amount from its records).
+      function isValidClubPayment(data) {
+        return data.keys().hasOnly([
+            'requestUid', 'teamId', 'teamName', 'season', 'method', 'amount',
+            'reference', 'paidOn', 'paidWhen', 'paidTo', 'proofUrl',
+            'status', 'recordedBy', 'createdBy', 'createdAt'
+          ])
+          && data.requestUid == request.auth.uid
+          && data.createdBy == request.auth.uid
+          && isText(data.teamName, 2, 60)
+          && isSeason(data.season)
+          && data.status == 'waiting'
+          && data.recordedBy == 'club'
+          && data.createdAt == request.time
+          && isOptionalText(data, 'paidWhen', 40)
+          && isOptionalText(data, 'paidTo', 60)
+          && isOptionalText(data, 'proofUrl', 2000)
+          && ((data.method == 'momo'
+                 && isFeeAmount(data.get('amount', null))
+                 && isText(data.get('reference', null), 4, 30)
+                 && data.get('paidOn', null) is timestamp)
+              || (data.method == 'cash'
+                 && isFeeAmount(data.get('amount', null))
+                 && data.get('reference', null) == null)
+              || (data.method == 'before'
+                 && data.get('amount', null) == null
+                 && data.get('reference', null) == null));
+      }
+
+      // Cash the FA received in person: confirmed straight away.
+      function isFaCash(data) {
+        return data.keys().hasOnly([
+            'requestUid', 'teamId', 'teamName', 'season', 'method', 'amount',
+            'paidWhen', 'status', 'receiptNo', 'recordedBy',
+            'createdBy', 'createdAt', 'reviewedBy', 'reviewedAt'
+          ])
+          && data.requestUid is string
+          && isText(data.teamName, 2, 60)
+          && isSeason(data.season)
+          && data.method == 'cash'
+          && isFeeAmount(data.amount)
+          && isOptionalText(data, 'paidWhen', 40)
+          && data.status == 'confirmed'
+          && data.recordedBy == 'fa'
+          && data.createdBy == request.auth.uid
+          && data.reviewedBy == request.auth.uid
+          && data.createdAt == request.time
+          && data.reviewedAt == request.time
+          && takesNextReceipt(data.receiptNo, data.season)
+          && addsToTotal(data.season, data.requestUid, data.amount);
+      }
+
+      // The FA confirms a waiting payment: receipt, amount (kept, or filled
+      // in for "already paid"), and the club's total goes up by it.
+      function isPaymentConfirmation() {
+        let before = resource.data;
+        let after = request.resource.data;
+        return after.status == 'confirmed'
+          && after.diff(before).affectedKeys()
+               .hasOnly(['status', 'amount', 'receiptNo', 'reviewedBy', 'reviewedAt'])
+          && after.reviewedBy == request.auth.uid
+          && after.reviewedAt == request.time
+          && isFeeAmount(after.amount)
+          && (before.get('amount', null) == null || after.amount == before.amount)
+          && takesNextReceipt(after.receiptNo, before.season)
+          && addsToTotal(before.season, before.requestUid, after.amount);
+      }
+
+      // Payments are never rejected. "Not found" is only for an ID that
+      // isn't on the FA's statement, or details that are false.
+      function isPaymentNotFound() {
+        let after = request.resource.data;
+        return after.status == 'notFound'
+          && after.diff(resource.data).affectedKeys()
+               .hasOnly(['status', 'reason', 'reviewedBy', 'reviewedAt'])
+          && isText(after.reason, 5, 300)
+          && after.reviewedBy == request.auth.uid
+          && after.reviewedAt == request.time;
+      }
+
+      // The FA fixes the amount of cash it recorded itself (a typing
+      // mistake). The receipt stays; the club's total changes by the
+      // difference.
+      function isCashCorrection() {
+        let before = resource.data;
+        let after = request.resource.data;
+        return before.status == 'confirmed'
+          && before.recordedBy == 'fa'
+          && after.diff(before).affectedKeys()
+               .hasOnly(['amount', 'editedBy', 'editedAt'])
+          && isFeeAmount(after.amount)
+          && after.editedBy == request.auth.uid
+          && after.editedAt == request.time
+          && getAfter(feeDoc(before.season, before.requestUid)).data.confirmed
+               == confirmedSoFar(before.season, before.requestUid)
+                  - before.amount + after.amount;
+      }
+
+      match /payments/{paymentId} {
+        allow get: if isFaAdmin()
+          || isOwner(resource.data.requestUid)
+          || (resource.data.get('teamId', null) != null
+              && isTeamAdminOf(resource.data.teamId));
+        allow list: if isFaAdmin() || resource.data.requestUid == request.auth.uid;
+
+        // The club sends a payment: with its registration (same batch),
+        // or later from its team.
+        allow create: if hasConfirmedEmail()
+          && isValidClubPayment(request.resource.data)
+          && existsAfter(teamRequestDoc(request.auth.uid))
+          && (request.resource.data.get('teamId', null) == null
+              || isTeamAdminOf(request.resource.data.teamId));
+
+        allow create: if isFaAdmin() && isFaCash(request.resource.data);
+
+        allow update: if isFaAdmin()
+          && ((resource.data.status == 'waiting'
+                && (isPaymentConfirmation() || isPaymentNotFound()))
+              || isCashCorrection());
+      }
+
+      // fees/{season}_{uid}: written only by the FA, in the same
+      // transaction as each confirmation (and the approval adds teamId).
+      // The club reads its own, even before it exists.
+      match /fees/{feeId} {
+        allow get: if isFaAdmin() || feeId.split('_')[1] == request.auth.uid;
+        allow list: if isFaAdmin();
+        allow create, update: if isFaAdmin()
+          && request.resource.data.keys()
+               .hasOnly(['season', 'requestUid', 'teamName', 'teamId', 'confirmed', 'updatedAt'])
+          && isSeason(request.resource.data.season)
+          && feeId == request.resource.data.season + '_' + request.resource.data.requestUid
+          && request.resource.data.confirmed is int
+          && request.resource.data.confirmed >= 0;
+      }
+
+      // settings/receiptCounter: the next receipt number. Only moves
+      // forward, one at a time, inside the FA's transactions.
+      match /settings/receiptCounter {
+        allow get: if isFaAdmin();
+        allow create: if isFaAdmin()
+          && request.resource.data.keys().hasOnly(['next'])
+          && request.resource.data.next == 2;
+        allow update: if isFaAdmin()
+          && request.resource.data.keys().hasOnly(['next'])
+          && request.resource.data.next == resource.data.next + 1;
+      }
+
       // ---------- teamRequests/{uid} ----------
 
       // Home, away and goalkeeper kits, plus an optional third kit and
@@ -438,9 +645,10 @@ service cloud.firestore {
             'rejectionReason', 'createdAt', 'updatedAt',
             'reviewedAt', 'reviewedBy', 'teamId',
             'clubStatus', 'lastLeague', 'letterUrl', 'licenceUrl', 'licenceType',
-            'juvenileKits', 'colours'
+            'juvenileKits', 'colours', 'season'
           ])
           && isText(data.teamName, 2, 60)
+          && (data.get('season', null) == null || isSeason(data.season))
           && data.teamNameLower == data.teamName.lower()
           && data.nameKey is string
           && data.nameKey.matches('^[a-z0-9-]{2,60}$')
@@ -488,7 +696,10 @@ service cloud.firestore {
           && after.teamId == resource.data.nameKey
           && getAfter(teamDoc(after.teamId)).data.requestUid == uid
           && getAfter(userDoc(uid)).data.role == 'teamAdmin'
-          && getAfter(userDoc(uid)).data.teamId == after.teamId;
+          && getAfter(userDoc(uid)).data.teamId == after.teamId
+          // The season fee must be started: at least one payment
+          // confirmed (2.13c). Requests from before 2.13c count as 2026-27.
+          && isFeeStarted(resource.data.get('season', '2026-27'), uid);
       }
 
       // FA rejects: status and a real reason (10 to 500 characters).
