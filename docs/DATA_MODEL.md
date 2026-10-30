@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.4, matches the rules after step 2.13c-2 (28 Oct 2026)
+**Status:** v2.5, matches the rules after step 2.13d (30 Oct 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -358,19 +358,25 @@ Stops the same person being registered twice, with any team.
 - Any team admin may `get` a single key, so the app can say "already registered with your team" or "already registered with another team" before saving. Listing keys is never allowed.
 - Same name with a **different** date of birth is allowed (two different people). Same name **and** same date of birth is blocked; an FA override for real namesakes is an open question (Section 7).
 
-### 2.6 `settings/league` — configurable league rules
+### 2.6 `settings/league` — league settings (2.13d)
 
-A single document. Values are placeholders until confirmed with GEDFA.
+A single document, edited in FA › More › League settings. Missing fields use the defaults (the app works before the FA saves anything).
 
-| Field                | Type      | Start value                             |
-| -------------------- | --------- | --------------------------------------- |
-| `maxSquadSize`     | number    | 30 per competition (agreed 18 Oct 2026) |
-| `matchdayStarters` | number    | 11                                      |
-| `matchdaySubs`     | number    | 7*(to confirm)*                       |
-| `registrationOpen` | boolean   | `true`                                |
-| `updatedAt`        | timestamp |                                         |
+| Field                    | Type    | Default        | Who may change it | Notes |
+| ------------------------ | ------- | -------------- | ----------------- | ----- |
+| `teamRegistrationOpen`   | boolean | `true`         | any FA admin      | Closed: no new team requests (rules). Existing requests can still be edited |
+| `playerRegistrationOpen` | boolean | `true`         | any FA admin      | Closed: no new players (rules). Rejected players can still be corrected |
+| `maxSquadSize`           | number  | 30 (11–40)     | any FA admin      | Per competition |
+| `matchdaySquad`          | number  | 16 (11–23)     | any FA admin      | Phase 3 |
+| `matchdaySubs`           | number  | 5 (0–12)       | any FA admin      | Phase 3 |
+| `minPlayers`             | number  | 7 (7–11)       | any FA admin      | Team sheet red until reached (Phase 3) |
+| `season`                 | string  | `2026-27`      | **chairman**      | A new season starts a new fee for every team |
+| `fee`                    | number  | 1000           | **chairman**      | GH₵ per team per season; the rules cap payments at it |
+| `momoNumber`             | string  | `0244-***-***` | **chairman**      | Shown on the Payment step |
+| `updatedBy`, `updatedAt` |         |                |                   | |
 
-Readable by any signed-in user; writable only by FA admins.
+- Readable by any signed-in user. Registration is switched **by hand** (no closing date). Tie-breakers: as the Premier League (Phase 4).
+- Every save also writes **`settingsLog/{id}`** `{ by, byName, at, changes: { field: { from, to } } }` (FA only, never edited) and, when registration opens or closes, a `registrationChanged` note in the FA's bell, so every official sees who did it.
 
 ### 2.7 `settings/playerCounter` — player ID numbering
 
@@ -586,6 +592,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 30 Oct 2026 | v2.5 (2.13d): `settings/league` rules and fields (registration switches, squad numbers, season / fee / MoMo by the chairman), `settingsLog`, `registrationChanged` notification; the payment cap follows the fee. 205 tests. |
 | 28 Oct 2026 | v2.4 (2.13c-2): payments after approval; notification kinds `paymentConfirmed`, `paymentNotFound`, `feeReminder`, `paymentSent`; `teams.requestUid` used for the fee. 195 tests. |
 | 28 Oct 2026 | v2.3.1: "not found" sends a pending registration back; FA can correct recorded cash (`editedBy`, `editedAt`); FA team-request notifications grouped into one a day. 190 tests. |
 | 27 Oct 2026 | v2.3 (2.13c-1): `payments`, `fees`, `settings/receiptCounter`; `teamRequests.season`; approval needs a confirmed payment. Storage: payment proof. 187 tests. |

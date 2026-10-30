@@ -11,6 +11,8 @@ import 'package:gedfa_connect/core/utils/passport_photo.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
+import 'package:gedfa_connect/features/league/data/league_settings_repository.dart';
+import 'package:gedfa_connect/features/league/domain/league_settings.dart';
 import 'package:gedfa_connect/features/players/data/player_repository.dart';
 import 'package:gedfa_connect/features/players/domain/player.dart';
 import 'package:gedfa_connect/features/players/domain/position.dart';
@@ -19,8 +21,6 @@ import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/teams/domain/team.dart';
 
-/// Squad limit per competition. Later read from `settings/league`.
-const maxSquadSize = 30;
 
 /// Youngest allowed age for the Division side.
 const _minDivisionAge = 13;
@@ -175,10 +175,20 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
       thumbUrl: existing?.thumbUrl,
     );
 
-    if (existing == null && squad.length >= maxSquadSize) {
+    // The FA's league settings (2.13d): the window and the squad size
+    final league = ref.read(leagueSettingsProvider).value ??
+        const LeagueSettings();
+    if (existing == null && !league.playerRegistrationOpen) {
       AppToast.warning(
         context,
-        'Your squad is full ($maxSquadSize players).',
+        'Player registration is closed. The FA will open it again.',
+      );
+      return;
+    }
+    if (existing == null && squad.length >= league.maxSquadSize) {
+      AppToast.warning(
+        context,
+        'Your squad is full (${league.maxSquadSize} players).',
       );
       return;
     }

@@ -7,9 +7,11 @@ import 'package:gedfa_connect/core/constants/approval_status.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/initials.dart';
+import 'package:gedfa_connect/core/widgets/app_toast.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/notification_bell.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
+import 'package:gedfa_connect/features/league/data/league_settings_repository.dart';
 import 'package:gedfa_connect/features/notifications/presentation/pinned_announcement_card.dart';
 import 'package:gedfa_connect/features/players/data/player_repository.dart';
 import 'package:gedfa_connect/features/players/presentation/widgets/position_rows.dart';
@@ -37,7 +39,19 @@ class _TeamHomeScreenState extends ConsumerState<TeamHomeScreen> {
     super.dispose();
   }
 
-  void _addPlayer() => context.go(Routes.addPlayer);
+  void _addPlayer() {
+    // The FA can close player registration (2.13d)
+    final open =
+        ref.read(leagueSettingsProvider).value?.playerRegistrationOpen ?? true;
+    if (!open) {
+      AppToast.warning(
+        context,
+        'Player registration is closed. The FA will open it again.',
+      );
+      return;
+    }
+    context.go(Routes.addPlayer);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,6 +97,10 @@ class _TeamHomeScreenState extends ConsumerState<TeamHomeScreen> {
             .length ??
         0;
 
+    final playersOpen =
+        ref.watch(leagueSettingsProvider).value?.playerRegistrationOpen ??
+            true;
+
     return Scaffold(
       appBar: GedfaAppBar(
         title: team.name,
@@ -103,14 +121,31 @@ class _TeamHomeScreenState extends ConsumerState<TeamHomeScreen> {
         actions: const [NotificationBell()],
       ),
       floatingActionButton: isDivision && squadCount > 0
-          ? FloatingActionButton.extended(
-              onPressed: _addPlayer,
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('Add player'),
-            )
+          ? playersOpen
+              ? FloatingActionButton.extended(
+                  onPressed: _addPlayer,
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('Add player'),
+                )
+              // Board L3: greyed out; a tap explains why
+              : FloatingActionButton.extended(
+                  onPressed: _addPlayer,
+                  elevation: 0,
+                  backgroundColor:
+                      Theme.of(context).colorScheme.surfaceContainerHighest,
+                  foregroundColor:
+                      Theme.of(context).colorScheme.onSurfaceVariant,
+                  icon: const Icon(Icons.lock_outline_rounded),
+                  label: const Text('Add player (closed)'),
+                )
           : null,
       body: Column(
         children: [
+          if (!playersOpen)
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 14, 16, 0),
+              child: ResponsiveCenter(child: _ClosedBanner()),
+            ),
           if (team.hasBoth)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
@@ -410,6 +445,54 @@ class _StatusTile extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Board L3: "Player registration is closed."
+class _ClosedBanner extends StatelessWidget {
+  const _ClosedBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF3D3410) : const Color(0xFFFFF6CC);
+    final ink = isDark ? const Color(0xFFF5D25B) : const Color(0xFF5C4700);
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.lock_outline_rounded, size: 18, color: ink),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text.rich(
+              const TextSpan(
+                children: [
+                  TextSpan(
+                    text: 'Player registration is closed. ',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  TextSpan(
+                    text: 'You can still correct players the FA rejected. '
+                        'New players can be added when the FA opens it again.',
+                  ),
+                ],
+              ),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    fontSize: 12.5,
+                    height: 1.5,
+                    color: ink,
+                  ),
+            ),
+          ),
+        ],
       ),
     );
   }

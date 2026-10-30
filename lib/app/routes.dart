@@ -25,6 +25,9 @@ class Routes {
 
   /// FA: what every team has paid this season, and one team (2.13c).
   static const adminFees = '/admin/more/fees';
+
+  /// FA: registration switches, squad numbers, season and fee (2.13d).
+  static const adminLeagueSettings = '/admin/more/league';
   static String adminTeamFee(String teamId) => '$adminFees/team/$teamId';
   static const adminInvite = '/admin/more/people/invite';
   static String adminInviteReady(String email) =>

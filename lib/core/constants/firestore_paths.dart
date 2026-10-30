@@ -62,6 +62,9 @@ class FirestorePaths {
 
   static const leagueSettings = '$district/settings/league';
 
+  /// Who changed which league setting, and when (2.13d). FA only.
+  static const settingsLog = '$district/settingsLog';
+
   /// The next player-ID number: `{ next: 43 }`. FA only.
   static const playerCounter = '$district/settings/playerCounter';
 }

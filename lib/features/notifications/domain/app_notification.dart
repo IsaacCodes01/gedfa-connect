@@ -14,7 +14,8 @@ enum NotificationKind {
   playersSubmitted,
   playersResubmitted,
   inviteAccepted,
-  paymentSent; // a team added a payment (2.13c)
+  paymentSent, // a team added a payment (2.13c)
+  registrationChanged; // an FA official opened or closed registration
 
   static NotificationKind? fromString(String? value) {
     for (final kind in values) {
@@ -87,6 +88,7 @@ class AppNotification {
         NotificationKind.paymentSent => people == 1
             ? 'Payment from $teamName'
             : '$people payments from $teamName',
+        NotificationKind.registrationChanged => 'Registration changed',
       };
 
   String get body => switch (kind) {
@@ -116,6 +118,8 @@ class AppNotification {
               "GEDFA's MoMo and add the payment in More › Season fee.",
         NotificationKind.paymentSent =>
           '$namesText. Confirm it in More › Season fees.',
+        NotificationKind.registrationChanged =>
+          '$namesText. See More › League settings.',
       };
 
   static AppNotification? fromMap(String id, Map<String, dynamic> data) {

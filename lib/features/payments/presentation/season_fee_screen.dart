@@ -28,7 +28,7 @@ class SeasonFeeScreen extends ConsumerWidget {
     final uid =
         team?.requestUid ?? ref.watch(authStateProvider).value?.uid ?? '';
     final summary = ref.watch(feeSummaryProvider(uid)).value ??
-        const FeeSummary(confirmed: 0, fee: Season.fee);
+        FeeSummary(confirmed: 0, fee: Season.fee);
     final paymentsAsync = ref.watch(clubPaymentsProvider(uid));
 
     return Scaffold(

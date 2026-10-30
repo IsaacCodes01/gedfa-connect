@@ -59,8 +59,9 @@ class PaymentRepository {
     required PaymentDraft draft,
     String? teamId,
     String? proofUrl,
-    String season = Season.current,
+    String? season,
   }) {
+    season ??= Season.current; // live, from the league settings
     String? blankToNull(String? value) {
       final trimmed = value?.trim();
       return (trimmed == null || trimmed.isEmpty) ? null : trimmed;
@@ -118,7 +119,8 @@ class PaymentRepository {
   }
 
   /// FA: every club's confirmed total this season, by club account.
-  Stream<Map<String, int>> watchSeasonTotals({String season = Season.current}) {
+  Stream<Map<String, int>> watchSeasonTotals({String? season}) {
+    season ??= Season.current; // live, from the league settings
     return _db
         .collection(FirestorePaths.fees)
         .where('season', isEqualTo: season)
@@ -131,7 +133,8 @@ class PaymentRepository {
   }
 
   /// FA: every payment still waiting this season (the "to confirm" counts).
-  Stream<List<Payment>> watchWaiting({String season = Season.current}) {
+  Stream<List<Payment>> watchWaiting({String? season}) {
+    season ??= Season.current; // live, from the league settings
     return _payments
         .where('season', isEqualTo: season)
         .where('status', isEqualTo: PaymentStatus.waiting.name)
@@ -164,8 +167,9 @@ class PaymentRepository {
   /// Two equality filters only, so Firestore needs no extra index.
   Stream<List<Payment>> watchForClub(
     String requestUid, {
-    String season = Season.current,
+    String? season,
   }) {
+    season ??= Season.current; // live, from the league settings
     return _payments
         .where('requestUid', isEqualTo: requestUid)
         .where('season', isEqualTo: season)
@@ -183,8 +187,9 @@ class PaymentRepository {
   /// The confirmed total so far (0 when nothing is confirmed yet).
   Stream<FeeSummary> watchSummary(
     String requestUid, {
-    String season = Season.current,
+    String? season,
   }) {
+    season ??= Season.current; // live, from the league settings
     return _feeRef(season, requestUid).snapshots().map(
           (snapshot) => FeeSummary(
             confirmed:
@@ -374,16 +379,19 @@ class PaymentRepository {
     required String faUid,
     String? teamId,
     String? note,
-    String season = Season.current,
+    String? season,
   }) {
+    // Live, from the league settings. A new name, so the transaction
+    // below sees a value that can't be null.
+    final seasonKey = season ?? Season.current;
     final ref = _payments.doc();
     final trimmed = note?.trim();
 
     return _db.runTransaction<String>((tx) async {
-      final receipt = await _nextReceipt(tx, season);
+      final receipt = await _nextReceipt(tx, seasonKey);
       _addToTotal(
         tx,
-        season: season,
+        season: seasonKey,
         requestUid: requestUid,
         teamName: teamName,
         teamId: teamId,
@@ -393,7 +401,7 @@ class PaymentRepository {
         'requestUid': requestUid,
         'teamId': teamId,
         'teamName': teamName,
-        'season': season,
+        'season': seasonKey,
         'method': PaymentMethod.cash.name,
         'amount': amount,
         'paidWhen': (trimmed == null || trimmed.isEmpty) ? null : trimmed,

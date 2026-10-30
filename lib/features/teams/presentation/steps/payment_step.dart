@@ -351,7 +351,7 @@ class _FeeCard extends StatelessWidget {
   const _FeeCard();
 
   Future<void> _copy(BuildContext context) async {
-    await Clipboard.setData(const ClipboardData(text: Season.momoNumber));
+    await Clipboard.setData(ClipboardData(text: Season.momoNumber));
     if (context.mounted) AppToast.success(context, 'Number copied.');
   }
 

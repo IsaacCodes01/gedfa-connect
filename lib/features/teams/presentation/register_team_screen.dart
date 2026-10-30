@@ -17,6 +17,7 @@ import 'package:gedfa_connect/core/utils/team_name_key.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
+import 'package:gedfa_connect/features/league/data/league_settings_repository.dart';
 import 'package:gedfa_connect/features/payments/data/payment_repository.dart';
 import 'package:gedfa_connect/features/payments/domain/payment.dart';
 import 'package:gedfa_connect/features/teams/data/team_request_repository.dart';
@@ -532,6 +533,16 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
   Future<void> _submit() async {
     if (!_agreed) {
       AppToast.warning(context, 'Tick the declaration to submit.');
+      return;
+    }
+    // The FA can close team registration (2.13d). Edits stay possible.
+    final open =
+        ref.read(leagueSettingsProvider).value?.teamRegistrationOpen ?? true;
+    if (_existing == null && !open) {
+      AppToast.warning(
+        context,
+        'Team registration is closed. The FA will open it again.',
+      );
       return;
     }
     if (!_isOnline) {

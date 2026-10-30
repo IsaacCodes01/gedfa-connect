@@ -9,6 +9,7 @@ import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/core/utils/initials.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/auth/presentation/widgets/auth_widgets.dart';
+import 'package:gedfa_connect/features/league/data/league_settings_repository.dart';
 import 'package:gedfa_connect/features/people/data/people_repository.dart';
 import 'package:gedfa_connect/features/people/presentation/invite_accept_view.dart';
 import 'package:gedfa_connect/features/teams/data/team_request_repository.dart';
@@ -166,15 +167,18 @@ class _ErrorCard extends StatelessWidget {
 
 // ---------- No request yet ----------
 
-class _IntroCard extends StatelessWidget {
+class _IntroCard extends ConsumerWidget {
   const _IntroCard({required this.name});
 
   final String? name;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final textTheme = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
+    // The FA can close team registration (2.13d, board L2)
+    final open =
+        ref.watch(leagueSettingsProvider).value?.teamRegistrationOpen ?? true;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -204,36 +208,96 @@ class _IntroCard extends StatelessWidget {
               textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
         ),
         const SizedBox(height: 20),
-        const _HowStep(
-          number: 1,
-          title: 'Register your team',
-          text: 'Club, officials, kits and colours · about 5 minutes',
-        ),
-        const SizedBox(height: 14),
-        const _HowStep(
-          number: 2,
-          title: 'FA review',
-          text: 'The GEDFA office checks and approves your team',
-        ),
-        const SizedBox(height: 14),
-        const _HowStep(
-          number: 3,
-          title: 'Build your squad',
-          text: 'Add players once your team is approved',
-        ),
-        const SizedBox(height: 22),
-        FilledButton(
-          onPressed: () => context.go(Routes.registerTeam),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('Register your team'),
-              SizedBox(width: 8),
-              Icon(Icons.arrow_forward_rounded, size: 20),
-            ],
+        if (!open)
+          const _RegistrationClosed()
+        else ...[
+          const _HowStep(
+            number: 1,
+            title: 'Register your team',
+            text: 'Club, officials, kits and colours · about 5 minutes',
           ),
-        ),
+          const SizedBox(height: 14),
+          const _HowStep(
+            number: 2,
+            title: 'FA review',
+            text: 'The GEDFA office checks and approves your team',
+          ),
+          const SizedBox(height: 14),
+          const _HowStep(
+            number: 3,
+            title: 'Build your squad',
+            text: 'Add players once your team is approved',
+          ),
+          const SizedBox(height: 22),
+          FilledButton(
+            onPressed: () => context.go(Routes.registerTeam),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Register your team'),
+                SizedBox(width: 8),
+                Icon(Icons.arrow_forward_rounded, size: 20),
+              ],
+            ),
+          ),
+        ],
       ],
+    );
+  }
+}
+
+/// Board L2: "Team registration is closed", with a greyed-out button.
+class _RegistrationClosed extends StatelessWidget {
+  const _RegistrationClosed();
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final goldBg = isDark ? const Color(0xFF3D3410) : const Color(0xFFFFF6CC);
+    final gold = isDark ? const Color(0xFFF5D25B) : const Color(0xFF5C4700);
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: scheme.outline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: CircleAvatar(
+              radius: 28,
+              backgroundColor: goldBg,
+              child: Icon(Icons.lock_outline_rounded, size: 28, color: gold),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Team registration is closed',
+            textAlign: TextAlign.center,
+            style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            "The FA opens registration before the season. You'll see an "
+            'announcement in the bell, and this button appears here.',
+            textAlign: TextAlign.center,
+            style: textTheme.bodyMedium?.copyWith(
+              height: 1.5,
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 14),
+          const FilledButton(
+            onPressed: null,
+            child: Text('Register your team (closed)'),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -53,7 +53,7 @@ class FaPaymentCard extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
     final greens = _greens(context);
     final summary = ref.watch(feeSummaryProvider(requestUid)).value ??
-        const FeeSummary(confirmed: 0, fee: Season.fee);
+        FeeSummary(confirmed: 0, fee: Season.fee);
     final paymentsAsync = ref.watch(clubPaymentsProvider(requestUid));
     final payments = paymentsAsync.value ?? const <Payment>[];
     final firstWaiting = payments.indexWhere((p) => p.isWaiting);

@@ -1,4 +1,4 @@
-// Security rules tests for GEDFA Connect (steps 1.7 to 2.13c).
+// Security rules tests for GEDFA Connect (steps 1.7 to 2.13d).
 //
 // Run while the emulators are running:
 //   cd test/rules
@@ -973,6 +973,84 @@ describe('Season fee: the FA', () => {
       await deleteDoc(doc(context.firestore(), `${D}/fees/2026-27_applicant`));
     });
     await assertFails(approve(dbAs('fa1')));
+  });
+});
+
+// ---------- League settings (2.13d) ----------
+
+const LEAGUE = `${D}/settings/league`;
+
+function saveLeague(db, fields, by) {
+  return setDoc(doc(db, LEAGUE), {
+    ...fields, updatedBy: by, updatedAt: serverTimestamp(),
+  }, { merge: true });
+}
+
+async function seedLeague(fields) {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), LEAGUE), fields);
+  });
+}
+
+describe('League settings', () => {
+  it('everyone signed in can read them', async () => {
+    await seedLeague({ maxSquadSize: 30 });
+    await assertSucceeds(getDoc(doc(dbAs('admin1'), LEAGUE)));
+  });
+
+  it('any FA official can open or close registration and set squad numbers', async () => {
+    await assertSucceeds(saveLeague(dbAs('fa1'),
+      { teamRegistrationOpen: false, playerRegistrationOpen: false, maxSquadSize: 28 }, 'fa1'));
+  });
+
+  it('squad numbers stay in range', async () => {
+    await assertFails(saveLeague(dbAs('fa1'), { maxSquadSize: 60 }, 'fa1'));
+    await assertFails(saveLeague(dbAs('fa1'), { minPlayers: 5 }, 'fa1'));
+  });
+
+  it('only the chairman changes the season, fee and MoMo number', async () => {
+    await assertFails(saveLeague(dbAs('fa1'), { fee: 1200 }, 'fa1'));
+    await assertFails(saveLeague(dbAs('fa1'), { momoNumber: '0244 000 111' }, 'fa1'));
+    await assertSucceeds(saveLeague(dbAs('chair'), { fee: 1200, momoNumber: '0244 000 111' }, 'chair'));
+  });
+
+  it('a team admin cannot change them', async () => {
+    await assertFails(saveLeague(dbAs('admin1'), { playerRegistrationOpen: true }, 'admin1'));
+  });
+
+  it('the history: the FA writes its own lines, nobody edits them', async () => {
+    const entry = (by) => ({ by, byName: 'Kofi', at: serverTimestamp(), changes: { fee: { from: 1000, to: 1200 } } });
+    await assertSucceeds(setDoc(doc(dbAs('fa1'), `${D}/settingsLog/h1`), entry('fa1')));
+    await assertFails(setDoc(doc(dbAs('fa1'), `${D}/settingsLog/h2`), entry('chair')));
+    await assertFails(setDoc(doc(dbAs('admin1'), `${D}/settingsLog/h3`), entry('admin1')));
+    await assertFails(updateDoc(doc(dbAs('fa1'), `${D}/settingsLog/h1`), { byName: 'Someone' }));
+  });
+
+  it('team registration closed: no new requests', async () => {
+    await seedLeague({ teamRegistrationOpen: false });
+    await assertFails(sendTeamRequest(dbAs('newbie'), 'newbie'));
+  });
+
+  it('team registration closed: a club already registered can still edit', async () => {
+    await sendTeamRequest(dbAs('newbie'), 'newbie');
+    await seedLeague({ teamRegistrationOpen: false });
+    await assertSucceeds(updateDoc(doc(dbAs('newbie'), `${D}/teamRequests/newbie`), {
+      town: 'Afransi Junction', updatedAt: serverTimestamp(),
+    }));
+  });
+
+  it('player registration closed: no new players', async () => {
+    await seedLeague({ playerRegistrationOpen: false });
+    await assertFails(addPlayer(dbAs('admin1'), 'x1', playerData({
+      fullName: 'Kofi Mensah', playerKey: 'kofi-mensah_2003-05-01', jerseyNo: 11,
+    })));
+  });
+
+  it("the fee comes from the settings (here GH₵ 1,200)", async () => {
+    await seedLeague({ fee: 1200 });
+    await sendTeamRequest(dbAs('newbie'), 'newbie');
+    await assertSucceeds(sendPayment(dbAs('newbie'), 'big', { amount: 1100 }));
+    await assertFails(sendPayment(dbAs('newbie'), 'bigger', { amount: 1300 }));
   });
 });
 

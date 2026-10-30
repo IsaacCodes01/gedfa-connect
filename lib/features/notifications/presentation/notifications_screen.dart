@@ -249,6 +249,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       NotificationKind.feeReminder => (_Look.fa, Routes.teamFee),
       NotificationKind.paymentSent =>
         (_Look.team, Routes.adminTeamFee(n.teamId)),
+      NotificationKind.registrationChanged =>
+        (_Look.fa, Routes.adminLeagueSettings),
     };
     return _Item(
       look: look,

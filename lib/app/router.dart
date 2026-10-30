@@ -25,6 +25,7 @@ import 'package:gedfa_connect/features/auth/presentation/sign_up_screen.dart';
 import 'package:gedfa_connect/features/teams/presentation/welcome_screen.dart';
 import 'package:gedfa_connect/features/teams/presentation/register_team_screen.dart';
 import 'package:gedfa_connect/features/teams/presentation/team_home_screen.dart';
+import 'package:gedfa_connect/features/league/presentation/league_settings_screen.dart';
 import 'package:gedfa_connect/features/payments/presentation/add_payment_screen.dart';
 import 'package:gedfa_connect/features/payments/presentation/fa_fees_screen.dart';
 import 'package:gedfa_connect/features/payments/presentation/fa_team_fee_screen.dart';
@@ -174,6 +175,11 @@ final routerProvider = Provider<GoRouter>((ref) {
                         ),
                       ),
                     ],
+                  ),
+                  // FA only: League settings (2.13d). Inside the More tab.
+                  GoRoute(
+                    path: 'league',
+                    builder: (_, _) => const LeagueSettingsScreen(),
                   ),
                   // FA only: Season fees (2.13c). Inside the More tab.
                   GoRoute(

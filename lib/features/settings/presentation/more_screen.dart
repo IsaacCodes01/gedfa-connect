@@ -52,6 +52,12 @@ class MoreScreen extends ConsumerWidget {
                         onTap: () => context.go(Routes.adminAnnouncements),
                       ),
                       SettingsTile(
+                        icon: Icons.tune_rounded,
+                        title: 'League settings',
+                        subtitle: 'Registration, squad numbers, season and fee',
+                        onTap: () => context.go(Routes.adminLeagueSettings),
+                      ),
+                      SettingsTile(
                         icon: Icons.payments_outlined,
                         title: 'Season fees',
                         subtitle: 'What each team has paid this season',
