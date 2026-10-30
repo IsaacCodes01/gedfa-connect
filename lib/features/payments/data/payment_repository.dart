@@ -7,6 +7,8 @@ import 'package:gedfa_connect/core/constants/firestore_paths.dart';
 import 'package:gedfa_connect/core/constants/season.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
+import 'package:gedfa_connect/features/notifications/data/notification_writer.dart';
+import 'package:gedfa_connect/features/notifications/domain/app_notification.dart';
 import 'package:gedfa_connect/features/payments/domain/payment.dart';
 import 'package:gedfa_connect/features/teams/data/team_request_repository.dart';
 
@@ -82,6 +84,80 @@ class PaymentRepository {
       'createdBy': requestUid,
       'createdAt': FieldValue.serverTimestamp(),
     });
+  }
+
+  /// A team adds a payment after approval (More › Season fee). The FA's
+  /// bell hears about it in the same batch: "Payment from Golden Unity".
+  Future<void> addForTeam({
+    required String requestUid,
+    required String teamId,
+    required String teamName,
+    required PaymentDraft draft,
+    String? proofUrl,
+  }) {
+    final batch = _db.batch();
+    addInBatch(
+      batch,
+      requestUid: requestUid,
+      teamId: teamId,
+      teamName: teamName,
+      draft: draft,
+      proofUrl: proofUrl,
+    );
+    final amount = draft.amount;
+    NotificationWriter(_db).forFaInBatch(
+      batch,
+      kind: NotificationKind.paymentSent,
+      teamId: teamId,
+      teamName: teamName,
+      name: amount == null
+          ? 'Paid before the app (amount from your records)'
+          : '${cedis(amount)} · ${draft.method.shortLabel}',
+    );
+    return batch.commit().timeout(_timeout);
+  }
+
+  /// FA: every club's confirmed total this season, by club account.
+  Stream<Map<String, int>> watchSeasonTotals({String season = Season.current}) {
+    return _db
+        .collection(FirestorePaths.fees)
+        .where('season', isEqualTo: season)
+        .snapshots()
+        .map((snapshot) => {
+              for (final doc in snapshot.docs)
+                (doc.data()['requestUid'] as String? ?? ''):
+                    (doc.data()['confirmed'] as num?)?.toInt() ?? 0,
+            });
+  }
+
+  /// FA: every payment still waiting this season (the "to confirm" counts).
+  Stream<List<Payment>> watchWaiting({String season = Season.current}) {
+    return _payments
+        .where('season', isEqualTo: season)
+        .where('status', isEqualTo: PaymentStatus.waiting.name)
+        .snapshots()
+        .map((snapshot) => [
+              for (final doc in snapshot.docs)
+                Payment.fromMap(doc.id, doc.data()),
+            ]);
+  }
+
+  /// FA: a reminder in the team's bell, "GH₵ 400 left". One a day at
+  /// most: a second reminder on the same day updates the first.
+  Future<void> sendReminder({
+    required String teamId,
+    required String teamName,
+    required int left,
+  }) {
+    final batch = _db.batch();
+    NotificationWriter(_db).forTeamInBatch(
+      batch,
+      kind: NotificationKind.feeReminder,
+      teamId: teamId,
+      teamName: teamName,
+      name: cedis(left),
+    );
+    return batch.commit().timeout(_timeout);
   }
 
   /// One club's payments for [season], newest first.
@@ -196,6 +272,17 @@ class PaymentRepository {
         'reviewedBy': faUid,
         'reviewedAt': FieldValue.serverTimestamp(),
       });
+      // An approved team hears about it: "GH₵ 400 · receipt GEDFA-…"
+      final teamId = payment.teamId;
+      if (teamId != null) {
+        NotificationWriter(_db).forTeamInTransaction(
+          tx,
+          kind: NotificationKind.paymentConfirmed,
+          teamId: teamId,
+          teamName: payment.teamName,
+          name: '${cedis(value)} · receipt $receipt',
+        );
+      }
       return receipt;
     }).timeout(_timeout);
   }
@@ -219,6 +306,19 @@ class PaymentRepository {
         'reviewedBy': faUid,
         'reviewedAt': FieldValue.serverTimestamp(),
       });
+    // An approved team hears about it in its bell
+    final teamId = payment.teamId;
+    if (teamId != null) {
+      final amount = payment.amount;
+      NotificationWriter(_db).forTeamInBatch(
+        batch,
+        kind: NotificationKind.paymentNotFound,
+        teamId: teamId,
+        teamName: payment.teamName,
+        name: '${amount == null ? 'Your payment' : cedis(amount)}: '
+            '${reason.trim()}',
+      );
+    }
     if (rejectRequest) {
       batch.update(_db.doc(FirestorePaths.teamRequest(payment.requestUid)), {
         'status': 'rejected',
@@ -305,6 +405,15 @@ class PaymentRepository {
         'reviewedBy': faUid,
         'reviewedAt': FieldValue.serverTimestamp(),
       });
+      if (teamId != null) {
+        NotificationWriter(_db).forTeamInTransaction(
+          tx,
+          kind: NotificationKind.paymentConfirmed,
+          teamId: teamId,
+          teamName: teamName,
+          name: '${cedis(amount)} cash · receipt $receipt',
+        );
+      }
       return receipt;
     }).timeout(_timeout);
   }
@@ -327,4 +436,14 @@ final clubPaymentsProvider =
 final feeSummaryProvider =
     StreamProvider.family<FeeSummary, String>((ref, requestUid) {
   return ref.watch(paymentRepositoryProvider).watchSummary(requestUid);
+});
+
+/// FA: confirmed totals this season, by club account (Season fees list).
+final seasonTotalsProvider = StreamProvider<Map<String, int>>((ref) {
+  return ref.watch(paymentRepositoryProvider).watchSeasonTotals();
+});
+
+/// FA: payments still waiting this season.
+final waitingPaymentsProvider = StreamProvider<List<Payment>>((ref) {
+  return ref.watch(paymentRepositoryProvider).watchWaiting();
 });

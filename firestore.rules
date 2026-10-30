@@ -339,7 +339,8 @@ service cloud.firestore {
           && data.audience is string
           && data.kind in ['playersApproved', 'playersRejected', 'teamApproved',
                            'teamRequest', 'playersSubmitted', 'playersResubmitted',
-                           'inviteAccepted']
+                           'inviteAccepted', 'paymentConfirmed', 'paymentNotFound',
+                           'feeReminder', 'paymentSent']
           && data.teamId is string
           && data.teamName is string
           && data.names is list && data.names.size() <= 60
@@ -352,7 +353,7 @@ service cloud.firestore {
       function canNotifyFa(data) {
         return hasConfirmedEmail()
           && (isFaAdmin()
-              || (data.kind in ['playersSubmitted', 'playersResubmitted']
+              || (data.kind in ['playersSubmitted', 'playersResubmitted', 'paymentSent']
                   && isTeamAdminOf(data.teamId))
               || data.kind in ['teamRequest', 'inviteAccepted']);
       }

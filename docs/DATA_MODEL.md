@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.3, matches the rules after step 2.13c-1 (27 Oct 2026)
+**Status:** v2.4, matches the rules after step 2.13c-2 (28 Oct 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -401,7 +401,7 @@ Readable and writable only by FA admins. Created with `next: 2` by the very firs
 | Field | Notes |
 | ----- | ----- |
 | `audience` | `fa` or `team:<teamId>` |
-| `kind` | `playersApproved`, `playersRejected`, `teamApproved` (for teams, written by the FA); `teamRequest`, `playersSubmitted`, `playersResubmitted`, `inviteAccepted` (for the FA) |
+| `kind` | `playersApproved`, `playersRejected`, `teamApproved`, `paymentConfirmed`, `paymentNotFound`, `feeReminder` (for teams, written by the FA); `teamRequest`, `playersSubmitted`, `playersResubmitted`, `inviteAccepted`, `paymentSent` (for the FA) |
 | `teamId`, `teamName` | The team concerned (`teamRequest`: the club's uid) |
 | `names` | e.g. `Kojo Arthur (GE26-0011)`, `Yaw Boateng: Jersey number #10 → #14` |
 | `count`, `day`, `updatedAt` | |
@@ -441,6 +441,7 @@ The affiliation fee is **GH₵ 1,000 every season**, paid to GEDFA's MoMo (numbe
 - The first payment is sent in the **same batch** as the team request.
 - **Confirm** is one transaction: the payment (`confirmed`, `receiptNo`, `amount`), `settings/receiptCounter` + 1, and `fees/{season}_{uid}.confirmed` + amount. The rules check the receipt number and the new total.
 - **Not found** on a pending registration with nothing confirmed yet also **rejects the request** in the same batch (`rejectionReason`: "Payment not found: …"); the club must send a new payment when it resends.
+- **After approval** the team adds payments from More › Season fee (`teamId` set; the FA's bell gets `paymentSent`). Confirming, "not found" and recorded cash for an approved team go to the team's bell in the same transaction or batch (`paymentConfirmed`, `paymentNotFound`). The FA's **Send reminder** writes `feeReminder` ("GH₵ 400 left"): one a day at most. Automatic reminders every 3 days come with phone push, before the pilot.
 - The FA can **approve a team only after a payment is confirmed** (`fees/{season}_{uid}.confirmed > 0`; checked by the rules). The approval adds `teamId` to that fees document.
 
 ### 2.12 `fees/{season}_{uid}` — confirmed total per club and season
@@ -585,6 +586,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 28 Oct 2026 | v2.4 (2.13c-2): payments after approval; notification kinds `paymentConfirmed`, `paymentNotFound`, `feeReminder`, `paymentSent`; `teams.requestUid` used for the fee. 195 tests. |
 | 28 Oct 2026 | v2.3.1: "not found" sends a pending registration back; FA can correct recorded cash (`editedBy`, `editedAt`); FA team-request notifications grouped into one a day. 190 tests. |
 | 27 Oct 2026 | v2.3 (2.13c-1): `payments`, `fees`, `settings/receiptCounter`; `teamRequests.season`; approval needs a confirmed payment. Storage: payment proof. 187 tests. |
 | 27 Oct 2026 | v2.2 (2.13b): kits can be photos (`photos`); `juvenileKits` for clubs in both competitions; `colours` (home / away, main / second) required. Storage: `kits/` photos. 166 tests. |

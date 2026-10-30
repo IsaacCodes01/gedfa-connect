@@ -9,6 +9,45 @@ import 'package:gedfa_connect/features/payments/domain/payment.dart';
 import 'package:gedfa_connect/features/payments/presentation/widgets/payment_row.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/choice_card.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/file_upload_row.dart';
+import 'package:image_picker/image_picker.dart';
+
+/// "Date paid": a calendar up to today (the last year or so).
+Future<DateTime?> pickPaymentDate(BuildContext context, DateTime? initial) {
+  final now = DateTime.now();
+  return showDatePicker(
+    context: context,
+    initialDate: initial ?? now,
+    firstDate: DateTime(now.year - 1),
+    lastDate: now,
+    helpText: 'Date paid',
+  );
+}
+
+/// "Proof (optional)": a screenshot of the payment message, under 1 MB.
+Future<PickedDocument?> pickPaymentProof(BuildContext context) async {
+  try {
+    final file = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1200,
+      maxHeight: 1600,
+      imageQuality: 80,
+    );
+    if (file == null) return null;
+    final bytes = await file.readAsBytes();
+    if (bytes.length > 1024 * 1024) {
+      if (context.mounted) {
+        AppToast.error(context, 'That image is too large. Choose a smaller one.');
+      }
+      return null;
+    }
+    return PickedDocument(bytes: bytes, name: file.name, isPdf: false);
+  } catch (_) {
+    if (context.mounted) {
+      AppToast.error(context, "Couldn't open that image. Try another one.");
+    }
+    return null;
+  }
+}
 
 /// Amount: whole cedis, 1 to the season fee.
 String? validateAmount(String? value) {

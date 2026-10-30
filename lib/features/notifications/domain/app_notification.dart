@@ -6,11 +6,15 @@ enum NotificationKind {
   playersApproved,
   playersRejected,
   teamApproved,
+  paymentConfirmed, // season fee (2.13c)
+  paymentNotFound,
+  feeReminder,
   // For the FA (written by teams, clubs, invited people)
   teamRequest,
   playersSubmitted,
   playersResubmitted,
-  inviteAccepted;
+  inviteAccepted,
+  paymentSent; // a team added a payment (2.13c)
 
   static NotificationKind? fromString(String? value) {
     for (final kind in values) {
@@ -76,6 +80,13 @@ class AppNotification {
               : '$people players resubmitted ($teamName)',
         NotificationKind.inviteAccepted =>
           people == 1 ? 'Invitation accepted' : '$people invitations accepted',
+        NotificationKind.paymentConfirmed =>
+          people == 1 ? 'Payment confirmed' : '$people payments confirmed',
+        NotificationKind.paymentNotFound => 'Payment not found',
+        NotificationKind.feeReminder => 'Season fee reminder',
+        NotificationKind.paymentSent => people == 1
+            ? 'Payment from $teamName'
+            : '$people payments from $teamName',
       };
 
   String get body => switch (kind) {
@@ -94,6 +105,17 @@ class AppNotification {
         NotificationKind.playersResubmitted =>
           '$namesText. Waiting for your review in Players.',
         NotificationKind.inviteAccepted => '$namesText.',
+        NotificationKind.paymentConfirmed =>
+          '$namesText. See More › Season fee.',
+        NotificationKind.paymentNotFound =>
+          '$namesText. Check the details and send it again in More › '
+              'Season fee.',
+        // The latest balance the FA sent today
+        NotificationKind.feeReminder =>
+          '${names.lastOrNull ?? 'Part of the fee'} left to pay. Pay to '
+              "GEDFA's MoMo and add the payment in More › Season fee.",
+        NotificationKind.paymentSent =>
+          '$namesText. Confirm it in More › Season fees.',
       };
 
   static AppNotification? fromMap(String id, Map<String, dynamic> data) {

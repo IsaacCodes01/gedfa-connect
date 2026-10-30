@@ -25,6 +25,10 @@ import 'package:gedfa_connect/features/auth/presentation/sign_up_screen.dart';
 import 'package:gedfa_connect/features/teams/presentation/welcome_screen.dart';
 import 'package:gedfa_connect/features/teams/presentation/register_team_screen.dart';
 import 'package:gedfa_connect/features/teams/presentation/team_home_screen.dart';
+import 'package:gedfa_connect/features/payments/presentation/add_payment_screen.dart';
+import 'package:gedfa_connect/features/payments/presentation/fa_fees_screen.dart';
+import 'package:gedfa_connect/features/payments/presentation/fa_team_fee_screen.dart';
+import 'package:gedfa_connect/features/payments/presentation/season_fee_screen.dart';
 import 'package:gedfa_connect/features/people/presentation/invite_person_screen.dart';
 import 'package:gedfa_connect/features/people/presentation/invite_ready_screen.dart';
 import 'package:gedfa_connect/features/people/presentation/member_screen.dart';
@@ -171,6 +175,19 @@ final routerProvider = Provider<GoRouter>((ref) {
                       ),
                     ],
                   ),
+                  // FA only: Season fees (2.13c). Inside the More tab.
+                  GoRoute(
+                    path: 'fees',
+                    builder: (_, _) => const FaFeesScreen(),
+                    routes: [
+                      GoRoute(
+                        path: 'team/:teamId',
+                        builder: (_, state) => FaTeamFeeScreen(
+                          teamId: state.pathParameters['teamId']!,
+                        ),
+                      ),
+                    ],
+                  ),
                   // FA only: People and roles (2.6). Inside the More tab.
                   GoRoute(
                     path: 'people',
@@ -289,7 +306,22 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: Routes.teamMore,
                 builder: (_, _) => const MoreScreen(),
-                routes: _moreChildren(),
+                routes: [
+                  ..._moreChildren(),
+                  // Team only: Season fee (2.13c). Inside the More tab;
+                  // adding a payment opens full-screen.
+                  GoRoute(
+                    path: 'fee',
+                    builder: (_, _) => const SeasonFeeScreen(),
+                    routes: [
+                      GoRoute(
+                        path: 'add',
+                        parentNavigatorKey: rootNavigatorKey,
+                        builder: (_, _) => const AddPaymentScreen(),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ],
           ),

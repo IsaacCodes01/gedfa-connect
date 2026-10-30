@@ -4,7 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart' show WriteBatch;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:gedfa_connect/app/routes.dart';
 import 'package:gedfa_connect/app/theme.dart';
 import 'package:gedfa_connect/core/connectivity/connectivity_provider.dart';
@@ -273,42 +272,13 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
   bool get _sendsPayment => !_hasActivePayment || _addAnotherPayment;
 
   Future<void> _pickPaidOn() async {
-    final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _paidOn ?? now,
-      firstDate: DateTime(now.year - 1),
-      lastDate: now,
-      helpText: 'Date paid',
-    );
+    final picked = await pickPaymentDate(context, _paidOn);
     if (picked != null && mounted) setState(() => _paidOn = picked);
   }
 
   Future<void> _pickProof() async {
-    try {
-      final file = await ImagePicker().pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 1200,
-        maxHeight: 1600,
-        imageQuality: 80,
-      );
-      if (file == null || !mounted) return;
-      final bytes = await file.readAsBytes();
-      if (!mounted) return;
-      if (bytes.length > 1024 * 1024) {
-        AppToast.error(context, 'That image is too large. Choose a smaller one.');
-        return;
-      }
-      setState(() => _proof = PickedDocument(
-            bytes: bytes,
-            name: file.name,
-            isPdf: false,
-          ));
-    } catch (_) {
-      if (mounted) {
-        AppToast.error(context, "Couldn't open that image. Try another one.");
-      }
-    }
+    final proof = await pickPaymentProof(context);
+    if (proof != null && mounted) setState(() => _proof = proof);
   }
 
   PaymentDraft get _paymentDraft => PaymentDraft(

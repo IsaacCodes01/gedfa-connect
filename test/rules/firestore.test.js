@@ -819,6 +819,36 @@ describe('Season fee: the club', () => {
   });
 });
 
+describe('Season fee: an approved team adds a payment', () => {
+  beforeEach(async () => {
+    // admin1 registered Royal Unique FC (its request is approved)
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `${D}/teamRequests/admin1`),
+        { teamName: 'Royal Unique FC', status: 'approved', teamId: 'royal' });
+    });
+  });
+
+  const royalPayment = (changes = {}) => momoPayment({
+    requestUid: 'admin1', createdBy: 'admin1', teamId: 'royal', teamName: 'Royal Unique FC', ...changes,
+  });
+
+  it('for its own team', async () => {
+    await assertSucceeds(setDoc(doc(dbAs('admin1'), `${D}/payments/r1`), royalPayment()));
+  });
+
+  it('not for another team', async () => {
+    await assertFails(setDoc(doc(dbAs('admin1'), `${D}/payments/r2`), royalPayment({ teamId: 'stars' })));
+  });
+
+  it('reads its own payments', async () => {
+    await setDoc(doc(dbAs('admin1'), `${D}/payments/r1`), royalPayment());
+    await assertSucceeds(getDocs(query(collection(dbAs('admin1'), `${D}/payments`),
+      where('requestUid', '==', 'admin1'), where('season', '==', SEASON))));
+    await assertFails(getDocs(query(collection(dbAs('admin2'), `${D}/payments`),
+      where('requestUid', '==', 'admin1'))));
+  });
+});
+
 describe('Season fee: without a registration', () => {
   it('cannot send a payment', async () => {
     await assertFails(sendPayment(dbAs('newbie')));
@@ -1705,6 +1735,19 @@ describe('Notifications', () => {
       where('audience', '==', 'fa'))));
     await assertFails(getDocs(query(collection(dbAs('admin1'), `${D}/notifications`),
       where('audience', '==', 'fa'))));
+  });
+
+  it('the FA sends a fee reminder; a team cannot (2.13c)', async () => {
+    const data = { audience: 'team:royal', kind: 'feeReminder', teamId: 'royal', names: ['GH₵ 400'] };
+    await assertSucceeds(notify(dbAs('fa1'), 'team-royal_feeReminder_royal_d', data));
+    await assertFails(notify(dbAs('admin1'), 'team-royal_feeReminder_royal_e', data));
+  });
+
+  it('a team tells the FA about its own payment only (2.13c)', async () => {
+    await assertSucceeds(notify(dbAs('admin1'), 'fa_paymentSent_royal',
+      { audience: 'fa', kind: 'paymentSent', teamId: 'royal' }));
+    await assertFails(notify(dbAs('admin1'), 'fa_paymentSent_stars',
+      { audience: 'fa', kind: 'paymentSent', teamId: 'stars' }));
   });
 
   it('unknown kinds are refused', async () => {

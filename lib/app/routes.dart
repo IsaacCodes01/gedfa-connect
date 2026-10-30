@@ -22,6 +22,10 @@ class Routes {
       '$adminPlayers/player/$playerId';
   static const adminMore = '/admin/more';
   static const adminPeople = '/admin/more/people';
+
+  /// FA: what every team has paid this season, and one team (2.13c).
+  static const adminFees = '/admin/more/fees';
+  static String adminTeamFee(String teamId) => '$adminFees/team/$teamId';
   static const adminInvite = '/admin/more/people/invite';
   static String adminInviteReady(String email) =>
       '$adminPeople/invited/${Uri.encodeComponent(email)}';
@@ -39,6 +43,10 @@ class Routes {
   static const teamProfile = '/team/more/profile';
   static const teamChangeEmail = '/team/more/profile/email';
   static const teamSettings = '/team/more/settings';
+
+  /// The team's season fee, and adding a payment (2.13c).
+  static const teamFee = '/team/more/fee';
+  static const teamAddPayment = '/team/more/fee/add';
   static const referee = '/referee';
   static const teamPlayer = '/team/player';
   static String player(String playerId) => '$teamPlayer/$playerId';

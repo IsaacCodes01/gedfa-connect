@@ -15,6 +15,7 @@ class Team {
     this.logoUrl,
     this.homeKit,
     this.colours,
+    this.requestUid,
   });
 
   final String id;
@@ -28,6 +29,10 @@ class Team {
 
   /// Home and away colours (2.13b); null for teams approved before.
   final TeamColours? colours;
+
+  /// The club's account that registered the team. Its season fee is kept
+  /// under this uid (2.13c).
+  final String? requestUid;
 
   /// Colour behind the initials when there is no logo.
   Color get logoColor =>
@@ -50,6 +55,7 @@ class Team {
       logoUrl: data['logoUrl'] as String?,
       homeKit: Kit.fromMap(kits?['home'] as Map<String, dynamic>?),
       colours: TeamColours.fromMap(data['colours'] as Map<String, dynamic>?),
+      requestUid: data['requestUid'] as String?,
     );
   }
 }

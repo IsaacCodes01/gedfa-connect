@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gedfa_connect/app/more_paths.dart';
 import 'package:gedfa_connect/app/routes.dart';
+import 'package:gedfa_connect/core/constants/season.dart';
 import 'package:gedfa_connect/core/constants/user_role.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
@@ -10,6 +11,7 @@ import 'package:gedfa_connect/core/widgets/app_toast.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
+import 'package:gedfa_connect/features/payments/data/payment_repository.dart';
 import 'package:gedfa_connect/features/settings/data/app_version_provider.dart';
 import 'package:gedfa_connect/features/settings/presentation/widgets/settings_widgets.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
@@ -50,6 +52,12 @@ class MoreScreen extends ConsumerWidget {
                         onTap: () => context.go(Routes.adminAnnouncements),
                       ),
                       SettingsTile(
+                        icon: Icons.payments_outlined,
+                        title: 'Season fees',
+                        subtitle: 'What each team has paid this season',
+                        onTap: () => context.go(Routes.adminFees),
+                      ),
+                      SettingsTile(
                         icon: Icons.manage_accounts_outlined,
                         title: 'People and roles',
                         subtitle: 'FA officials, referees and invitations',
@@ -75,6 +83,7 @@ class MoreScreen extends ConsumerWidget {
                               'and ask the FA to change the name or logo.',
                         ),
                       ),
+                    if (isTeamAdmin) const _SeasonFeeTile(),
                     SettingsTile(
                       icon: Icons.settings_outlined,
                       title: 'Settings',
@@ -121,6 +130,34 @@ class MoreScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ── Season fee (team admins, 2.13c) ──────────────────────────────────────
+
+/// "Season fee · GH₵ 600 of 1,000 paid"
+class _SeasonFeeTile extends ConsumerWidget {
+  const _SeasonFeeTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final team = ref.watch(myTeamProvider).value;
+    final uid = team?.requestUid ?? ref.watch(authStateProvider).value?.uid;
+    final summary =
+        uid == null ? null : ref.watch(feeSummaryProvider(uid)).value;
+
+    return SettingsTile(
+      icon: Icons.payments_outlined,
+      title: 'Season fee',
+      subtitle: summary == null
+          ? '${Season.label(Season.current)}: ${cedis(Season.fee)}'
+          : summary.isPaid
+              ? '${Season.label(Season.current)}: fully paid'
+              : '${cedis(summary.confirmed)} of '
+                  '${cedis(Season.fee).substring(4)} paid · '
+                  '${cedis(summary.left)} left',
+      onTap: () => context.go(Routes.teamFee),
     );
   }
 }

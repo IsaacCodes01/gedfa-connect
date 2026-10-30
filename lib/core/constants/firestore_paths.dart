@@ -50,6 +50,7 @@ class FirestorePaths {
 
   // Season fee (2.13c)
   static const payments = '$district/payments';
+  static const fees = '$district/fees';
   static String payment(String id) => '$district/payments/$id';
 
   /// Confirmed total for one club and season, e.g. `fees/2026-27_<uid>`.
