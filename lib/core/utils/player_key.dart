@@ -19,6 +19,16 @@ String playerKeyFor(String fullName, DateTime dob) {
 }
 
 /// The ID of a jersey reservation inside a team:
-/// competition + '-' + number, e.g. 'division-10'.
-/// Division and Juvenile squads each have their own numbers.
-String jerseyIdFor(String category, int jerseyNo) => '$category-$jerseyNo';
+/// 'division-10', or for a juvenile side 'juvenile-U13-10'.
+/// Division and each juvenile age group have their own numbers.
+/// Must match jerseyIdOf in firestore.rules.
+String jerseyIdFor(String category, int jerseyNo, {String? ageGroup}) =>
+    ageGroup == null || category != 'juvenile'
+        ? '$category-$jerseyNo'
+        : '$category-$ageGroup-$jerseyNo';
+
+/// The duplicate-check key for a competition. A 16- or 17-year-old may
+/// play for a club's Division AND Juvenile sides (GEDFA, 30 Oct 2026),
+/// so juvenile players get their own key: 'kofi-mensah_2010-03-15_juvenile'.
+String competitionPlayerKey(String baseKey, String category) =>
+    category == 'juvenile' ? '${baseKey}_juvenile' : baseKey;

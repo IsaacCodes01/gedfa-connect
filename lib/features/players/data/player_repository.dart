@@ -6,7 +6,6 @@ import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/core/utils/passport_photo.dart';
 import 'package:gedfa_connect/core/utils/player_code.dart';
-import 'package:gedfa_connect/core/utils/player_key.dart';
 import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/core/constants/approval_status.dart';
 import 'package:gedfa_connect/features/notifications/data/notification_writer.dart';
@@ -80,16 +79,14 @@ bool needsReapproval(
 typedef ReservationKey = ({
   String playerId,
   String teamId,
-  String category,
-  int jerseyNo,
+  String jerseyId,
   String playerKey,
 });
 
 ReservationKey reservationKeyOf(Player player) => (
       playerId: player.id,
       teamId: player.teamId,
-      category: player.category.name,
-      jerseyNo: player.jerseyNo,
+      jerseyId: player.jerseyId,
       playerKey: player.playerKey,
     );
 
@@ -102,12 +99,9 @@ class PlayerRepository {
   CollectionReference<Map<String, dynamic>> get _players =>
       _db.collection(FirestorePaths.players);
 
-  /// `teams/{teamId}/jerseys/{category-number}` for this player.
+  /// `teams/{teamId}/jerseys/{division-10 | juvenile-U13-10}`.
   DocumentReference<Map<String, dynamic>> _jerseyRef(Player player) =>
-      _db.doc(FirestorePaths.jersey(
-        player.teamId,
-        jerseyIdFor(player.category.name, player.jerseyNo),
-      ));
+      _db.doc(FirestorePaths.jersey(player.teamId, player.jerseyId));
 
   /// `settings/playerCounter`: `{ next: 43 }`.
   DocumentReference<Map<String, dynamic>> get _counterRef =>
@@ -168,10 +162,7 @@ class PlayerRepository {
   ) async {
     final results = await Future.wait([
       _db
-          .doc(FirestorePaths.jersey(
-            player.teamId,
-            jerseyIdFor(player.category, player.jerseyNo),
-          ))
+          .doc(FirestorePaths.jersey(player.teamId, player.jerseyId))
           .get(),
       _db.doc(FirestorePaths.playerKey(player.playerKey)).get(),
     ]).timeout(_timeout);
@@ -294,14 +285,17 @@ class PlayerRepository {
         'teamId': player.teamId,
         'createdAt': FieldValue.serverTimestamp(),
       });
-    // The FA's bell: "4 new players from Royal Unique FC" (one per day)
-    NotificationWriter(_db).forFaInBatch(
-      batch,
-      kind: NotificationKind.playersSubmitted,
-      teamId: player.teamId,
-      teamName: player.teamName,
-      name: player.fullName.trim(),
-    );
+    // The FA's bell: "4 new players from Royal Unique FC" (one per day).
+    // Juvenile players wait for the screening day instead (2.14).
+    if (!player.isJuvenile) {
+      NotificationWriter(_db).forFaInBatch(
+        batch,
+        kind: NotificationKind.playersSubmitted,
+        teamId: player.teamId,
+        teamName: player.teamName,
+        name: player.fullName.trim(),
+      );
+    }
 
     try {
       await _commit(batch, () => _checkFree(player));
@@ -322,7 +316,8 @@ class PlayerRepository {
     ProcessedPhoto? newPhoto,
   }) async {
     final photoChanged = newPhoto != null;
-    final jerseyChanged = before.jerseyNo != after.jerseyNo;
+    // A juvenile player moving age group changes jersey reservation too
+    final jerseyChanged = before.jerseyId != after.jerseyId;
     final keyChanged = before.playerKey != after.playerKey;
     final keepApproved = before.isApproved &&
         !needsReapproval(before, after, photoChanged: photoChanged);
@@ -373,7 +368,9 @@ class PlayerRepository {
 
     // The FA's bell, when a reviewed player comes back to them:
     // "Yaw Boateng: Jersey number #10 → #14"
-    if (!keepApproved && before.status != ApprovalStatus.pending) {
+    if (!keepApproved &&
+        before.status != ApprovalStatus.pending &&
+        !after.isJuvenile) {
       final first = changes.entries.firstOrNull;
       final what = first == null
           ? 'details updated'
@@ -554,8 +551,19 @@ final allPlayersProvider = StreamProvider<List<Player>>((ref) {
 
 /// FA: how many players are waiting for review (gold number on the
 /// Players tab).
+/// FA: the Division players only. The Players tab reviews these in the
+/// app; juvenile players are checked on the screening day (2.14).
+final divisionPlayersProvider = Provider<AsyncValue<List<Player>>>((ref) {
+  return ref.watch(allPlayersProvider).whenData(
+        (players) => [
+          for (final p in players)
+            if (!p.isJuvenile) p,
+        ],
+      );
+});
+
 final pendingPlayerCountProvider = Provider<int>((ref) {
-  final players = ref.watch(allPlayersProvider).value ?? const [];
+  final players = ref.watch(divisionPlayersProvider).value ?? const [];
   return players.where((p) => p.status == ApprovalStatus.pending).length;
 });
 

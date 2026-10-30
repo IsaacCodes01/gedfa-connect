@@ -54,5 +54,8 @@ class Routes {
   static const teamPlayer = '/team/player';
   static String player(String playerId) => '$teamPlayer/$playerId';
   static const addPlayer = '/team/add';
+
+  /// Add a juvenile player to an age group (2.14): /team/add?group=U13
+  static String addJuvenilePlayer(String group) => '$addPlayer?group=$group';
   static String editPlayer(String playerId) => '/team/player/$playerId/edit';
 }

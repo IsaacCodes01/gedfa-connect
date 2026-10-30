@@ -339,7 +339,9 @@ class PlayerGridCard extends ConsumerWidget {
     return switch (cardLine) {
       CardLine.squad => switch (player.status) {
           ApprovalStatus.approved => code == null ? pos : '$code · $pos',
-          ApprovalStatus.pending => '$pos · awaiting FA',
+          ApprovalStatus.pending => player.isJuvenile
+              ? '$pos · waiting for screening'
+              : '$pos · awaiting FA',
           ApprovalStatus.rejected => '$pos · needs correcting',
         },
       CardLine.fa =>
@@ -351,8 +353,9 @@ class PlayerGridCard extends ConsumerWidget {
   /// The bottom strip for the registration status.
   static (String, Color, Color) _registrationStrip(
     ApprovalStatus status,
-    bool isDark,
-  ) =>
+    bool isDark, {
+    bool juvenile = false,
+  }) =>
       switch (status) {
         ApprovalStatus.approved => (
             'Approved',
@@ -360,7 +363,7 @@ class PlayerGridCard extends ConsumerWidget {
             isDark ? const Color(0xFF7BE3B0) : AppColors.approvedText,
           ),
         ApprovalStatus.pending => (
-            'Pending',
+            juvenile ? 'Screening' : 'Pending',
             AppColors.ghanaGold,
             const Color(0xFF3A2C00),
           ),
@@ -409,7 +412,7 @@ class PlayerGridCard extends ConsumerWidget {
           isDark ? AppColors.darkBorder : const Color(0xFFE3EAF2),
           isDark ? const Color(0xFFCFE4FB) : const Color(0xFF33445A),
         ),
-      null => _registrationStrip(status, isDark),
+      null => _registrationStrip(status, isDark, juvenile: player.isJuvenile),
     };
     final badge = extra?.badge;
     final extraLine = extra?.line;

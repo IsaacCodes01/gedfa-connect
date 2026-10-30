@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.5, matches the rules after step 2.13d (30 Oct 2026)
+**Status:** v2.6, matches the rules after step 2.14a (30 Oct 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -256,6 +256,8 @@ One document per jersey number in use **within this team and competition**. The 
 
 ### 2.4 `players/{playerId}` — all players in the league
 
+- **Juvenile players (2.14)** are added "waiting for screening" (`status: pending`); the FA checks them in person on a screening day (2.14b–c), not in the Players tab. Jersey reservations are per age group (`juvenile-U13-10`), and their player key ends in `_juvenile`, so the same child may also be in the club's Division squad.
+
 One collection for the whole district. Team admins see only their own team's players (enforced by rules on `teamId`); the FA sees all.
 
 | Field               | Type             | Notes                                                                                                                                                                                                                              |
@@ -263,6 +265,8 @@ One collection for the whole district. Team admins see only their own team's pla
 | `teamId`          | string           |                                                                                                                                                                                                                                    |
 | `teamName`        | string           | Copied from the team                                                                                                                                                                                                               |
 | `category`        | string           | `division` or `juvenile`; must be one of the team's `categories`                                                                                                                                                             |
+| `ageGroup`        | string?          | **Juvenile only** (2.14): `U13`, `U15` or `U17`. Age = the season's **start** year − birth year (2026 for 2026/27). Own group or older (playing up); never younger; over 17 refused |
+| `guardian`        | map?             | **Juvenile only, required**: `{ relation: mother / father / guardian / other, name, phone }`. Team and FA only |
 | `fullName`        | string           | Entered once, reused everywhere                                                                                                                                                                                                    |
 | `fullNameLower`   | string           |                                                                                                                                                                                                                                    |
 | `searchKeys`      | array of strings | Set by the app from`fullName`: every word and its beginnings (2+ letters), lowercase. `Kwame Asante` → `kw, kwa, kwam, kwame, as, asa, asan, asant, asante`. Lets the FA and referees find a player by any part of the name. At most 80 items |
@@ -592,6 +596,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 30 Oct 2026 | v2.6 (2.14a): juvenile players: `ageGroup`, `guardian`, jersey IDs `juvenile-U13-10`, player keys `…_juvenile`; the rules check the age group from the season's start year. 214 tests. |
 | 30 Oct 2026 | v2.5 (2.13d): `settings/league` rules and fields (registration switches, squad numbers, season / fee / MoMo by the chairman), `settingsLog`, `registrationChanged` notification; the payment cap follows the fee. 205 tests. |
 | 28 Oct 2026 | v2.4 (2.13c-2): payments after approval; notification kinds `paymentConfirmed`, `paymentNotFound`, `feeReminder`, `paymentSent`; `teams.requestUid` used for the fee. 195 tests. |
 | 28 Oct 2026 | v2.3.1: "not found" sends a pending registration back; FA can correct recorded cash (`editedBy`, `editedAt`); FA team-request notifications grouped into one a day. 190 tests. |

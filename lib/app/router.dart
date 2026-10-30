@@ -256,7 +256,10 @@ final routerProvider = Provider<GoRouter>((ref) {
                   GoRoute(
                     path: 'add',
                     parentNavigatorKey: rootNavigatorKey,
-                    builder: (_, _) => const PlayerFormScreen(),
+                    // ?group=U13 adds a juvenile player (2.14)
+                    builder: (_, state) => PlayerFormScreen(
+                      juvenileGroup: state.uri.queryParameters['group'],
+                    ),
                   ),
                   GoRoute(
                     path: 'player/:playerId',

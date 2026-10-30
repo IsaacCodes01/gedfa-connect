@@ -4,16 +4,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:gedfa_connect/app/routes.dart';
 import 'package:gedfa_connect/core/constants/approval_status.dart';
+import 'package:gedfa_connect/core/constants/season.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/core/utils/passport_photo.dart';
+import 'package:gedfa_connect/core/utils/phone.dart';
+import 'package:gedfa_connect/core/utils/validators.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/features/league/data/league_settings_repository.dart';
 import 'package:gedfa_connect/features/league/domain/league_settings.dart';
 import 'package:gedfa_connect/features/players/data/player_repository.dart';
+import 'package:gedfa_connect/features/players/domain/age_group.dart';
 import 'package:gedfa_connect/features/players/domain/player.dart';
 import 'package:gedfa_connect/features/players/domain/position.dart';
 import 'package:gedfa_connect/features/players/presentation/widgets/player_photo.dart';
@@ -27,9 +31,11 @@ const _minDivisionAge = 13;
 
 class PlayerFormScreen extends ConsumerStatefulWidget {
   /// [playerId] null = Add player, otherwise Edit player.
-  const PlayerFormScreen({super.key, this.playerId});
+  /// [juvenileGroup] ('U13', 'U15' or 'U17') adds a juvenile player (2.14).
+  const PlayerFormScreen({super.key, this.playerId, this.juvenileGroup});
 
   final String? playerId;
+  final String? juvenileGroup;
 
   @override
   ConsumerState<PlayerFormScreen> createState() => _PlayerFormScreenState();
@@ -49,7 +55,22 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
   bool _showErrors = false;
   bool _busy = false;
 
+  // Juvenile only (2.14)
+  late AgeGroup? _ageGroup = AgeGroup.fromString(widget.juvenileGroup);
+  GuardianRelation? _relation;
+  final _guardianName = TextEditingController();
+  final _guardianPhone = TextEditingController();
+
   bool get _isEdit => widget.playerId != null;
+
+  /// Division, or Juvenile when adding to an age group / editing one.
+  Competition get _category =>
+      _existing?.category ??
+      (widget.juvenileGroup != null
+          ? Competition.juvenile
+          : Competition.division);
+
+  bool get _isJuvenile => _category == Competition.juvenile;
 
   /// True if there is a photo: a new one, or one already saved.
   bool get _hasPhoto =>
@@ -60,6 +81,8 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
     _name.dispose();
     _dobText.dispose();
     _jersey.dispose();
+    _guardianName.dispose();
+    _guardianPhone.dispose();
     super.dispose();
   }
 
@@ -71,6 +94,13 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
     _dobText.text = formatDate(player.dob);
     _position = player.position;
     _jersey.text = '${player.jerseyNo}';
+    _ageGroup = player.ageGroup;
+    final guardian = player.guardian;
+    if (guardian != null) {
+      _relation = guardian.relation;
+      _guardianName.text = guardian.name;
+      _guardianPhone.text = guardian.phone;
+    }
     _prefilled = true;
   }
 
@@ -78,10 +108,15 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
 
   Future<void> _pickDob() async {
     final now = DateTime.now();
-    final latest = DateTime(now.year - _minDivisionAge, now.month, now.day);
+    // Juvenile: any child from 5 up (the age box below says if they're
+    // too old). Division: 13 and older.
+    final latest = _isJuvenile
+        ? DateTime(now.year - 5, now.month, now.day)
+        : DateTime(now.year - _minDivisionAge, now.month, now.day);
     final picked = await showDatePicker(
       context: context,
-      initialDate: _dob ?? DateTime(now.year - 20, 1, 1),
+      initialDate:
+          _dob ?? DateTime(now.year - (_isJuvenile ? 12 : 20), 1, 1),
       firstDate: DateTime(1960),
       lastDate: latest,
       initialEntryMode: DatePickerEntryMode.calendarOnly,
@@ -91,6 +126,11 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
     setState(() {
       _dob = DateTime(picked.year, picked.month, picked.day);
       _dobText.text = formatDate(_dob!);
+      // Keep the chosen group only if the child may play in it
+      final allowed = AgeGroup.allowedFor(_dob!);
+      if (_isJuvenile && !allowed.contains(_ageGroup)) {
+        _ageGroup = allowed.isEmpty ? _ageGroup : allowed.first;
+      }
     });
   }
 
@@ -154,7 +194,11 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
     FocusScope.of(context).unfocus();
     setState(() => _showErrors = true);
     final formOk = _formKey.currentState!.validate();
-    if (!formOk || !_hasPhoto) {
+    final juvenileOk = !_isJuvenile ||
+        (_dob != null &&
+            AgeGroup.allowedFor(_dob!).contains(_ageGroup) &&
+            _relation != null);
+    if (!formOk || !_hasPhoto || !juvenileOk) {
       AppToast.warning(context, 'Please fix the highlighted fields.');
       return;
     }
@@ -164,7 +208,16 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
       id: existing?.id ?? '',
       teamId: team.id,
       teamName: team.name,
-      category: existing?.category ?? Competition.division,
+      category: _category,
+      ageGroup: _isJuvenile ? _ageGroup : null,
+      guardian: _isJuvenile
+          ? Guardian(
+              relation: _relation!,
+              name: _guardianName.text,
+              phone: normalizeGhanaPhone(_guardianPhone.text) ??
+                  _guardianPhone.text.trim(),
+            )
+          : null,
       fullName: _name.text.trim(),
       dob: _dob!,
       position: _position!,
@@ -185,7 +238,11 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
       );
       return;
     }
-    if (existing == null && squad.length >= league.maxSquadSize) {
+    // Juvenile: the limit is per age group
+    final sameSquad = _isJuvenile
+        ? squad.where((p) => p.ageGroup == _ageGroup).length
+        : squad.length;
+    if (existing == null && sameSquad >= league.maxSquadSize) {
       AppToast.warning(
         context,
         'Your squad is full (${league.maxSquadSize} players).',
@@ -211,7 +268,12 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
         // _hasPhoto was checked above, so a new player always has one
         await repository.create(draft, photo: newPhoto!);
         if (!mounted) return;
-        AppToast.success(context, '${draft.fullName} sent to the FA.');
+        AppToast.success(
+          context,
+          draft.isJuvenile
+              ? '${draft.fullName} added. Bring them to the screening day.'
+              : '${draft.fullName} sent to the FA.',
+        );
         context.go(Routes.team);
       } else {
         await repository.update(existing, draft, newPhoto: newPhoto);
@@ -238,7 +300,11 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
   Widget build(BuildContext context) {
     final team = ref.watch(myTeamProvider).value;
     final playersAsync = ref.watch(teamPlayersProvider);
-    final title = _isEdit ? 'Edit player' : 'Add player';
+    final title = _isEdit
+        ? 'Edit player'
+        : _isJuvenile
+            ? 'Add ${_ageGroup?.label ?? 'juvenile'} player'
+            : 'Add player';
 
     if (team == null || !playersAsync.hasValue) {
       return Scaffold(
@@ -263,8 +329,12 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
       _prefill(found.first);
     }
 
-    final category = _existing?.category ?? Competition.division;
+    final category = _category;
     final squad = allPlayers.where((p) => p.category == category).toList();
+    // Jersey numbers: Division, or one juvenile age group
+    final numbersSquad = _isJuvenile
+        ? squad.where((p) => p.ageGroup == _ageGroup).toList()
+        : squad;
 
     return PopScope(
       canPop: !_busy,
@@ -272,7 +342,11 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
         appBar: GedfaAppBar(title: title),
         bottomNavigationBar: _BottomBar(
           busy: _busy,
-          saveLabel: _isEdit ? 'Save changes' : 'Send for FA approval',
+          saveLabel: _isEdit
+              ? 'Save changes'
+              : _isJuvenile
+                  ? 'Add for screening'
+                  : 'Send for FA approval',
           onCancel: _cancel,
           onSave: () => _save(team, squad),
         ),
@@ -287,7 +361,7 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
               ResponsiveCenter(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: _fields(squad, category),
+                  children: _fields(numbersSquad, category),
                 ),
               ),
             ],
@@ -323,7 +397,11 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
           Chip(
             avatar: Icon(Icons.shield_outlined,
                 size: 16, color: scheme.primary),
-            label: Text('${category.label} squad'),
+            label: Text(
+              _isJuvenile && _ageGroup != null
+                  ? 'Juvenile ${_ageGroup!.label}'
+                  : '${category.label} squad',
+            ),
             visualDensity: VisualDensity.compact,
           ),
         ],
@@ -380,6 +458,19 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
         validator: (_) => _dob == null ? 'Pick the date of birth' : null,
       ),
       gap,
+      if (_isJuvenile) ...[
+        _AgeBox(dob: _dob),
+        if (_dob != null && AgeGroup.ownGroup(_dob!) != null) ...[
+          const SizedBox(height: 12),
+          _GroupChips(
+            dob: _dob!,
+            selected: _ageGroup,
+            enabled: !_busy,
+            onSelected: (group) => setState(() => _ageGroup = group),
+          ),
+        ],
+        gap,
+      ],
 
       // Position (23 positions in 4 groups)
       FormField<Position>(
@@ -448,6 +539,18 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
       ),
       gap,
 
+      if (_isJuvenile) ...[
+        _GuardianFields(
+          relation: _relation,
+          name: _guardianName,
+          phone: _guardianPhone,
+          enabled: !_busy,
+          showErrors: _showErrors,
+          onRelation: (r) => setState(() => _relation = r),
+        ),
+        gap,
+      ],
+
       // Info box
       Container(
         padding: const EdgeInsets.all(12),
@@ -462,9 +565,14 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                'The FA checks every player. After approval, changing the '
-                'name, date of birth, jersey number or photo needs FA '
-                'approval again.',
+                _isJuvenile
+                    ? 'New juvenile players wait for the screening day. The '
+                        'FA checks each child in person and passes them in '
+                        'the group they really fit (moving them up if '
+                        'needed), or marks them not eligible.'
+                    : 'The FA checks every player. After approval, changing '
+                        'the name, date of birth, jersey number or photo '
+                        'needs FA approval again.',
                 style: textTheme.bodySmall,
               ),
             ),
@@ -482,6 +590,206 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
       years--;
     }
     return years;
+  }
+}
+
+/// Board J2: "Age group: U13 · born 2015: 11 in 2026", or red
+/// "Too old for Juvenile".
+class _AgeBox extends StatelessWidget {
+  const _AgeBox({required this.dob});
+
+  final DateTime? dob;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final dob = this.dob;
+    if (dob == null) return const SizedBox.shrink();
+
+    final own = AgeGroup.ownGroup(dob);
+    final age = AgeGroup.seasonAge(dob);
+    final year = Season.startYear(Season.current);
+    final season = Season.label(Season.current);
+    final (bg, ink) = own == null
+        ? (
+            isDark ? const Color(0xFF4A1820) : const Color(0xFFFDE7EA),
+            scheme.error,
+          )
+        : (
+            isDark ? const Color(0xFF1E3A5F) : const Color(0xFFE3EEFA),
+            isDark ? const Color(0xFFCFE4FB) : const Color(0xFF0B3F7A),
+          );
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            own == null ? 'Too old for Juvenile' : 'Age group: ${own.label}',
+            style: textTheme.titleSmall
+                ?.copyWith(fontWeight: FontWeight.w700, color: ink),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            own == null
+                ? 'Born ${dob.year}: $age in $year. Juvenile ends at 17; '
+                    'register this player in the Division instead.'
+                : 'Born ${dob.year}: $age in $year, the year the $season '
+                    'season starts.',
+            style: textTheme.bodySmall
+                ?.copyWith(fontSize: 12.5, height: 1.45, color: ink),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// "Register in  [U13] [U15] [U17]": own group or older (playing up).
+class _GroupChips extends StatelessWidget {
+  const _GroupChips({
+    required this.dob,
+    required this.selected,
+    required this.enabled,
+    required this.onSelected,
+  });
+
+  final DateTime dob;
+  final AgeGroup? selected;
+  final bool enabled;
+  final ValueChanged<AgeGroup> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
+    final own = AgeGroup.ownGroup(dob);
+    final allowed = AgeGroup.allowedFor(dob);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Register in',
+          style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            for (final group in AgeGroup.values) ...[
+              if (group != AgeGroup.values.first) const SizedBox(width: 8),
+              Expanded(
+                child: ChoiceChip(
+                  label: Text(group.label),
+                  selected: selected == group,
+                  showCheckmark: false,
+                  // Younger groups are greyed out: nobody plays down
+                  onSelected: enabled && allowed.contains(group)
+                      ? (_) => onSelected(group)
+                      : null,
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          selected == own
+              ? 'Own age group. Younger players can play up; nobody can '
+                  'play down.'
+              : 'Playing up in ${selected?.label}. On team sheets the GFA '
+                  'limits how many younger players play up.',
+          style: textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+        ),
+      ],
+    );
+  }
+}
+
+/// Parent or guardian (required for juvenile players).
+class _GuardianFields extends StatelessWidget {
+  const _GuardianFields({
+    required this.relation,
+    required this.name,
+    required this.phone,
+    required this.enabled,
+    required this.showErrors,
+    required this.onRelation,
+  });
+
+  final GuardianRelation? relation;
+  final TextEditingController name;
+  final TextEditingController phone;
+  final bool enabled;
+  final bool showErrors;
+  final ValueChanged<GuardianRelation> onRelation;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Parent or guardian *',
+          style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final r in GuardianRelation.values)
+              ChoiceChip(
+                label: Text(r.label),
+                selected: relation == r,
+                showCheckmark: false,
+                onSelected: enabled ? (_) => onRelation(r) : null,
+              ),
+          ],
+        ),
+        if (showErrors && relation == null)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              'Choose who they are',
+              style: textTheme.bodySmall?.copyWith(color: scheme.error),
+            ),
+          ),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: name,
+          enabled: enabled,
+          decoration: const InputDecoration(labelText: 'Their full name *'),
+          textCapitalization: TextCapitalization.words,
+          inputFormatters: [LengthLimitingTextInputFormatter(80)],
+          validator: (v) => (v?.trim().length ?? 0) < 3
+              ? "Enter the parent or guardian's name"
+              : null,
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: phone,
+          enabled: enabled,
+          decoration: const InputDecoration(
+            labelText: 'Their phone *',
+            hintText: 'e.g. 024 555 1234',
+            helperText: 'Only the team and the FA see this.',
+          ),
+          keyboardType: TextInputType.phone,
+          validator: Validators.ghanaPhone,
+        ),
+      ],
+    );
   }
 }
 

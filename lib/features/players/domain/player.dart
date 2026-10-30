@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:gedfa_connect/core/constants/approval_status.dart';
 import 'package:gedfa_connect/core/utils/search_keys.dart';
+import 'package:gedfa_connect/features/players/domain/age_group.dart';
 import 'package:gedfa_connect/features/players/domain/position.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/core/utils/player_key.dart';
@@ -24,6 +25,8 @@ class Player {
     this.updatedAt,
     this.approvedAt,
     this.changes = const {},
+    this.ageGroup,
+    this.guardian,
   });
 
   /// Firestore document ID ('' for a player not saved yet).
@@ -55,12 +58,32 @@ class Player {
   /// is waiting. Cleared by the FA's approval or rejection.
   final Map<String, PlayerChange> changes;
 
+  /// Juvenile only (2.14): the group the player is registered in. It can
+  /// be older than their own group (playing up), never younger.
+  final AgeGroup? ageGroup;
+
+  /// Juvenile only: parent or guardian (required).
+  final Guardian? guardian;
+
+  bool get isJuvenile => category == Competition.juvenile;
+
+  /// Juvenile players wait for the FA's screening day instead of a review
+  /// in the app (2.14).
+  bool get isWaitingForScreening =>
+      isJuvenile && status == ApprovalStatus.pending;
+
+  /// The jersey reservation's ID: 'division-10' or 'juvenile-U13-10'.
+  String get jerseyId =>
+      jerseyIdFor(category.name, jerseyNo, ageGroup: ageGroup?.label);
+
   PositionGroup get positionGroup => position.group;
 
   bool get isApproved => status == ApprovalStatus.approved;
 
-    /// The duplicate-check key, e.g. 'kwame-asante_2004-03-15'.
-  String get playerKey => playerKeyFor(fullName, dob);
+  /// The duplicate-check key, e.g. 'kwame-asante_2004-03-15'
+  /// (juvenile players: '…_juvenile').
+  String get playerKey =>
+      competitionPlayerKey(playerKeyFor(fullName, dob), category.name);
 
   /// Age today, in full years.
   int get age {
@@ -93,7 +116,9 @@ class Player {
       'fullName': name,
       'fullNameLower': name.toLowerCase(),
       'searchKeys': searchKeysFor(name),
-      'playerKey': playerKeyFor(name, dob),
+      'playerKey': competitionPlayerKey(playerKeyFor(name, dob), category.name),
+      if (isJuvenile) 'ageGroup': ageGroup?.label,
+      if (isJuvenile) 'guardian': guardian?.toMap(),
       // Midnight UTC, so the date never shifts with time zones
       'dob': Timestamp.fromDate(DateTime.utc(dob.year, dob.month, dob.day)),
       'position': position.code,
@@ -127,6 +152,8 @@ class Player {
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
       approvedAt: (data['approvedAt'] as Timestamp?)?.toDate(),
       changes: PlayerChange.mapFrom(data['changes']),
+      ageGroup: AgeGroup.fromString(data['ageGroup'] as String?),
+      guardian: Guardian.fromMap(data['guardian']),
     );
   }
 }

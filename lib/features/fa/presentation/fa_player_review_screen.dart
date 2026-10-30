@@ -442,7 +442,12 @@ class _Duplicates extends ConsumerWidget {
       );
     }
 
-    final matches = possibleDuplicates(player, all);
+    // Only the same competition: the same person may play for a club's
+    // Division and Juvenile sides (2.14)
+    final matches = possibleDuplicates(
+      player,
+      all.where((p) => p.category == player.category).toList(),
+    );
     if (matches.isEmpty) {
       return const CheckLine(
         ok: true,

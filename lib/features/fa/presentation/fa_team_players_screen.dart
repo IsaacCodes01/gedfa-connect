@@ -109,7 +109,8 @@ class _FaTeamPlayersScreenState extends ConsumerState<FaTeamPlayersScreen> {
   @override
   Widget build(BuildContext context) {
     final teamAsync = ref.watch(teamByIdProvider(widget.teamId));
-    final playersAsync = ref.watch(allPlayersProvider);
+    // Division players only; juvenile ones are screened in person (2.14)
+    final playersAsync = ref.watch(divisionPlayersProvider);
     final team = teamAsync.value;
 
     // This team's players, sorted by position group, then jersey number

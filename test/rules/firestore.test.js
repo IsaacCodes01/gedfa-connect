@@ -1,4 +1,4 @@
-// Security rules tests for GEDFA Connect (steps 1.7 to 2.13d).
+// Security rules tests for GEDFA Connect (steps 1.7 to 2.14a).
 //
 // Run while the emulators are running:
 //   cd test/rules
@@ -82,8 +82,12 @@ function addPlayer(db, playerId, data) {
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
+  // 'division-10', or 'juvenile-U13-10' for a juvenile player (2.14)
+  const jerseyId = data.category === 'juvenile'
+    ? `juvenile-${data.ageGroup}-${data.jerseyNo}`
+    : `${data.category}-${data.jerseyNo}`;
   batch.set(
-    doc(db, `${D}/teams/${data.teamId}/jerseys/${data.category}-${data.jerseyNo}`),
+    doc(db, `${D}/teams/${data.teamId}/jerseys/${jerseyId}`),
     { playerId, createdAt: serverTimestamp() },
   );
   batch.set(doc(db, `${D}/playerKeys/${data.playerKey}`), {
@@ -467,7 +471,7 @@ describe('Team admin: adding players', () => {
     }));
   });
 
-  it('cannot add a juvenile player yet', async () => {
+  it('cannot add a juvenile player like a Division one (no age group or guardian)', async () => {
     await assertFails(addPlayer(dbAs('admin1'), 'x1', newPlayer({ category: 'juvenile' })));
   });
 
@@ -599,6 +603,91 @@ describe('FA admin: team requests', () => {
 
   it('a role-less user cannot list teams', async () => {
     await assertFails(getDocs(collection(dbAs('newbie'), `${D}/teams`)));
+  });
+});
+
+// ---------- Juvenile players (2.14) ----------
+
+/** A juvenile player: born 2015 (11 in 2026), U13, with a mother. */
+function juvenileData(changes = {}) {
+  const born = changes.born ?? 2015;
+  const fullName = changes.fullName ?? 'Esi Mensah';
+  const data = playerData({
+    category: 'juvenile',
+    fullName,
+    fullNameLower: fullName.toLowerCase(),
+    dob: Timestamp.fromDate(new Date(Date.UTC(born, 2, 3))),
+    playerKey: `esi-mensah_${born}-03-03_juvenile`,
+    ageGroup: 'U13',
+    guardian: { relation: 'mother', name: 'Abena Mensah', phone: '+233245551234' },
+    jerseyNo: 9,
+    ...changes,
+  });
+  delete data.born;
+  return data;
+}
+
+describe('Juvenile players', () => {
+  beforeEach(async () => {
+    // Royal plays in both competitions
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `${D}/teams/royal`),
+        { name: 'Royal Unique FC', categories: ['division', 'juvenile'] });
+    });
+  });
+
+  it('a U13 player with a parent can be added', async () => {
+    await assertSucceeds(addPlayer(dbAs('admin1'), 'j1', juvenileData()));
+  });
+
+  it('a younger player can play up (born 2015 in U15)', async () => {
+    await assertSucceeds(addPlayer(dbAs('admin1'), 'j1', juvenileData({ ageGroup: 'U15' })));
+  });
+
+  it('nobody plays down (born 2011 = 15, not U13)', async () => {
+    await assertFails(addPlayer(dbAs('admin1'), 'j1', juvenileData({ born: 2011 })));
+    await assertSucceeds(addPlayer(dbAs('admin1'), 'j2', juvenileData({ born: 2011, ageGroup: 'U15' })));
+  });
+
+  it('nobody over 17 (born 2008 = 18)', async () => {
+    await assertFails(addPlayer(dbAs('admin1'), 'j1', juvenileData({ born: 2008, ageGroup: 'U17' })));
+  });
+
+  it('a parent or guardian is required', async () => {
+    await assertFails(addPlayer(dbAs('admin1'), 'j1', without(juvenileData(), 'guardian')));
+    await assertFails(addPlayer(dbAs('admin1'), 'j1',
+      juvenileData({ guardian: { relation: 'uncle', name: 'Kofi', phone: '+233245551234' } })));
+  });
+
+  it('each age group has its own jersey numbers', async () => {
+    await addPlayer(dbAs('admin1'), 'j1', juvenileData());
+    await assertSucceeds(addPlayer(dbAs('admin1'), 'j2', juvenileData({
+      fullName: 'Ama Owusu', playerKey: 'ama-owusu_2015-03-03_juvenile', ageGroup: 'U15',
+    })));
+  });
+
+  it('the same child can also be in the Division squad', async () => {
+    await addPlayer(dbAs('admin1'), 'j1', juvenileData({ born: 2010, ageGroup: 'U17' }));
+    await assertSucceeds(addPlayer(dbAs('admin1'), 'd1', playerData({
+      fullName: 'Esi Mensah', fullNameLower: 'esi mensah',
+      dob: Timestamp.fromDate(new Date(Date.UTC(2010, 2, 3))),
+      playerKey: 'esi-mensah_2010-03-03', jerseyNo: 23,
+    })));
+  });
+
+  it('a team not in the Juvenile competition cannot add juvenile players', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `${D}/teams/royal`),
+        { name: 'Royal Unique FC', categories: ['division'] });
+    });
+    await assertFails(addPlayer(dbAs('admin1'), 'j1', juvenileData()));
+  });
+
+  it('a Division player has no age group or guardian', async () => {
+    await assertFails(addPlayer(dbAs('admin1'), 'd1', playerData({
+      fullName: 'Kofi Mensah', fullNameLower: 'kofi mensah', playerKey: 'kofi-mensah_2003-05-01',
+      jerseyNo: 11, ageGroup: 'U17',
+    })));
   });
 });
 

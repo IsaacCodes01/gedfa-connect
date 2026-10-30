@@ -10,6 +10,7 @@ import 'package:gedfa_connect/core/widgets/pitch_lines_painter.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/core/widgets/status_badge.dart';
 import 'package:gedfa_connect/features/players/data/player_repository.dart';
+import 'package:gedfa_connect/features/players/domain/age_group.dart';
 import 'package:gedfa_connect/features/players/domain/player.dart';
 import 'package:gedfa_connect/features/players/presentation/widgets/player_photo.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
@@ -213,6 +214,30 @@ class _Details extends StatelessWidget {
                             ? 'Third Division · senior'
                             : 'Youth league',
                       ),
+                      // Juvenile (2.14): age group and parent or guardian
+                      if (player.ageGroup case final group?)
+                        _Row(
+                          label: 'Age group',
+                          value: group.label,
+                          note: AgeGroup.ownGroup(player.dob) == group
+                              ? 'Own age group'
+                              : 'Playing up (own group: '
+                                  '${AgeGroup.ownGroup(player.dob)?.label ?? '-'})',
+                        ),
+                      if (player.guardian case final guardian?)
+                        _Row(
+                          label: guardian.relation.label,
+                          value: guardian.name,
+                          note: '${guardian.phone} · only your team and the '
+                              'FA see this',
+                        ),
+                      if (player.isWaitingForScreening)
+                        const _Row(
+                          label: 'Screening',
+                          value: 'Waiting',
+                          note: 'Bring the player to the FA screening day '
+                              'with a birth certificate',
+                        ),
                       _Row(
                         label: 'Position',
                         value: player.position.code,

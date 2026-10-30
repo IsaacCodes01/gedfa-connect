@@ -38,7 +38,8 @@ class _FaPlayerTeamsScreenState extends ConsumerState<FaPlayerTeamsScreen> {
   @override
   Widget build(BuildContext context) {
     final teamsAsync = ref.watch(allTeamsProvider);
-    final playersAsync = ref.watch(allPlayersProvider);
+    // Division players only; juvenile ones are screened in person (2.14)
+    final playersAsync = ref.watch(divisionPlayersProvider);
 
     Widget body;
     final error = teamsAsync.error ?? playersAsync.error;

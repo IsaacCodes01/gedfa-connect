@@ -14,6 +14,7 @@ import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/features/league/data/league_settings_repository.dart';
 import 'package:gedfa_connect/features/notifications/presentation/pinned_announcement_card.dart';
 import 'package:gedfa_connect/features/players/data/player_repository.dart';
+import 'package:gedfa_connect/features/players/domain/age_group.dart';
 import 'package:gedfa_connect/features/players/presentation/widgets/position_rows.dart';
 import 'package:gedfa_connect/features/settings/presentation/widgets/settings_widgets.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
@@ -30,6 +31,7 @@ class TeamHomeScreen extends ConsumerStatefulWidget {
 
 class _TeamHomeScreenState extends ConsumerState<TeamHomeScreen> {
   Competition? _competition; // null = the team's first competition
+  AgeGroup _ageGroup = AgeGroup.u13; // Juvenile tab (2.14)
   ApprovalStatus? _status; // null = show everyone
   final _search = TextEditingController();
 
@@ -39,7 +41,7 @@ class _TeamHomeScreenState extends ConsumerState<TeamHomeScreen> {
     super.dispose();
   }
 
-  void _addPlayer() {
+  void _addPlayer({bool juvenile = false}) {
     // The FA can close player registration (2.13d)
     final open =
         ref.read(leagueSettingsProvider).value?.playerRegistrationOpen ?? true;
@@ -50,7 +52,9 @@ class _TeamHomeScreenState extends ConsumerState<TeamHomeScreen> {
       );
       return;
     }
-    context.go(Routes.addPlayer);
+    context.go(
+      juvenile ? Routes.addJuvenilePlayer(_ageGroup.label) : Routes.addPlayer,
+    );
   }
 
   @override
@@ -96,6 +100,9 @@ class _TeamHomeScreenState extends ConsumerState<TeamHomeScreen> {
             ?.where((p) => p.category == competition)
             .length ??
         0;
+    final addLabel =
+        isDivision ? 'Add player' : 'Add ${_ageGroup.label} player';
+    void add() => _addPlayer(juvenile: !isDivision);
 
     final playersOpen =
         ref.watch(leagueSettingsProvider).value?.playerRegistrationOpen ??
@@ -120,23 +127,23 @@ class _TeamHomeScreenState extends ConsumerState<TeamHomeScreen> {
         ),
         actions: const [NotificationBell()],
       ),
-      floatingActionButton: isDivision && squadCount > 0
+      floatingActionButton: squadCount > 0
           ? playersOpen
               ? FloatingActionButton.extended(
-                  onPressed: _addPlayer,
+                  onPressed: add,
                   icon: const Icon(Icons.add_rounded),
-                  label: const Text('Add player'),
+                  label: Text(addLabel),
                 )
               // Board L3: greyed out; a tap explains why
               : FloatingActionButton.extended(
-                  onPressed: _addPlayer,
+                  onPressed: add,
                   elevation: 0,
                   backgroundColor:
                       Theme.of(context).colorScheme.surfaceContainerHighest,
                   foregroundColor:
                       Theme.of(context).colorScheme.onSurfaceVariant,
                   icon: const Icon(Icons.lock_outline_rounded),
-                  label: const Text('Add player (closed)'),
+                  label: Text('$addLabel (closed)'),
                 )
           : null,
       body: Column(
@@ -178,11 +185,16 @@ class _TeamHomeScreenState extends ConsumerState<TeamHomeScreen> {
             ),
           Expanded(child: _SquadBody(
             competition: competition,
+            ageGroup: _ageGroup,
+            onAgeGroupChanged: (group) => setState(() {
+              _ageGroup = group;
+              _status = null;
+            }),
             status: _status,
             search: _search,
             onStatusChanged: (status) => setState(() => _status = status),
             onSearchChanged: () => setState(() {}),
-            onAddPlayer: _addPlayer,
+            onAddPlayer: add,
           )),
         ],
       ),
@@ -193,6 +205,8 @@ class _TeamHomeScreenState extends ConsumerState<TeamHomeScreen> {
 class _SquadBody extends ConsumerWidget {
   const _SquadBody({
     required this.competition,
+    required this.ageGroup,
+    required this.onAgeGroupChanged,
     required this.status,
     required this.search,
     required this.onStatusChanged,
@@ -201,6 +215,10 @@ class _SquadBody extends ConsumerWidget {
   });
 
   final Competition competition;
+
+  /// Juvenile: the age group tab (U13 / U15 / U17).
+  final AgeGroup ageGroup;
+  final ValueChanged<AgeGroup> onAgeGroupChanged;
 
   /// Which tile is selected (null = show everyone).
   final ApprovalStatus? status;
@@ -224,18 +242,52 @@ class _SquadBody extends ConsumerWidget {
         onRetry: () => ref.invalidate(teamPlayersProvider),
       ),
       data: (allPlayers) {
-        final squad =
+        final competitionPlayers =
             allPlayers.where((p) => p.category == competition).toList();
+        // Juvenile: one age group at a time (board J1)
+        final squad = isDivision
+            ? competitionPlayers
+            : competitionPlayers.where((p) => p.ageGroup == ageGroup).toList();
+        final ageTabs = isDivision
+            ? null
+            : _AgeGroupTabs(
+                selected: ageGroup,
+                counts: {
+                  for (final g in AgeGroup.values)
+                    g: competitionPlayers.where((p) => p.ageGroup == g).length,
+                },
+                onChanged: onAgeGroupChanged,
+              );
 
         if (squad.isEmpty) {
-          return isDivision
-              ? _EmptySquad(onAddPlayer: onAddPlayer)
-              : const EmptyView(
-                  icon: Icons.groups_outlined,
-                  title: 'Youth registration opens soon',
-                  message: 'You can add U13, U15 and U17 players once the FA '
-                      'confirms the juvenile age rules.',
-                );
+          if (isDivision) return _EmptySquad(onAddPlayer: onAddPlayer);
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
+            children: [
+              ResponsiveCenter(
+                maxWidth: 720,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    ?ageTabs,
+                    const SizedBox(height: 24),
+                    EmptyView(
+                      icon: Icons.groups_outlined,
+                      title: 'No ${ageGroup.label} players yet',
+                      message: 'Add them now. They wait for the FA\'s '
+                          'screening day, where each child is checked in '
+                          'person.',
+                    ),
+                    FilledButton.icon(
+                      onPressed: onAddPlayer,
+                      icon: const Icon(Icons.add_rounded),
+                      label: Text('Add ${ageGroup.label} player'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
         }
 
         int count(ApprovalStatus s) => squad.where((p) => p.status == s).length;
@@ -264,6 +316,7 @@ class _SquadBody extends ConsumerWidget {
                 children: [
                   // FA's pinned announcement (2.7), if any
                   const PinnedAnnouncementCard(),
+                  if (ageTabs != null) ...[ageTabs, const SizedBox(height: 12)],
                   Row(
                     children: [
                       _StatusTile(
@@ -278,7 +331,8 @@ class _SquadBody extends ConsumerWidget {
                       const SizedBox(width: 10),
                       _StatusTile(
                         value: count(ApprovalStatus.pending),
-                        label: 'Pending',
+                        // Juvenile players wait for the screening day
+                        label: isDivision ? 'Pending' : 'Screening',
                         color: isDark
                             ? const Color(0xFFF5D25B)
                             : const Color(0xFF8A6A00),
@@ -379,6 +433,91 @@ class _SquadBody extends ConsumerWidget {
         ApprovalStatus.pending => 'pending',
         ApprovalStatus.rejected => 'rejected',
       };
+}
+
+/// Board J1: U13 · 14 | U15 · 18 | U17 · 21, and a line saying who fits.
+class _AgeGroupTabs extends StatelessWidget {
+  const _AgeGroupTabs({
+    required this.selected,
+    required this.counts,
+    required this.onChanged,
+  });
+
+  final AgeGroup selected;
+  final Map<AgeGroup, int> counts;
+  final ValueChanged<AgeGroup> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            for (final group in AgeGroup.values) ...[
+              if (group != AgeGroup.values.first) const SizedBox(width: 8),
+              Expanded(
+                child: Semantics(
+                  selected: group == selected,
+                  button: true,
+                  child: Material(
+                    color: group == selected ? scheme.primary : scheme.surface,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: group == selected
+                          ? BorderSide.none
+                          : BorderSide(color: scheme.outline, width: 1.5),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      onTap: () => onChanged(group),
+                      child: SizedBox(
+                        height: 44,
+                        child: Center(
+                          child: Text.rich(
+                            TextSpan(
+                              text: group.label,
+                              children: [
+                                TextSpan(
+                                  text: ' · ${counts[group] ?? 0}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                              color: group == selected
+                                  ? scheme.onPrimary
+                                  : scheme.onSurface,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 6),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Text(
+            '${selected.bornText()}. Younger players can play up.',
+            style:
+                textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 /// One of the three numbers at the top. Tap to filter; the selected tile
