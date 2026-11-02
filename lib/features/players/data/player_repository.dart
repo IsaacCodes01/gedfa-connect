@@ -285,17 +285,18 @@ class PlayerRepository {
         'teamId': player.teamId,
         'createdAt': FieldValue.serverTimestamp(),
       });
-    // The FA's bell: "4 new players from Royal Unique FC" (one per day).
-    // Juvenile players wait for the screening day instead (2.14).
-    if (!player.isJuvenile) {
-      NotificationWriter(_db).forFaInBatch(
-        batch,
-        kind: NotificationKind.playersSubmitted,
-        teamId: player.teamId,
-        teamName: player.teamName,
-        name: player.fullName.trim(),
-      );
-    }
+    // The FA's bell: "4 new players from Royal Unique FC", or for
+    // juvenile players "9 juvenile players from Royal Unique FC" (2.14b).
+    // One note per team and day either way.
+    NotificationWriter(_db).forFaInBatch(
+      batch,
+      kind: player.isJuvenile
+          ? NotificationKind.juvenileSubmitted
+          : NotificationKind.playersSubmitted,
+      teamId: player.teamId,
+      teamName: player.teamName,
+      name: player.fullName.trim(),
+    );
 
     try {
       await _commit(batch, () => _checkFree(player));
@@ -549,8 +550,6 @@ final allPlayersProvider = StreamProvider<List<Player>>((ref) {
   return ref.watch(playerRepositoryProvider).watchAll();
 });
 
-/// FA: how many players are waiting for review (gold number on the
-/// Players tab).
 /// FA: the Division players only. The Players tab reviews these in the
 /// app; juvenile players are checked on the screening day (2.14).
 final divisionPlayersProvider = Provider<AsyncValue<List<Player>>>((ref) {
@@ -562,6 +561,19 @@ final divisionPlayersProvider = Provider<AsyncValue<List<Player>>>((ref) {
       );
 });
 
+/// FA: the juvenile players only (2.14b): Players › Juvenile.
+final juvenilePlayersProvider = Provider<AsyncValue<List<Player>>>((ref) {
+  return ref.watch(allPlayersProvider).whenData(
+        (players) => [
+          for (final p in players)
+            if (p.isJuvenile) p,
+        ],
+      );
+});
+
+/// FA: how many Division players are waiting for review (gold number on
+/// the Players tab). Juvenile players don't count: they wait for the
+/// screening day, not for the FA to open the app.
 final pendingPlayerCountProvider = Provider<int>((ref) {
   final players = ref.watch(divisionPlayersProvider).value ?? const [];
   return players.where((p) => p.status == ApprovalStatus.pending).length;

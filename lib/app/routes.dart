@@ -18,6 +18,12 @@ class Routes {
   static const adminPlayers = '/admin/players';
   static String adminTeamPlayers(String teamId) =>
       '$adminPlayers/team/$teamId';
+
+  /// FA: Players with the Juvenile switch on, and one team's juvenile
+  /// players by age group (2.14b, board J5).
+  static const adminPlayersJuvenile = '$adminPlayers?view=juvenile';
+  static String adminTeamJuvenile(String teamId) =>
+      '$adminPlayers/team/$teamId/juvenile';
   static String adminPlayer(String playerId) =>
       '$adminPlayers/player/$playerId';
   static const adminMore = '/admin/more';

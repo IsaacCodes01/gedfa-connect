@@ -13,6 +13,7 @@ enum NotificationKind {
   teamRequest,
   playersSubmitted,
   playersResubmitted,
+  juvenileSubmitted, // new juvenile players, waiting for screening (2.14b)
   inviteAccepted,
   paymentSent, // a team added a payment (2.13c)
   registrationChanged; // an FA official opened or closed registration
@@ -79,6 +80,9 @@ class AppNotification {
           people == 1
               ? 'Player resubmitted ($teamName)'
               : '$people players resubmitted ($teamName)',
+        NotificationKind.juvenileSubmitted => people == 1
+            ? 'New juvenile player from $teamName'
+            : '$people juvenile players from $teamName',
         NotificationKind.inviteAccepted =>
           people == 1 ? 'Invitation accepted' : '$people invitations accepted',
         NotificationKind.paymentConfirmed =>
@@ -106,6 +110,9 @@ class AppNotification {
           '$namesText. Waiting for your review in Players.',
         NotificationKind.playersResubmitted =>
           '$namesText. Waiting for your review in Players.',
+        NotificationKind.juvenileSubmitted =>
+          '$namesText. Waiting for the screening day; see Players › '
+              'Juvenile.',
         NotificationKind.inviteAccepted => '$namesText.',
         NotificationKind.paymentConfirmed =>
           '$namesText. See More › Season fee.',

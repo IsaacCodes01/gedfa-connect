@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.6, matches the rules after step 2.14a (30 Oct 2026)
+**Status:** v2.7, matches the rules after step 2.14b-1 (2 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -265,7 +265,7 @@ One collection for the whole district. Team admins see only their own team's pla
 | `teamId`          | string           |                                                                                                                                                                                                                                    |
 | `teamName`        | string           | Copied from the team                                                                                                                                                                                                               |
 | `category`        | string           | `division` or `juvenile`; must be one of the team's `categories`                                                                                                                                                             |
-| `ageGroup`        | string?          | **Juvenile only** (2.14): `U13`, `U15` or `U17`. Age = the season's **start** year − birth year (2026 for 2026/27). Own group or older (playing up); never younger; over 17 refused |
+| `ageGroup`        | string?          | **Juvenile only** (2.14): `U13`, `U15` or `U17`. Age = the season's **start** year − birth year (2026 for 2026/27). Own group or older; never younger; over 17 refused. The app registers a child in the group of the tab they were added from, or moves them **up** to their own group if too old for it (2.14b). Playing up for a match is a team-sheet choice (Phase 3) |
 | `guardian`        | map?             | **Juvenile only, required**: `{ relation: mother / father / guardian / other, name, phone }`. Team and FA only |
 | `fullName`        | string           | Entered once, reused everywhere                                                                                                                                                                                                    |
 | `fullNameLower`   | string           |                                                                                                                                                                                                                                    |
@@ -411,12 +411,12 @@ Readable and writable only by FA admins. Created with `next: 2` by the very firs
 | Field | Notes |
 | ----- | ----- |
 | `audience` | `fa` or `team:<teamId>` |
-| `kind` | `playersApproved`, `playersRejected`, `teamApproved`, `paymentConfirmed`, `paymentNotFound`, `feeReminder` (for teams, written by the FA); `teamRequest`, `playersSubmitted`, `playersResubmitted`, `inviteAccepted`, `paymentSent` (for the FA) |
+| `kind` | `playersApproved`, `playersRejected`, `teamApproved`, `paymentConfirmed`, `paymentNotFound`, `feeReminder` (for teams, written by the FA); `teamRequest`, `playersSubmitted`, `playersResubmitted`, `juvenileSubmitted`, `inviteAccepted`, `paymentSent` (for the FA) |
 | `teamId`, `teamName` | The team concerned (`teamRequest`: the club's uid) |
 | `names` | e.g. `Kojo Arthur (GE26-0011)`, `Yaw Boateng: Jersey number #10 → #14` |
 | `count`, `day`, `updatedAt` | |
 
-- Written in the **same batch or transaction** as the action. Teams write only `playersSubmitted` / `playersResubmitted` for their own team; only the FA writes team notifications.
+- Written in the **same batch or transaction** as the action. Teams write only `playersSubmitted` / `playersResubmitted` / `juvenileSubmitted` / `paymentSent` for their own team; only the FA writes team notifications.
 - Read: the FA reads `fa`; a team admin reads `team:<their team>`.
 - Indexes: `audience` + `updatedAt` (desc); announcements `to` + `createdAt` (desc). See `firestore.indexes.json`.
 
@@ -596,6 +596,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 2 Nov 2026 | v2.7 (2.14b-1): notification kind `juvenileSubmitted` ("9 juvenile players from X", one per team and day); "Register in" follows the tab, moving up only. 215 tests. |
 | 30 Oct 2026 | v2.6 (2.14a): juvenile players: `ageGroup`, `guardian`, jersey IDs `juvenile-U13-10`, player keys `…_juvenile`; the rules check the age group from the season's start year. 214 tests. |
 | 30 Oct 2026 | v2.5 (2.13d): `settings/league` rules and fields (registration switches, squad numbers, season / fee / MoMo by the chairman), `settingsLog`, `registrationChanged` notification; the payment cap follows the fee. 205 tests. |
 | 28 Oct 2026 | v2.4 (2.13c-2): payments after approval; notification kinds `paymentConfirmed`, `paymentNotFound`, `feeReminder`, `paymentSent`; `teams.requestUid` used for the fee. 195 tests. |

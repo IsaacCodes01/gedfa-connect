@@ -49,6 +49,17 @@ enum AgeGroup {
     return values.where((g) => g.index >= own.index).toList();
   }
 
+  /// The group a player registers in when added from the [tab]'s
+  /// "Add player" (Isaac's rule, 30 Oct 2026): the tab's group if the
+  /// child is young enough for it, otherwise moved UP to their own group.
+  /// Never moved down: a 13-year-old added from U15 stays in U15 and can
+  /// still play U13 matches. Null if too old for Juvenile.
+  static AgeGroup? registerIn(DateTime dob, AgeGroup tab, [String? season]) {
+    final own = ownGroup(dob, season);
+    if (own == null) return null;
+    return tab.index >= own.index ? tab : own;
+  }
+
   /// "Born 2013 or later" for the tab's note.
   String bornText([String? season]) {
     final year = Season.startYear(season ?? Season.current) - maxAge;

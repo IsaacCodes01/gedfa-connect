@@ -18,6 +18,7 @@ import 'package:gedfa_connect/features/fa/presentation/fa_player_review_screen.d
 import 'package:gedfa_connect/features/fa/presentation/fa_player_teams_screen.dart';
 import 'package:gedfa_connect/features/fa/presentation/fa_request_review_screen.dart';
 import 'package:gedfa_connect/features/fa/presentation/fa_requests_screen.dart';
+import 'package:gedfa_connect/features/fa/presentation/fa_team_juvenile_screen.dart';
 import 'package:gedfa_connect/features/fa/presentation/fa_team_players_screen.dart';
 import 'package:gedfa_connect/features/auth/presentation/verify_email_screen.dart';
 import 'package:gedfa_connect/features/auth/presentation/forgot_password_screen.dart';
@@ -129,7 +130,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: Routes.adminPlayers,
-                builder: (_, _) => const FaPlayerTeamsScreen(),
+                // ?view=juvenile opens the Juvenile side (2.14b)
+                builder: (_, state) => FaPlayerTeamsScreen(
+                  juvenile: state.uri.queryParameters['view'] == 'juvenile',
+                ),
                 routes: [
                   // One team's players. Inside the tab (bottom bar stays).
                   GoRoute(
@@ -137,6 +141,15 @@ final routerProvider = Provider<GoRouter>((ref) {
                     builder: (_, state) => FaTeamPlayersScreen(
                       teamId: state.pathParameters['teamId']!,
                     ),
+                    routes: [
+                      // Its juvenile players by age group (2.14b)
+                      GoRoute(
+                        path: 'juvenile',
+                        builder: (_, state) => FaTeamJuvenileScreen(
+                          teamId: state.pathParameters['teamId']!,
+                        ),
+                      ),
+                    ],
                   ),
                   // Review one player. Full-screen, above the tabs.
                   GoRoute(

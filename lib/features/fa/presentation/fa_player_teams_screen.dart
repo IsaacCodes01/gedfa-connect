@@ -6,14 +6,17 @@ import 'package:gedfa_connect/core/constants/approval_status.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/initials.dart';
+import 'package:gedfa_connect/core/widgets/count_tabs.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/notification_bell.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/core/widgets/status_badge.dart';
 import 'package:gedfa_connect/features/players/data/player_repository.dart';
+import 'package:gedfa_connect/features/players/domain/age_group.dart';
 import 'package:gedfa_connect/features/players/domain/player.dart';
 import 'package:gedfa_connect/features/players/presentation/widgets/player_photo.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
+import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/teams/domain/team.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/team_logo.dart';
 import 'package:go_router/go_router.dart';
@@ -24,8 +27,16 @@ import 'package:go_router/go_router.dart';
 ///
 /// The search also finds single players (by name, player ID or #number)
 /// across all teams.
+///
+/// 2.14b (board J5): a "Division | Juvenile" switch at the top. Juvenile
+/// shows how many children wait for screening in each age group, and the
+/// teams with their age groups. The switch lives in the address
+/// (`?view=juvenile`), so the bell and the Back button can open either.
 class FaPlayerTeamsScreen extends ConsumerStatefulWidget {
-  const FaPlayerTeamsScreen({super.key});
+  const FaPlayerTeamsScreen({super.key, this.juvenile = false});
+
+  /// True: the Juvenile side is showing.
+  final bool juvenile;
 
   @override
   ConsumerState<FaPlayerTeamsScreen> createState() =>
@@ -38,8 +49,7 @@ class _FaPlayerTeamsScreenState extends ConsumerState<FaPlayerTeamsScreen> {
   @override
   Widget build(BuildContext context) {
     final teamsAsync = ref.watch(allTeamsProvider);
-    // Division players only; juvenile ones are screened in person (2.14)
-    final playersAsync = ref.watch(divisionPlayersProvider);
+    final playersAsync = ref.watch(allPlayersProvider);
 
     Widget body;
     final error = teamsAsync.error ?? playersAsync.error;
@@ -54,7 +64,33 @@ class _FaPlayerTeamsScreenState extends ConsumerState<FaPlayerTeamsScreen> {
     } else if (!teamsAsync.hasValue || !playersAsync.hasValue) {
       body = const LoadingView();
     } else {
-      body = _body(teamsAsync.requireValue, playersAsync.requireValue);
+      final teams = teamsAsync.requireValue;
+      final all = playersAsync.requireValue;
+      final division = [for (final p in all) if (!p.isJuvenile) p];
+      final juvenile = [for (final p in all) if (p.isJuvenile) p];
+      body = Column(
+        children: [
+          _ViewSwitch(
+            juvenile: widget.juvenile,
+            toReview: division
+                .where((p) => p.status == ApprovalStatus.pending)
+                .length,
+            waiting: juvenile.where((p) => p.isWaitingForScreening).length,
+            // A new search for each side
+            onChanged: (value) {
+              setState(() => _search = '');
+              context.go(
+                value ? Routes.adminPlayersJuvenile : Routes.adminPlayers,
+              );
+            },
+          ),
+          Expanded(
+            child: widget.juvenile
+                ? _juvenileBody(teams, juvenile)
+                : _body(teams, division),
+          ),
+        ],
+      );
     }
 
     return Scaffold(
@@ -64,6 +100,140 @@ class _FaPlayerTeamsScreenState extends ConsumerState<FaPlayerTeamsScreen> {
         actions: [NotificationBell()],
       ),
       body: body,
+    );
+  }
+
+  /// The Juvenile side (board J5): waiting per age group, then the teams
+  /// with an age-group chip each. The search finds teams and children.
+  Widget _juvenileBody(List<Team> teams, List<Player> players) {
+    final textTheme = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
+
+    // Per team, per age group: how many children, how many waiting
+    final stats = <String, Map<AgeGroup, _GroupCount>>{};
+    for (final player in players) {
+      final group = player.ageGroup;
+      if (group == null) continue;
+      final count = stats
+          .putIfAbsent(player.teamId, () => {})
+          .putIfAbsent(group, _GroupCount.new);
+      count.total++;
+      if (player.isWaitingForScreening) count.waiting++;
+    }
+    int waitingIn(AgeGroup group) => players
+        .where((p) => p.ageGroup == group && p.isWaitingForScreening)
+        .length;
+    int waitingAt(String teamId) => (stats[teamId]?.values ?? const [])
+        .fold(0, (sum, c) => sum + c.waiting);
+
+    // Juvenile teams (and any team that still has juvenile players)
+    final query = _search.trim().toLowerCase();
+    final shownTeams = teams
+        .where((team) =>
+            team.categories.contains(Competition.juvenile) ||
+            stats.containsKey(team.id))
+        .where((team) =>
+            query.isEmpty ||
+            team.name.toLowerCase().contains(query) ||
+            team.shortName.toLowerCase().contains(query))
+        .toList()
+      ..sort((a, b) {
+        final byWaiting = waitingAt(b.id).compareTo(waitingAt(a.id));
+        return byWaiting != 0
+            ? byWaiting
+            : a.name.toLowerCase().compareTo(b.name.toLowerCase());
+      });
+
+    final matchingChildren = query.isEmpty
+        ? const <Player>[]
+        : players.where((p) => p.matches(query)).take(20).toList();
+    final gold = Theme.of(context).brightness == Brightness.dark
+        ? const Color(0xFFF5D25B)
+        : const Color(0xFF8A6A00);
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+      children: [
+        ResponsiveCenter(
+          maxWidth: 720,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  for (final group in AgeGroup.values) ...[
+                    if (group != AgeGroup.values.first)
+                      const SizedBox(width: 10),
+                    _TotalCard(
+                      value: waitingIn(group),
+                      label: '${group.label} waiting',
+                      color: waitingIn(group) > 0 ? gold : scheme.onSurface,
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                key: const ValueKey('juvenile-search'),
+                decoration: const InputDecoration(
+                  hintText: 'Search a team or child',
+                  prefixIcon: Icon(Icons.search_rounded),
+                ),
+                textInputAction: TextInputAction.search,
+                onChanged: (value) => setState(() => _search = value),
+              ),
+              const SizedBox(height: 12),
+
+              if (matchingChildren.isNotEmpty) ...[
+                _SmallHeading('Children · ${matchingChildren.length}'),
+                for (final child in matchingChildren) ...[
+                  _PlayerResult(
+                    player: child,
+                    onTap: () =>
+                        context.go(Routes.adminTeamJuvenile(child.teamId)),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                const SizedBox(height: 8),
+                _SmallHeading('Teams · ${shownTeams.length}'),
+              ],
+
+              if (shownTeams.isEmpty && matchingChildren.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 40),
+                  child: EmptyView(
+                    icon: Icons.child_care_outlined,
+                    title: query.isEmpty ? 'No juvenile teams yet' : 'No match',
+                    message: query.isEmpty
+                        ? 'Approved clubs in the Juvenile competition will '
+                            'appear here.'
+                        : 'No team or child matches "$_search".',
+                  ),
+                )
+              else ...[
+                for (final team in shownTeams) ...[
+                  _JuvenileTeamCard(
+                    team: team,
+                    groups: stats[team.id] ?? const {},
+                    onTap: () => context.go(Routes.adminTeamJuvenile(team.id)),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
+                  child: Text(
+                    'Tap a team to see its children by age group, with '
+                    'photo, date of birth and parent. Decisions are made on '
+                    'the screening day.',
+                    style: textTheme.bodySmall
+                        ?.copyWith(color: scheme.onSurfaceVariant),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -104,7 +274,7 @@ class _FaPlayerTeamsScreenState extends ConsumerState<FaPlayerTeamsScreen> {
         : players.where((p) => p.matches(query)).take(20).toList();
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
       children: [
         ResponsiveCenter(
           maxWidth: 720,
@@ -138,6 +308,7 @@ class _FaPlayerTeamsScreenState extends ConsumerState<FaPlayerTeamsScreen> {
               ),
               const SizedBox(height: 12),
               TextField(
+                key: const ValueKey('division-search'),
                 decoration: const InputDecoration(
                   hintText: 'Team, player name or player ID',
                   prefixIcon: Icon(Icons.search_rounded),
@@ -195,6 +366,153 @@ class _FaPlayerTeamsScreenState extends ConsumerState<FaPlayerTeamsScreen> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// "Division · 7 | Juvenile · 62" at the top of the tab (board J5).
+class _ViewSwitch extends StatelessWidget {
+  const _ViewSwitch({
+    required this.juvenile,
+    required this.toReview,
+    required this.waiting,
+    required this.onChanged,
+  });
+
+  final bool juvenile;
+
+  /// Division players to review
+  final int toReview;
+
+  /// Juvenile players waiting for screening
+  final int waiting;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+      child: ResponsiveCenter(
+        maxWidth: 720,
+        child: CountTabs<bool>(
+          tabs: [
+            CountTab(
+              value: false,
+              label: 'Division',
+              count: toReview,
+              highlight: true,
+            ),
+            CountTab(
+              value: true,
+              label: 'Juvenile',
+              count: waiting,
+              highlight: true,
+            ),
+          ],
+          selected: juvenile,
+          onChanged: onChanged,
+        ),
+      ),
+    );
+  }
+}
+
+/// One team's children in one age group.
+class _GroupCount {
+  int total = 0;
+  int waiting = 0;
+}
+
+/// A juvenile team: logo, name and one chip per age group:
+/// gold "U13 · 9 waiting", or grey "U17 · 4" when nobody waits.
+class _JuvenileTeamCard extends StatelessWidget {
+  const _JuvenileTeamCard({
+    required this.team,
+    required this.groups,
+    required this.onTap,
+  });
+
+  final Team team;
+  final Map<AgeGroup, _GroupCount> groups;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final goldBg = isDark ? const Color(0xFF3D3410) : const Color(0xFFFFF6CC);
+    final goldInk = isDark ? const Color(0xFFF5D25B) : const Color(0xFF5C4700);
+    final greyBg = isDark ? AppColors.darkBorder : const Color(0xFFDCE6F2);
+
+    final chips = [
+      for (final group in AgeGroup.values)
+        if (groups[group] case final count?)
+          count.waiting > 0
+              ? _Pill(
+                  text: '${group.label} · ${count.waiting} waiting',
+                  background: goldBg,
+                  foreground: goldInk,
+                )
+              : _Pill(
+                  text: '${group.label} · ${count.total}',
+                  background: greyBg,
+                  foreground: scheme.onSurfaceVariant,
+                ),
+    ];
+
+    return Material(
+      color: scheme.surface,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: scheme.outline),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              TeamLogo(
+                label: initialsFor(team.name),
+                color: team.logoColor,
+                url: team.logoUrl,
+                size: 46,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      team.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.titleSmall
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 4),
+                    if (chips.isEmpty)
+                      Text(
+                        'No juvenile players yet',
+                        style: textTheme.bodySmall
+                            ?.copyWith(color: scheme.onSurfaceVariant),
+                      )
+                    else
+                      Wrap(spacing: 6, runSpacing: 6, children: chips),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: scheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -471,6 +789,7 @@ class _PlayerResult extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final code = player.playerCode;
 
     return Material(
@@ -500,11 +819,12 @@ class _PlayerResult extends StatelessWidget {
                           ?.copyWith(fontWeight: FontWeight.w600),
                     ),
                     Text(
-                     [
-                      player.teamName,
-                      '#${player.jerseyNo}',
-                      ?code,
-                    ].join(' · '),
+                      [
+                        player.teamName,
+                        ?player.ageGroup?.label,
+                        '#${player.jerseyNo}',
+                        ?code,
+                      ].join(' · '),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: textTheme.bodySmall
@@ -514,7 +834,19 @@ class _PlayerResult extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              StatusBadge(status: player.status),
+              // Juvenile children waiting: "Screening", not "Pending"
+              if (player.isWaitingForScreening)
+                _Pill(
+                  text: 'Screening',
+                  background: isDark
+                      ? const Color(0xFF3D3410)
+                      : const Color(0xFFFFF6CC),
+                  foreground: isDark
+                      ? const Color(0xFFF5D25B)
+                      : const Color(0xFF5C4700),
+                )
+              else
+                StatusBadge(status: player.status),
             ],
           ),
         ),

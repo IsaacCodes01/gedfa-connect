@@ -56,7 +56,12 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
   bool _busy = false;
 
   // Juvenile only (2.14)
-  late AgeGroup? _ageGroup = AgeGroup.fromString(widget.juvenileGroup);
+  /// The tab the club came from ("Add U13 player"), or the player's
+  /// group when editing. The date of birth may move them UP from it.
+  late AgeGroup? _tab = AgeGroup.fromString(widget.juvenileGroup);
+
+  /// The group they will register in (board J2): only this chip is lit.
+  late AgeGroup? _ageGroup = _tab;
   GuardianRelation? _relation;
   final _guardianName = TextEditingController();
   final _guardianPhone = TextEditingController();
@@ -94,6 +99,7 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
     _dobText.text = formatDate(player.dob);
     _position = player.position;
     _jersey.text = '${player.jerseyNo}';
+    _tab = player.ageGroup;
     _ageGroup = player.ageGroup;
     final guardian = player.guardian;
     if (guardian != null) {
@@ -126,10 +132,11 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
     setState(() {
       _dob = DateTime(picked.year, picked.month, picked.day);
       _dobText.text = formatDate(_dob!);
-      // Keep the chosen group only if the child may play in it
-      final allowed = AgeGroup.allowedFor(_dob!);
-      if (_isJuvenile && !allowed.contains(_ageGroup)) {
-        _ageGroup = allowed.isEmpty ? _ageGroup : allowed.first;
+      // The tab's group, or moved up if the child is too old for it.
+      // Too old for Juvenile: keep the tab (saving is blocked anyway).
+      final tab = _tab;
+      if (_isJuvenile && tab != null) {
+        _ageGroup = AgeGroup.registerIn(_dob!, tab) ?? tab;
       }
     });
   }
@@ -271,7 +278,8 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
         AppToast.success(
           context,
           draft.isJuvenile
-              ? '${draft.fullName} added. Bring them to the screening day.'
+              ? '${draft.fullName} added to ${draft.ageGroup?.label}. '
+                  'Bring them to the screening day.'
               : '${draft.fullName} sent to the FA.',
         );
         context.go(Routes.team);
@@ -303,7 +311,7 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
     final title = _isEdit
         ? 'Edit player'
         : _isJuvenile
-            ? 'Add ${_ageGroup?.label ?? 'juvenile'} player'
+            ? 'Add ${_tab?.label ?? 'juvenile'} player'
             : 'Add player';
 
     if (team == null || !playersAsync.hasValue) {
@@ -464,9 +472,8 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
           const SizedBox(height: 12),
           _GroupChips(
             dob: _dob!,
+            tab: _tab,
             selected: _ageGroup,
-            enabled: !_busy,
-            onSelected: (group) => setState(() => _ageGroup = group),
           ),
         ],
         gap,
@@ -652,26 +659,59 @@ class _AgeBox extends StatelessWidget {
   }
 }
 
-/// "Register in  [U13] [U15] [U17]": own group or older (playing up).
+/// "Register in  [U13] [U15] [U17]" (board J2). The club can't pick:
+/// only the group from [AgeGroup.registerIn] is lit, the other two are
+/// greyed out. A note under them says why.
 class _GroupChips extends StatelessWidget {
   const _GroupChips({
     required this.dob,
+    required this.tab,
     required this.selected,
-    required this.enabled,
-    required this.onSelected,
   });
 
   final DateTime dob;
+
+  /// The tab they came from, e.g. U13
+  final AgeGroup? tab;
+
+  /// Where they will register, e.g. U15
   final AgeGroup? selected;
-  final bool enabled;
-  final ValueChanged<AgeGroup> onSelected;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final own = AgeGroup.ownGroup(dob);
-    final allowed = AgeGroup.allowedFor(dob);
+    final tab = this.tab;
+    final selected = this.selected;
+    final movedUp = tab != null && selected != null && selected != tab;
+
+    // Gold when moved up (worth noticing), blue otherwise
+    final (bg, ink, icon) = movedUp
+        ? (
+            isDark ? const Color(0xFF3D3410) : const Color(0xFFFFF6CC),
+            isDark ? const Color(0xFFF5D25B) : const Color(0xFF5C4700),
+            Icons.arrow_upward_rounded,
+          )
+        : (
+            isDark ? const Color(0xFF1E3A5F) : const Color(0xFFE3EEFA),
+            isDark ? const Color(0xFFCFE4FB) : const Color(0xFF0B3F7A),
+            Icons.info_outline_rounded,
+          );
+
+    final String note;
+    if (tab != null && selected != null && selected != tab) {
+      final bornFrom = Season.startYear(Season.current) - tab.maxAge;
+      note = 'Too old for ${tab.label} (born before $bornFrom). Moved up '
+          'to ${selected.label}. This player will be on the '
+          '${selected.label} tab.';
+    } else if (own != null && selected != null && selected != own) {
+      note = '${own.label} age, registered in the ${selected.label} squad. '
+          'The coach can also pick them for ${own.label} matches.';
+    } else {
+      note = 'Own age group. On match day the coach can pick them to play '
+          'up (GFA limits apply).';
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -690,23 +730,35 @@ class _GroupChips extends StatelessWidget {
                   label: Text(group.label),
                   selected: selected == group,
                   showCheckmark: false,
-                  // Younger groups are greyed out: nobody plays down
-                  onSelected: enabled && allowed.contains(group)
-                      ? (_) => onSelected(group)
-                      : null,
+                  // Only the lit chip is enabled; tapping it does nothing.
+                  // A null onSelected greys the others out.
+                  onSelected: selected == group ? (_) {} : null,
                 ),
               ),
             ],
           ],
         ),
-        const SizedBox(height: 6),
-        Text(
-          selected == own
-              ? 'Own age group. Younger players can play up; nobody can '
-                  'play down.'
-              : 'Playing up in ${selected?.label}. On team sheets the GFA '
-                  'limits how many younger players play up.',
-          style: textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, size: 18, color: ink),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  note,
+                  style: textTheme.bodySmall
+                      ?.copyWith(fontSize: 12.5, height: 1.45, color: ink),
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );

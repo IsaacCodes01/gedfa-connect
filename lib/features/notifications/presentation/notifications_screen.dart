@@ -243,6 +243,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         (_Look.ok, Routes.adminTeamPlayers(n.teamId)),
       NotificationKind.playersResubmitted =>
         (_Look.no, Routes.adminTeamPlayers(n.teamId)),
+      // Players › Juvenile › that team's children
+      NotificationKind.juvenileSubmitted =>
+        (_Look.fa, Routes.adminTeamJuvenile(n.teamId)),
       NotificationKind.inviteAccepted => (_Look.ref, Routes.adminPeople),
       NotificationKind.paymentConfirmed => (_Look.ok, Routes.teamFee),
       NotificationKind.paymentNotFound => (_Look.no, Routes.teamFee),

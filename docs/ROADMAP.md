@@ -210,7 +210,8 @@ Time estimates assume part-time work and are rough guides.
   - [x] 2.13d **League settings:** FA › More › League settings: team and player registration switches (by hand; history and a bell note for every official), squad 30 / matchday 16 / subs 5 / fewest players 7, season, fee and MoMo number (chairman only), tie-breakers as the Premier League; closed registration hides the buttons and the rules refuse it. 205 rules tests *(done 30 Oct 2026)*
 - [ ] 2.14 **Juvenile** (mockups J1–J4): age group = season start year − birth year (U13 / U15 / U17); play up allowed (GFA limits on the team sheet), overage blocked; parent or guardian required
   - [x] 2.14a **Juvenile players:** Squad › Juvenile with U13 / U15 / U17 tabs; add a player per age group (date picker, age-group box, "Register in" own group or older, parent or guardian); "waiting for screening"; jersey numbers per age group; the same child may also play Division; Juvenile kept out of the FA Players tab. 214 rules tests *(done 30 Oct 2026)*
-  - [ ] 2.14b **Screening days:** FA › More › Juvenile screening; saving announces it to Juvenile teams; a blue card on their Squad tab until the day after
+  - [x] 2.14b-1 **FA sees juvenile players** (J2, J5): "Register in" follows the tab the club came from and only moves a child UP when too old (Isaac, 30 Oct 2026); FA Players tab gets a Division | Juvenile switch (waiting per age group, teams with age-group chips, a team's children with photo, date of birth and parent); bell note "N juvenile players from X". Badge stays Division only. 215 rules tests *(done 2 Nov 2026)*
+  - [ ] 2.14b-2 **Screening days** (J3): FA › More › Juvenile screening; saving announces it to Juvenile teams; a blue card on their Squad tab until the day after; "Next screening" strip on Players › Juvenile
   - [ ] 2.14c **Screening decisions:** pass in U13, U15 or U17 (moved up, no second screening) with a `GJ26-0001` ID, or "not eligible for Juvenile" with a reason (blocked from all juvenile groups)
 
 ### Phase 3 — Team sheet builder and PDF
@@ -308,6 +309,7 @@ Work backwards from the GEDFA season start date to decide what the pilot must co
 | 12 Oct 2026 | Renamed to GEDFA Connect; dev/prod projects created |
 | 13 Oct 2026 | Phase 0 complete; added 0.8 design foundation, 1.0 emulators, 1.1a toasts/connectivity/responsive; invite-only roles (2.6); FA announcements (2.7); new Phase 5.5 League feed; navigation, connectivity and responsive standards; pre-pilot checklist |
 | 17 Oct 2026 | 1.1b, 1.2, 1.3 done; new 1.3b Competitions (Division / Juvenile, one registration per club); 1.4 split into Division first, Juvenile after GEDFA answers |
+| 2 Nov 2026 | 2.14b-1 done: FA Players Division / Juvenile switch, juvenile bell note, "Register in" by tab. Isaac: playing up for a match is chosen on the team sheet (Phase 3); a younger child registered in an older squad stays there and can still play their own age |
 | 30 Oct 2026 | 2.14a done: juvenile players by age group, parent or guardian, waiting for screening. GEDFA: moved-up children are not screened again; juvenile IDs `GJ26-…`; the screening day is the only check; 16–17-year-olds may also play Division |
 | 30 Oct 2026 | 2.13d done: League settings; 2.13 complete |
 | 28 Oct 2026 | 2.13c-2 done: team Season fee screen and payments after approval, FA Season fees and reminders, payment notifications |

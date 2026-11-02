@@ -1896,6 +1896,13 @@ describe('Notifications', () => {
       { audience: 'fa', kind: 'playersSubmitted', teamId: 'stars' }));
   });
 
+  it('a team notifies the FA about its own new juvenile players only (2.14b)', async () => {
+    await assertSucceeds(notify(dbAs('admin1'), 'fa_juvenileSubmitted_royal',
+      { audience: 'fa', kind: 'juvenileSubmitted', teamId: 'royal' }));
+    await assertFails(notify(dbAs('admin1'), 'fa_juvenileSubmitted_stars',
+      { audience: 'fa', kind: 'juvenileSubmitted', teamId: 'stars' }));
+  });
+
   it('only the FA reads the FA\'s notifications', async () => {
     await notify(dbAs('admin1'), 'fa_n', { audience: 'fa', kind: 'playersSubmitted', teamId: 'royal' });
     await assertSucceeds(getDocs(query(collection(dbAs('fa1'), `${D}/notifications`),
