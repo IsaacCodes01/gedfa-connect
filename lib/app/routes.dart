@@ -32,6 +32,9 @@ class Routes {
   /// FA: what every team has paid this season, and one team (2.13c).
   static const adminFees = '/admin/more/fees';
 
+  /// FA: juvenile screening days (2.14b, board J3).
+  static const adminScreening = '/admin/more/screening';
+
   /// FA: registration switches, squad numbers, season and fee (2.13d).
   static const adminLeagueSettings = '/admin/more/league';
   static String adminTeamFee(String teamId) => '$adminFees/team/$teamId';

@@ -15,6 +15,7 @@ import 'package:gedfa_connect/features/players/data/player_repository.dart';
 import 'package:gedfa_connect/features/players/domain/age_group.dart';
 import 'package:gedfa_connect/features/players/domain/player.dart';
 import 'package:gedfa_connect/features/players/presentation/widgets/player_photo.dart';
+import 'package:gedfa_connect/features/screening/presentation/widgets/next_screening_strip.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/teams/domain/team.dart';
@@ -172,6 +173,8 @@ class _FaPlayerTeamsScreenState extends ConsumerState<FaPlayerTeamsScreen> {
                   ],
                 ],
               ),
+              const SizedBox(height: 12),
+              const NextScreeningStrip(),
               const SizedBox(height: 12),
               TextField(
                 key: const ValueKey('juvenile-search'),

@@ -16,6 +16,7 @@ import 'package:gedfa_connect/features/notifications/presentation/pinned_announc
 import 'package:gedfa_connect/features/players/data/player_repository.dart';
 import 'package:gedfa_connect/features/players/domain/age_group.dart';
 import 'package:gedfa_connect/features/players/presentation/widgets/position_rows.dart';
+import 'package:gedfa_connect/features/screening/presentation/widgets/screening_card.dart';
 import 'package:gedfa_connect/features/settings/presentation/widgets/settings_widgets.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
@@ -258,6 +259,18 @@ class _SquadBody extends ConsumerWidget {
                 },
                 onChanged: onAgeGroupChanged,
               );
+        // Juvenile: the blue screening card(s) above the age tabs (J1)
+        final screening = isDivision
+            ? null
+            : ScreeningCards(
+                waiting: {
+                  for (final g in AgeGroup.values)
+                    g: competitionPlayers
+                        .where((p) =>
+                            p.ageGroup == g && p.isWaitingForScreening)
+                        .length,
+                },
+              );
 
         if (squad.isEmpty) {
           if (isDivision) return _EmptySquad(onAddPlayer: onAddPlayer);
@@ -269,6 +282,7 @@ class _SquadBody extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    ?screening,
                     ?ageTabs,
                     const SizedBox(height: 24),
                     EmptyView(
@@ -316,6 +330,7 @@ class _SquadBody extends ConsumerWidget {
                 children: [
                   // FA's pinned announcement (2.7), if any
                   const PinnedAnnouncementCard(),
+                  ?screening,
                   if (ageTabs != null) ...[ageTabs, const SizedBox(height: 12)],
                   Row(
                     children: [

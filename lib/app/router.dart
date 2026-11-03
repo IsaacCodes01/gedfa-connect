@@ -40,6 +40,7 @@ import 'package:gedfa_connect/features/players/presentation/player_form_screen.d
 import 'package:gedfa_connect/features/players/presentation/player_profile_edit_screen.dart';
 import 'package:gedfa_connect/features/players/presentation/player_profile_screen.dart';
 import 'package:gedfa_connect/features/players/presentation/team_positions_screen.dart';
+import 'package:gedfa_connect/features/screening/presentation/fa_screening_days_screen.dart';
 import 'package:gedfa_connect/features/settings/presentation/change_email_screen.dart';
 import 'package:gedfa_connect/features/settings/presentation/more_screen.dart';
 import 'package:gedfa_connect/features/settings/presentation/my_profile_screen.dart';
@@ -188,6 +189,11 @@ final routerProvider = Provider<GoRouter>((ref) {
                         ),
                       ),
                     ],
+                  ),
+                  // FA only: Juvenile screening days (2.14b). More tab.
+                  GoRoute(
+                    path: 'screening',
+                    builder: (_, _) => const FaScreeningDaysScreen(),
                   ),
                   // FA only: League settings (2.13d). Inside the More tab.
                   GoRoute(

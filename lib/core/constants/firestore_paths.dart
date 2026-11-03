@@ -65,6 +65,11 @@ class FirestorePaths {
   /// Who changed which league setting, and when (2.13d). FA only.
   static const settingsLog = '$district/settingsLog';
 
+  /// Juvenile screening days (2.14b): read by everyone with a role,
+  /// written by the FA.
+  static const screeningDays = '$district/screeningDays';
+  static String screeningDay(String id) => '$district/screeningDays/$id';
+
   /// The next player-ID number: `{ next: 43 }`. FA only.
   static const playerCounter = '$district/settings/playerCounter';
 }

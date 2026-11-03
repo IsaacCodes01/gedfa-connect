@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.7, matches the rules after step 2.14b-1 (2 Nov 2026)
+**Status:** v2.8, matches the rules after step 2.14b-2 (2 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -462,6 +462,21 @@ The affiliation fee is **GH₵ 1,000 every season**, paid to GEDFA's MoMo (numbe
 
 `{ next: 15 }`. FA only; moves on by exactly 1 per receipt, like `settings/playerCounter`.
 
+### 2.14 `screeningDays/{id}` — juvenile screening days (2.14b)
+
+| Field | Notes |
+| ----- | ----- |
+| `startsAt` | timestamp, date and start time; must be in the future when saved |
+| `venue` | 2–80 characters |
+| `groups` | 1–3 of `U13`, `U15`, `U17`, no repeats |
+| `note` | optional, ≤ 200: "what to bring" |
+| `announcementId` | the announcement saved with it (`to: juvenile`) |
+| `season` | e.g. `2026-27` |
+| `createdBy`, `createdAt` | the FA admin, server time |
+
+- Read by anyone with a role; created and deleted (cancelled) by FA admins; never edited (cancel and add again).
+- The team's blue "Juvenile screening" card shows each day until midnight after it.
+
 ## 3. Who can do what (summary)
 
 The security rules enforce this table. Screens hiding a button is **not** security.
@@ -502,6 +517,8 @@ These changes always happen together in **one batch** (all succeed or none do):
 | Reject team request (FA)              | update request only (`status: rejected`, `rejectionReason`, review fields)                    |
 | Approve player (FA) — **transaction** | read player (must be pending) + read counter → update player (`approved`, `playerCode`, `approvedBy`, `approvedAt`) + set / update counter (`next + 1`). A player who already has an ID keeps it and the counter is not touched |
 | Reject player (FA)                    | update player only (`status: rejected`, `rejectionReason`, `reviewedBy`, `reviewedAt`)        |
+| Save a screening day (FA)             | create `announcements/{id}` (`to: juvenile`) + create `screeningDays/{id}` pointing to it      |
+| Cancel a screening day (FA)           | delete the day + delete its announcement + create a "Screening cancelled" announcement        |
 
 **Photos and batches.** Storage files can't be part of a Firestore batch, so a player's photo is handled around it:
 
@@ -596,6 +613,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 2 Nov 2026 | v2.8 (2.14b-2): `screeningDays` saved and cancelled with announcements to Juvenile teams. 220 tests. |
 | 2 Nov 2026 | v2.7 (2.14b-1): notification kind `juvenileSubmitted` ("9 juvenile players from X", one per team and day); "Register in" follows the tab, moving up only. 215 tests. |
 | 30 Oct 2026 | v2.6 (2.14a): juvenile players: `ageGroup`, `guardian`, jersey IDs `juvenile-U13-10`, player keys `…_juvenile`; the rules check the age group from the season's start year. 214 tests. |
 | 30 Oct 2026 | v2.5 (2.13d): `settings/league` rules and fields (registration switches, squad numbers, season / fee / MoMo by the chairman), `settingsLog`, `registrationChanged` notification; the payment cap follows the fee. 205 tests. |

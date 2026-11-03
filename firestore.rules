@@ -361,6 +361,47 @@ service cloud.firestore {
         }
       }
 
+      // ---------- Juvenile screening days (2.14b) ----------
+
+      function announcementDoc(id) {
+        return /databases/$(database)/documents/districts/$(districtId)/announcements/$(id);
+      }
+
+      // screeningDays/{id}: written by the FA in ONE batch with its
+      // announcement to Juvenile teams (announcementId points to it).
+      function isValidScreeningDay(data) {
+        return data.keys().hasOnly([
+            'startsAt', 'venue', 'groups', 'note', 'announcementId', 'season',
+            'createdBy', 'createdAt'
+          ])
+          && data.keys().hasAll([
+            'startsAt', 'venue', 'groups', 'announcementId', 'season',
+            'createdBy', 'createdAt'
+          ])
+          && data.startsAt is timestamp
+          && data.startsAt > request.time
+          && isText(data.venue, 2, 80)
+          && data.groups is list
+          && data.groups.size() >= 1 && data.groups.size() <= 3
+          && data.groups.hasOnly(['U13', 'U15', 'U17'])
+          && data.groups.toSet().size() == data.groups.size()
+          && isOptionalText(data, 'note', 200)
+          && data.announcementId is string
+          && existsAfter(announcementDoc(data.announcementId))
+          && getAfter(announcementDoc(data.announcementId)).data.to == 'juvenile'
+          && isText(data.season, 7, 7)
+          && data.createdBy == request.auth.uid
+          && data.createdAt == request.time;
+      }
+
+      match /screeningDays/{dayId} {
+        // Teams see the blue card; the FA plans the day
+        allow get, list: if hasRole();
+        allow create: if isFaAdmin() && isValidScreeningDay(request.resource.data);
+        // Cancelling removes it; a day is never edited (cancel and add again)
+        allow delete: if isFaAdmin();
+      }
+
       // notifications/{id}: one per audience, kind, team and day; each new
       // event updates it (count + 1, one more name), so 20 approvals make
       // 1 notification. audience = 'fa' or 'team:<teamId>'.

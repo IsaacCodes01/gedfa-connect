@@ -8,6 +8,7 @@ import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:go_router/go_router.dart';
 import 'package:gedfa_connect/app/routes.dart';
 import 'package:gedfa_connect/features/auth/presentation/widgets/auth_widgets.dart';
+import 'package:gedfa_connect/features/auth/presentation/widgets/google_popup_guard.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -28,8 +29,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   bool get _isBusy => _isLoading || _isGoogleLoading;
 
+  /// Each tap on "Continue with Google" gets a number, so a late answer
+  /// from an older, abandoned window can't change the screen.
+  int _googleAttempt = 0;
+
+  /// Stops the spinner if the Google window is closed without signing in.
+  late final _googleGuard = GooglePopupGuard(onGaveUp: _googleGaveUp);
+
+  void _googleGaveUp() {
+    if (!mounted || !_isGoogleLoading) return;
+    _googleAttempt++; // ignore whatever the abandoned window does later
+    _googleGuard.stop();
+    setState(() => _isGoogleLoading = false);
+    AppToast.info(context, 'Google sign-in was cancelled.');
+  }
+
   @override
   void dispose() {
+    _googleGuard.stop();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -85,20 +102,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
 
     setState(() => _isGoogleLoading = true);
+    final attempt = ++_googleAttempt;
+    _googleGuard.start();
 
     try {
       await ref.read(authRepositoryProvider).signInWithGoogle();
-      if (!mounted) return;
+      if (!mounted || attempt != _googleAttempt) return;
       AppToast.success(context, 'Welcome!');
     } catch (error) {
-      if (!mounted) return;
+      // Already stopped by the guard, or replaced by a newer attempt
+      if (!mounted || attempt != _googleAttempt) return;
       if (isInfoAuthError(error)) {
         AppToast.info(context, authErrorMessage(error));
       } else {
         AppToast.error(context, authErrorMessage(error));
       }
     } finally {
-      if (mounted) setState(() => _isGoogleLoading = false);
+      if (attempt == _googleAttempt) {
+        _googleGuard.stop();
+        if (mounted) setState(() => _isGoogleLoading = false);
+      }
     }
   }
 

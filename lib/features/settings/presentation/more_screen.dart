@@ -52,6 +52,12 @@ class MoreScreen extends ConsumerWidget {
                         onTap: () => context.go(Routes.adminAnnouncements),
                       ),
                       SettingsTile(
+                        icon: Icons.child_care_outlined,
+                        title: 'Juvenile screening',
+                        subtitle: 'Screening days, announced to Juvenile teams',
+                        onTap: () => context.go(Routes.adminScreening),
+                      ),
+                      SettingsTile(
                         icon: Icons.tune_rounded,
                         title: 'League settings',
                         subtitle: 'Registration, squad numbers, season and fee',

@@ -1867,6 +1867,69 @@ describe('Announcements', () => {
   });
 });
 
+// ---------- Juvenile screening days (2.14b) ----------
+
+function screeningData(changes = {}) {
+  return {
+    startsAt: Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 3600 * 1000)),
+    venue: 'Fetteh Park',
+    groups: ['U13', 'U15'],
+    note: 'Birth certificate and a parent or guardian',
+    announcementId: 'ann1',
+    season: '2026-27',
+    createdBy: 'fa1',
+    createdAt: serverTimestamp(),
+    ...changes,
+  };
+}
+
+/** "Save and announce": the day and its announcement in one batch. */
+function saveScreening(db, dayChanges = {}, announcementChanges = {}) {
+  const batch = writeBatch(db);
+  batch.set(doc(db, `${D}/announcements/ann1`),
+    announcementData({ to: 'juvenile', pinned: false, ...announcementChanges }));
+  batch.set(doc(db, `${D}/screeningDays/day1`), screeningData(dayChanges));
+  return batch.commit();
+}
+
+describe('Juvenile screening days', () => {
+  it('the FA saves a day together with its Juvenile announcement', async () => {
+    await assertSucceeds(saveScreening(dbAs('fa1')));
+  });
+
+  it('a day needs its announcement, and it must be for Juvenile teams', async () => {
+    const db = dbAs('fa1');
+    await assertFails(setDoc(doc(db, `${D}/screeningDays/day1`), screeningData()));
+    await assertFails(saveScreening(dbAs('fa1'), {}, { to: 'division' }));
+  });
+
+  it('a day must be in the future, with valid age groups and a venue', async () => {
+    const past = Timestamp.fromDate(new Date(Date.now() - 3600 * 1000));
+    await assertFails(saveScreening(dbAs('fa1'), { startsAt: past }));
+    await assertFails(saveScreening(dbAs('fa1'), { groups: [] }));
+    await assertFails(saveScreening(dbAs('fa1'), { groups: ['U13', 'U19'] }));
+    await assertFails(saveScreening(dbAs('fa1'), { groups: ['U13', 'U13'] }));
+    await assertFails(saveScreening(dbAs('fa1'), { venue: '' }));
+  });
+
+  it('a team admin cannot add a day; teams and referees can read them', async () => {
+    await assertFails(saveScreening(dbAs('admin1'), { createdBy: 'admin1' },
+      { createdBy: 'admin1' }));
+    await saveScreening(dbAs('fa1'));
+    await assertSucceeds(getDoc(doc(dbAs('admin1'), `${D}/screeningDays/day1`)));
+    await assertSucceeds(getDoc(doc(dbAs('ref1'), `${D}/screeningDays/day1`)));
+    await assertFails(getDoc(doc(dbAs('newbie'), `${D}/screeningDays/day1`)));
+  });
+
+  it('only the FA cancels a day, and nobody edits one', async () => {
+    await saveScreening(dbAs('fa1'));
+    await assertFails(updateDoc(doc(dbAs('fa1'), `${D}/screeningDays/day1`),
+      { venue: 'Afransi Park' }));
+    await assertFails(deleteDoc(doc(dbAs('admin1'), `${D}/screeningDays/day1`)));
+    await assertSucceeds(deleteDoc(doc(dbAs('fa1'), `${D}/screeningDays/day1`)));
+  });
+});
+
 describe('Notifications', () => {
   it('the FA notifies a team, and the counts add up in one notification', async () => {
     const db = dbAs('fa1');
