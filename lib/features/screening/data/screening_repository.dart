@@ -37,6 +37,14 @@ class ScreeningRepository {
             ]);
   }
 
+  /// One day, live (the decision screen, 2.14c). Null once cancelled.
+  Stream<ScreeningDay?> watchOne(String id) {
+    return _days.doc(id).snapshots().map((doc) {
+      final data = doc.data();
+      return data == null ? null : ScreeningDay.fromMap(doc.id, data);
+    });
+  }
+
   /// "Save and announce": the day plus an announcement to Juvenile teams.
   Future<void> create({
     required DateTime startsAt,
@@ -137,6 +145,12 @@ class ScreeningRepository {
 
 final screeningRepositoryProvider = Provider<ScreeningRepository>((ref) {
   return ScreeningRepository(ref.watch(firestoreProvider));
+});
+
+/// One screening day, live.
+final screeningDayProvider =
+    StreamProvider.family<ScreeningDay?, String>((ref, id) {
+  return ref.watch(screeningRepositoryProvider).watchOne(id);
 });
 
 /// Today's and later screening days, soonest first (FA and teams).

@@ -5,6 +5,9 @@ enum NotificationKind {
   // For a team (written by the FA)
   playersApproved,
   playersRejected,
+  juvenilePassed, // screening day (2.14c)
+  juvenileNotEligible,
+  juvenileToCorrect, // "needs correcting" at screening (2.14d)
   teamApproved,
   paymentConfirmed, // season fee (2.13c)
   paymentNotFound,
@@ -68,6 +71,15 @@ class AppNotification {
   String get title => switch (kind) {
         NotificationKind.playersApproved => '${_players(people)} approved',
         NotificationKind.playersRejected => '${_players(people)} rejected',
+        NotificationKind.juvenilePassed => people == 1
+            ? '1 juvenile player passed'
+            : '$people juvenile players passed',
+        NotificationKind.juvenileNotEligible => people == 1
+            ? '1 child not eligible for Juvenile'
+            : '$people children not eligible for Juvenile',
+        NotificationKind.juvenileToCorrect => people == 1
+            ? '1 juvenile player to correct'
+            : '$people juvenile players to correct',
         NotificationKind.teamApproved => '$teamName approved',
         NotificationKind.teamRequest => people == 1
             ? 'New team request: ${names.firstOrNull ?? teamName}'
@@ -101,6 +113,13 @@ class AppNotification {
         NotificationKind.playersRejected =>
           '$namesText. Open Squad › Rejected to read the reasons and correct '
               'them.',
+        NotificationKind.juvenilePassed =>
+          '$namesText. Passed at screening, with their player IDs.',
+        NotificationKind.juvenileNotEligible =>
+          '$namesText. The reasons are on each player in Squad › Juvenile.',
+        NotificationKind.juvenileToCorrect =>
+          '$namesText. Open Squad › Juvenile to read what to fix, then send '
+              'them again for screening.',
         NotificationKind.teamApproved =>
           'Welcome to the league. You can now add your Division players.',
         NotificationKind.teamRequest => people == 1

@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.8, matches the rules after step 2.14b-2 (2 Nov 2026)
+**Status:** v2.10, matches the rules after step 2.14d (3 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -257,6 +257,7 @@ One document per jersey number in use **within this team and competition**. The 
 ### 2.4 `players/{playerId}` — all players in the league
 
 - **Juvenile players (2.14)** are added "waiting for screening" (`status: pending`); the FA checks them in person on a screening day (2.14b–c), not in the Players tab. Jersey reservations are per age group (`juvenile-U13-10`), and their player key ends in `_juvenile`, so the same child may also be in the club's Division squad.
+- **Screening decisions (2.14c)**: only the FA, only for a pending juvenile player. *Passed*: `status: approved`, a `GJ26-0001` ID from `settings/juvenileCounter` (Division IDs `GE…` are refused for children), in the registered group or an older one (moved up, never down; the jersey reservation moves in the same transaction). *Needs correcting* (2.14d): `status: rejected` with a reason and no `notEligible`; the team fixes it and the child is pending (waiting) again. *Not eligible*: `status: rejected`, `notEligible: true`, a reason (5–500); the team can no longer edit the player, and the player key stays taken, so the child can't be added again in any juvenile group.
 
 One collection for the whole district. Team admins see only their own team's players (enforced by rules on `teamId`); the FA sees all.
 
@@ -279,6 +280,8 @@ One collection for the whole district. Team admins see only their own team's pla
 | `photoUrl`        | string           | **Required.** Download link of the 300×400 passport photo (3:4, JPEG). 10–2000 characters                                                                                                                                         |
 | `thumbUrl`        | string           | **Required.** Download link of the 96×128 thumbnail for lists                                                                                                                                                                      |
 | `status`          | string           | `pending` / `approved` / `rejected`                                                                                                                                                                                          |
+| `screeningDayId`  | string?          | **Juvenile only** (2.14d): the screening day of the FA's last decision. The rules refuse a decision unless that day has started, is under a day old and covers the child's age group. Written only by the FA |
+| `notEligible`     | bool?            | **Juvenile only** (2.14c): `true` when the FA found the child not eligible at screening. Written only by the FA |
 | `rejectionReason` | string?          |                                                                                                                                                                                                                                    |
 | `createdAt`       | timestamp        |                                                                                                                                                                                                                                    |
 | `updatedAt`       | timestamp        |                                                                                                                                                                                                                                    |
@@ -381,6 +384,10 @@ A single document, edited in FA › More › League settings. Missing fields use
 
 - Readable by any signed-in user. Registration is switched **by hand** (no closing date). Tie-breakers: as the Premier League (Phase 4).
 - Every save also writes **`settingsLog/{id}`** `{ by, byName, at, changes: { field: { from, to } } }` (FA only, never edited) and, when registration opens or closes, a `registrationChanged` note in the FA's bell, so every official sees who did it.
+
+### 2.7a `settings/juvenileCounter` — juvenile player IDs (2.14c)
+
+`{ next: 5 }`. FA only; moves on by exactly 1 per child passed at screening, like `settings/playerCounter`. IDs read `GJ26-0001`.
 
 ### 2.7 `settings/playerCounter` — player ID numbering
 
@@ -517,6 +524,8 @@ These changes always happen together in **one batch** (all succeed or none do):
 | Reject team request (FA)              | update request only (`status: rejected`, `rejectionReason`, review fields)                    |
 | Approve player (FA) — **transaction** | read player (must be pending) + read counter → update player (`approved`, `playerCode`, `approvedBy`, `approvedAt`) + set / update counter (`next + 1`). A player who already has an ID keeps it and the counter is not touched |
 | Reject player (FA)                    | update player only (`status: rejected`, `rejectionReason`, `reviewedBy`, `reviewedAt`)        |
+| Pass a child at screening (FA) — **transaction** | read the child (must be pending) + the new jersey doc if moving up + the juvenile counter → update player (`approved`, `GJ…` ID, `ageGroup`) + move the jersey reservation if moving up + counter `next + 1` + team notification |
+| Child not eligible (FA)               | update player (`rejected`, `notEligible: true`, reason) + team notification                    |
 | Save a screening day (FA)             | create `announcements/{id}` (`to: juvenile`) + create `screeningDays/{id}` pointing to it      |
 | Cancel a screening day (FA)           | delete the day + delete its announcement + create a "Screening cancelled" announcement        |
 
@@ -613,6 +622,8 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 3 Nov 2026 | v2.10 (2.14d): every screening decision carries `screeningDayId` and is refused before the day starts, a day after it, or for an age group the day doesn't cover; "needs correcting" (back to the team); kind `juvenileToCorrect`. 236 tests. |
+| 3 Nov 2026 | v2.9 (2.14c): juvenile IDs `GJ26-…` from `settings/juvenileCounter`; pass (move up only, jersey moves along) or `notEligible`; the FA may move a child's jersey reservation; notification kinds `juvenilePassed`, `juvenileNotEligible`. 231 tests. |
 | 2 Nov 2026 | v2.8 (2.14b-2): `screeningDays` saved and cancelled with announcements to Juvenile teams. 220 tests. |
 | 2 Nov 2026 | v2.7 (2.14b-1): notification kind `juvenileSubmitted` ("9 juvenile players from X", one per team and day); "Register in" follows the tab, moving up only. 215 tests. |
 | 30 Oct 2026 | v2.6 (2.14a): juvenile players: `ageGroup`, `guardian`, jersey IDs `juvenile-U13-10`, player keys `…_juvenile`; the rules check the age group from the season's start year. 214 tests. |

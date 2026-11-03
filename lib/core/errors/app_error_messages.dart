@@ -13,6 +13,14 @@ class JerseyTakenException implements Exception {
   final int number;
 }
 
+/// Passing a child in an older group (2.14c), but their jersey number is
+/// already worn by another child of the team in that group.
+class MoveUpJerseyTakenException implements Exception {
+  const MoveUpJerseyTakenException(this.number, this.group);
+  final int number;
+  final String group;
+}
+
 /// A player with the same name and date of birth is already registered
 /// (with this team or another one).
 class DuplicatePlayerException implements Exception {
@@ -63,6 +71,11 @@ String appErrorMessage(Object error) {
   if (error is JerseyTakenException) {
     return '#${error.number} is already taken in your squad. '
         'Choose another number.';
+  }
+  if (error is MoveUpJerseyTakenException) {
+    return '#${error.number} is already worn by another ${error.group} player '
+        'of this team. Ask the team to change one of the numbers, then pass '
+        'the child.';
   }
   if (error is DuplicatePlayerException) {
     return error.sameTeam

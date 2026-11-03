@@ -34,7 +34,8 @@ class PlayerDetailsScreen extends ConsumerWidget {
       appBar: GedfaAppBar(
         title: 'Player',
         actions: [
-          if (player != null)
+          // A child found not eligible at screening can't be edited (2.14c)
+          if (player != null && !player.notEligible)
             IconButton(
               tooltip: 'Edit player',
               icon: const Icon(Icons.edit_outlined),
@@ -42,7 +43,7 @@ class PlayerDetailsScreen extends ConsumerWidget {
             ),
         ],
       ),
-      bottomNavigationBar: player == null
+      bottomNavigationBar: player == null || player.notEligible
           ? null
           : _BottomButton(player: player, onPressed: () => _edit(context)),
       body: playerAsync.when(
@@ -167,7 +168,12 @@ class _Details extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Not approved by the FA',
+                                player.notEligible
+                                    ? 'Not eligible for Juvenile'
+                                    : player.isJuvenile
+                                        ? 'Sent back at screening: please '
+                                            'correct'
+                                        : 'Not approved by the FA',
                                 style: textTheme.titleSmall?.copyWith(
                                   color: AppColors.rejectedText,
                                   fontWeight: FontWeight.w600,
@@ -181,6 +187,18 @@ class _Details extends StatelessWidget {
                                   color: AppColors.rejectedText,
                                 ),
                               ),
+                              if (player.notEligible)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 6),
+                                  child: Text(
+                                    'Decided at the FA screening. This child '
+                                    "can't play U13, U15 or U17. If old "
+                                    'enough, register them in the Division.',
+                                    style: textTheme.bodySmall?.copyWith(
+                                      color: AppColors.rejectedText,
+                                    ),
+                                  ),
+                                ),
                             ],
                           ),
                         ),
@@ -257,7 +275,9 @@ class _Details extends StatelessWidget {
                         ),
                       if (reviewDate != null)
                         _Row(
-                          label: rejected ? 'Rejected' : 'Approved',
+                          label: rejected
+                              ? (player.isJuvenile ? 'Screened' : 'Rejected')
+                              : (player.isJuvenile ? 'Passed' : 'Approved'),
                           value: formatDateTime(reviewDate),
                           note: 'by the FA',
                         ),

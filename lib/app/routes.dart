@@ -22,6 +22,10 @@ class Routes {
   /// FA: Players with the Juvenile switch on, and one team's juvenile
   /// players by age group (2.14b, board J5).
   static const adminPlayersJuvenile = '$adminPlayers?view=juvenile';
+
+  /// FA: one juvenile child, read only (2.14c).
+  static String adminJuvenileChild(String playerId) =>
+      '$adminPlayers/child/$playerId';
   static String adminTeamJuvenile(String teamId) =>
       '$adminPlayers/team/$teamId/juvenile';
   static String adminPlayer(String playerId) =>
@@ -34,6 +38,13 @@ class Routes {
 
   /// FA: juvenile screening days (2.14b, board J3).
   static const adminScreening = '/admin/more/screening';
+
+  /// FA: screening one child after another on a day (2.14c, board J4).
+  /// [childId]: "Screen player" from a child's page puts them first.
+  static String adminScreeningDay(String dayId, {String? childId}) =>
+      childId == null
+          ? '$adminScreening/day/$dayId'
+          : '$adminScreening/day/$dayId?child=$childId';
 
   /// FA: registration switches, squad numbers, season and fee (2.13d).
   static const adminLeagueSettings = '/admin/more/league';

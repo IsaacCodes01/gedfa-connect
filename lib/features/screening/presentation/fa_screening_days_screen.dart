@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,6 +14,7 @@ import 'package:gedfa_connect/features/players/data/player_repository.dart';
 import 'package:gedfa_connect/features/players/domain/age_group.dart';
 import 'package:gedfa_connect/features/screening/data/screening_repository.dart';
 import 'package:gedfa_connect/features/screening/domain/screening_day.dart';
+import 'package:gedfa_connect/features/screening/presentation/widgets/screening_countdown.dart';
 import 'package:go_router/go_router.dart';
 
 const _monthCaps = [
@@ -43,8 +46,21 @@ class _FaScreeningDaysScreenState
   bool _showErrors = false;
   bool _busy = false;
 
+  /// Redraws every 30 seconds, so "Start screening" switches on by
+  /// itself at the start time.
+  late final Timer _clock;
+
+  @override
+  void initState() {
+    super.initState();
+    _clock = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
   @override
   void dispose() {
+    _clock.cancel();
     _venue.dispose();
     _note.dispose();
     super.dispose();
@@ -192,6 +208,13 @@ class _FaScreeningDaysScreenState
                       waitingFor: waitingFor,
                       enabled: !_busy,
                       onCancel: _cancel,
+                      // Board J4: one child after another (2.14c)
+                      onStart: (day) =>
+                          context.go(Routes.adminScreeningDay(day.id)),
+                      // The countdown reached 0: show Start screening
+                      onStarted: () {
+                        if (mounted) setState(() {});
+                      },
                     ),
                     const SizedBox(height: 20),
                     const _Heading('Add a screening day'),
@@ -407,12 +430,16 @@ class _ComingUp extends StatelessWidget {
     required this.waitingFor,
     required this.enabled,
     required this.onCancel,
+    required this.onStart,
+    required this.onStarted,
   });
 
   final List<ScreeningDay> days;
   final int Function(ScreeningDay) waitingFor;
   final bool enabled;
   final ValueChanged<ScreeningDay> onCancel;
+  final ValueChanged<ScreeningDay> onStart;
+  final VoidCallback onStarted;
 
   @override
   Widget build(BuildContext context) {
@@ -445,7 +472,7 @@ class _ComingUp extends StatelessWidget {
                   if (day != days.first)
                     Divider(height: 1, color: scheme.outline),
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    padding: const EdgeInsets.only(top: 12),
                     child: Row(
                       children: [
                         _DateTile(day: day.startsAt.toLocal()),
@@ -497,9 +524,82 @@ class _ComingUp extends StatelessWidget {
                       ],
                     ),
                   ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(60, 8, 0, 12),
+                    // Board J3: a countdown from the moment the day is
+                    // saved, then Start screening at the start time
+                    child: day.hasStarted(DateTime.now())
+                        ? Align(
+                            alignment: Alignment.centerLeft,
+                            child: FilledButton.tonalIcon(
+                              onPressed: enabled ? () => onStart(day) : null,
+                              icon: const Icon(
+                                Icons.fact_check_outlined,
+                                size: 18,
+                              ),
+                              label: Text(
+                                waitingFor(day) == 0
+                                    ? 'Open screening'
+                                    : 'Start screening',
+                              ),
+                            ),
+                          )
+                        : _CountdownBox(day: day, onStarted: onStarted),
+                  ),
                 ],
               ],
             ),
+    );
+  }
+}
+
+/// "⏱ Opens in 2 h 14 min / Start screening appears here at 9:00 am"
+class _CountdownBox extends StatelessWidget {
+  const _CountdownBox({required this.day, required this.onStarted});
+
+  final ScreeningDay day;
+  final VoidCallback onStarted;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF1E3A5F) : const Color(0xFFE3EEFA);
+    final ink = isDark ? const Color(0xFFCFE4FB) : const Color(0xFF0B3F7A);
+    final today = DateUtils.isSameDay(day.startsAt.toLocal(), DateTime.now());
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.timer_outlined, size: 20, color: ink),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ScreeningCountdown(
+                  key: ValueKey(day.id),
+                  startsAt: day.startsAt,
+                  onStarted: onStarted,
+                  style: textTheme.titleSmall
+                      ?.copyWith(fontWeight: FontWeight.w700, color: ink),
+                ),
+                Text(
+                  today
+                      ? 'Start screening appears here at ${day.timeText}'
+                      : '${day.dateText} at ${day.timeText}',
+                  style: textTheme.bodySmall?.copyWith(color: ink),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

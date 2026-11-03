@@ -1930,6 +1930,202 @@ describe('Juvenile screening days', () => {
   });
 });
 
+// ---------- Juvenile screening decisions (2.14c) ----------
+
+const JCOUNTER = `${D}/settings/juvenileCounter`;
+
+/**
+ * Passes a child the way the app does: the player (GJ ID, maybe an older
+ * group), the moved jersey reservation and the juvenile counter together.
+ */
+function passJuvenile(db, playerId, {
+  code, next, group = 'U13', from = 'U13', jersey = 9, counter = 'create', day = 'day1',
+} = {}) {
+  const batch = writeBatch(db);
+  batch.update(doc(db, `${D}/players/${playerId}`), {
+    status: 'approved',
+    screeningDayId: day,
+    playerCode: code,
+    ageGroup: group,
+    approvedAt: serverTimestamp(),
+    approvedBy: 'fa1',
+    rejectionReason: null,
+    changes: deleteField(),
+    updatedAt: serverTimestamp(),
+  });
+  if (group !== from) {
+    batch.delete(doc(db, `${D}/teams/royal/jerseys/juvenile-${from}-${jersey}`));
+    batch.set(doc(db, `${D}/teams/royal/jerseys/juvenile-${group}-${jersey}`),
+      { playerId, createdAt: serverTimestamp() });
+  }
+  if (counter === 'create') batch.set(doc(db, JCOUNTER), { next });
+  if (counter === 'update') batch.update(doc(db, JCOUNTER), { next });
+  return batch.commit();
+}
+
+/** "Not eligible for Juvenile" with a reason. */
+function notEligible(db, playerId, reason = 'Looks older than 17', day = 'day1') {
+  return updateDoc(doc(db, `${D}/players/${playerId}`), {
+    status: 'rejected',
+    notEligible: true,
+    screeningDayId: day,
+    rejectionReason: reason,
+    reviewedAt: serverTimestamp(),
+    reviewedBy: 'fa1',
+    changes: deleteField(),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/** "Needs correcting": back to the team with a reason (2.14d). */
+function sendBack(db, playerId, reason = 'Photo is not clear', day = 'day1') {
+  return updateDoc(doc(db, `${D}/players/${playerId}`), {
+    status: 'rejected',
+    screeningDayId: day,
+    rejectionReason: reason,
+    reviewedAt: serverTimestamp(),
+    reviewedBy: 'fa1',
+    changes: deleteField(),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/** A screening day [hoursAgo] hours ago (negative = in the future). */
+async function seedDay(id, hoursAgo, groups = ['U13', 'U15', 'U17']) {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), `${D}/screeningDays/${id}`), {
+      startsAt: Timestamp.fromDate(new Date(Date.now() - hoursAgo * 3600 * 1000)),
+      venue: 'Fetteh Park', groups, announcementId: 'ann1', season: '2026-27',
+      createdBy: 'fa1', createdAt: Timestamp.now(),
+    });
+  });
+}
+
+describe('Juvenile screening decisions', () => {
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `${D}/teams/royal`),
+        { name: 'Royal Unique FC', categories: ['division', 'juvenile'] });
+    });
+    await seedDay('day1', 1); // started an hour ago
+    await addPlayer(dbAs('admin1'), 'j1', juvenileData()); // born 2015, U13, #9
+  });
+
+  it('the FA passes a child with the first juvenile ID (GJ…-0001)', async () => {
+    await assertSucceeds(passJuvenile(dbAs('fa1'), 'j1', { code: `GJ${YY}-0001`, next: 2 }));
+  });
+
+  it('juvenile IDs have their own counter, separate from Division', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), JCOUNTER), { next: 5 });
+      await setDoc(doc(context.firestore(), COUNTER), { next: 40 });
+    });
+    await assertFails(passJuvenile(dbAs('fa1'), 'j1', {
+      code: `GJ${YY}-0040`, next: 41, counter: 'update',
+    }));
+    await assertSucceeds(passJuvenile(dbAs('fa1'), 'j1', {
+      code: `GJ${YY}-0005`, next: 6, counter: 'update',
+    }));
+  });
+
+  it('a child cannot get a Division (GE) ID', async () => {
+    await assertFails(approvePlayer(dbAs('fa1'), 'j1', {
+      code: `GE${YY}-0001`, next: 2, counter: 'create',
+    }));
+  });
+
+  it('moved up to U15: the jersey reservation moves with the child', async () => {
+    await assertSucceeds(passJuvenile(dbAs('fa1'), 'j1', {
+      code: `GJ${YY}-0001`, next: 2, group: 'U15',
+    }));
+  });
+
+  it('moving up without moving the jersey reservation is refused', async () => {
+    const db = dbAs('fa1');
+    const batch = writeBatch(db);
+    batch.update(doc(db, `${D}/players/j1`), {
+      status: 'approved', playerCode: `GJ${YY}-0001`, ageGroup: 'U15', screeningDayId: 'day1',
+      approvedAt: serverTimestamp(), approvedBy: 'fa1', rejectionReason: null,
+      changes: deleteField(), updatedAt: serverTimestamp(),
+    });
+    batch.set(doc(db, JCOUNTER), { next: 2 });
+    await assertFails(batch.commit());
+  });
+
+  it('nobody is moved down (registered U15, passed in U13)', async () => {
+    await addPlayer(dbAs('admin1'), 'j2', juvenileData({
+      fullName: 'Ama Owusu', playerKey: 'ama-owusu_2015-03-03_juvenile', ageGroup: 'U15', jerseyNo: 4,
+    }));
+    await assertFails(passJuvenile(dbAs('fa1'), 'j2', {
+      code: `GJ${YY}-0001`, next: 2, group: 'U13', from: 'U15', jersey: 4,
+    }));
+  });
+
+  it('a team admin cannot screen its own children', async () => {
+    await assertFails(notEligible(dbAs('admin1'), 'j1'));
+  });
+
+  it('not eligible needs a reason', async () => {
+    await assertFails(notEligible(dbAs('fa1'), 'j1', 'No'));
+    await assertSucceeds(notEligible(dbAs('fa1'), 'j1'));
+  });
+
+  it('a child found not eligible cannot be edited or added again', async () => {
+    await notEligible(dbAs('fa1'), 'j1');
+    await assertFails(updateDoc(doc(dbAs('admin1'), `${D}/players/j1`), {
+      status: 'pending', notEligible: deleteField(), updatedAt: serverTimestamp(),
+    }));
+    await assertFails(addPlayer(dbAs('admin1'), 'j9', juvenileData({ ageGroup: 'U15', jerseyNo: 30 })));
+  });
+
+  it('a team cannot write the not-eligible flag itself', async () => {
+    await assertFails(addPlayer(dbAs('admin1'), 'j3', juvenileData({
+      fullName: 'Kojo Badu', playerKey: 'kojo-badu_2015-03-03_juvenile', jerseyNo: 11, notEligible: false,
+    })));
+  });
+
+  it('2.14d: no decision before the screening day starts', async () => {
+    await seedDay('later', -2); // in two hours
+    await assertFails(passJuvenile(dbAs('fa1'), 'j1', { code: `GJ${YY}-0001`, next: 2, day: 'later' }));
+    await assertFails(notEligible(dbAs('fa1'), 'j1', 'Looks older than 17', 'later'));
+  });
+
+  it('2.14d: no decision on an old day, or without a day', async () => {
+    await seedDay('old', 30); // 30 hours ago
+    await assertFails(sendBack(dbAs('fa1'), 'j1', 'Photo is not clear', 'old'));
+    await assertFails(sendBack(dbAs('fa1'), 'j1', 'Photo is not clear', 'nope'));
+  });
+
+  it("2.14d: the day must cover the child's age group", async () => {
+    await seedDay('u17only', 1, ['U17']);
+    await assertFails(passJuvenile(dbAs('fa1'), 'j1', { code: `GJ${YY}-0001`, next: 2, day: 'u17only' }));
+  });
+
+  it('2.14d: needs correcting goes back to the team, who fix it and send it again', async () => {
+    await assertFails(sendBack(dbAs('fa1'), 'j1', 'No'));
+    await assertSucceeds(sendBack(dbAs('fa1'), 'j1'));
+    await assertSucceeds(updateDoc(doc(dbAs('admin1'), `${D}/players/j1`), {
+      status: 'pending', rejectionReason: null, updatedAt: serverTimestamp(),
+    }));
+  });
+
+  it('2.14d: the team cannot change the screening day on the player', async () => {
+    await sendBack(dbAs('fa1'), 'j1');
+    await assertFails(updateDoc(doc(dbAs('admin1'), `${D}/players/j1`), {
+      status: 'pending', screeningDayId: 'other', updatedAt: serverTimestamp(),
+    }));
+  });
+
+  it('the FA tells the team: juvenile players passed / not eligible', async () => {
+    await assertSucceeds(notify(dbAs('fa1'), 'team_juvenilePassed_royal',
+      { audience: 'team:royal', kind: 'juvenilePassed', teamId: 'royal' }));
+    await assertSucceeds(notify(dbAs('fa1'), 'team_juvenileNotEligible_royal',
+      { audience: 'team:royal', kind: 'juvenileNotEligible', teamId: 'royal' }));
+    await assertSucceeds(notify(dbAs('fa1'), 'team_juvenileToCorrect_royal',
+      { audience: 'team:royal', kind: 'juvenileToCorrect', teamId: 'royal' }));
+  });
+});
+
 describe('Notifications', () => {
   it('the FA notifies a team, and the counts add up in one notification', async () => {
     const db = dbAs('fa1');

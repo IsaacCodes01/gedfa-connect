@@ -6,10 +6,12 @@ import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/core/utils/passport_photo.dart';
 import 'package:gedfa_connect/core/utils/player_code.dart';
+import 'package:gedfa_connect/core/utils/player_key.dart';
 import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/core/constants/approval_status.dart';
 import 'package:gedfa_connect/features/notifications/data/notification_writer.dart';
 import 'package:gedfa_connect/features/notifications/domain/app_notification.dart';
+import 'package:gedfa_connect/features/players/domain/age_group.dart';
 import 'package:gedfa_connect/features/players/domain/player.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/data/team_request_repository.dart'
@@ -102,6 +104,10 @@ class PlayerRepository {
   /// `teams/{teamId}/jerseys/{division-10 | juvenile-U13-10}`.
   DocumentReference<Map<String, dynamic>> _jerseyRef(Player player) =>
       _db.doc(FirestorePaths.jersey(player.teamId, player.jerseyId));
+
+  /// `settings/juvenileCounter`: `{ next: 5 }` (GJ26-0005 next, 2.14c).
+  DocumentReference<Map<String, dynamic>> get _juvenileCounterRef =>
+      _db.doc(FirestorePaths.juvenileCounter);
 
   /// `settings/playerCounter`: `{ next: 43 }`.
   DocumentReference<Map<String, dynamic>> get _counterRef =>
@@ -513,6 +519,183 @@ class PlayerRepository {
     NotificationWriter(_db).forTeamInBatch(
       batch,
       kind: NotificationKind.playersRejected,
+      teamId: player.teamId,
+      teamName: player.teamName,
+      name: player.fullName,
+    );
+    return batch.commit().timeout(_timeout);
+  }
+
+  // ---------- Juvenile screening (2.14c, board J4) ----------
+
+  /// FA, on the screening day: passes a waiting child in [group] (their
+  /// own group or an older one, never younger) and returns their ID.
+  ///
+  /// One transaction, like [approve]:
+  /// 1. Read the child. Stop if they are no longer waiting.
+  /// 2. Moving up (U13 -> U15)? Their jersey number must be free in the
+  ///    new group; the reservation moves with them.
+  /// 3. A new GJ26-… ID from the juvenile counter (kept if they had one).
+  /// 4. Save the child as approved, in [group], and tell the team.
+  ///
+  /// [dayId] is the screening day the decision is made on (2.14d): the
+  /// rules refuse it unless that day has started and covers the child.
+  Future<String> passJuvenile(
+    Player player, {
+    required AgeGroup group,
+    required String dayId,
+    required String faUid,
+  }) async {
+    final playerRef = _db.doc(FirestorePaths.player(player.id));
+
+    // Check the number BEFORE the transaction too. On the web, an error
+    // thrown inside a transaction loses its type and arrives as a plain
+    // "something went wrong", so the FA would not know why (Isaac,
+    // 3 Nov 2026). The check inside stays as the safety net.
+    final targetJerseyId = jerseyIdFor(
+      player.category.name,
+      player.jerseyNo,
+      ageGroup: group.label,
+    );
+    if (targetJerseyId != player.jerseyId) {
+      final taken = await _db
+          .doc(FirestorePaths.jersey(player.teamId, targetJerseyId))
+          .get()
+          .timeout(_timeout);
+      if (taken.exists && taken.data()?['playerId'] != player.id) {
+        throw MoveUpJerseyTakenException(player.jerseyNo, group.label);
+      }
+    }
+
+    return _db.runTransaction<String>((tx) async {
+      // All reads first (Firestore transactions need reads before writes)
+      final snapshot = await tx.get(playerRef);
+      final data = snapshot.data();
+      if (data == null || data['status'] != ApprovalStatus.pending.name) {
+        throw const PlayerNotPendingException();
+      }
+      final child = Player.fromMap(snapshot.id, data);
+      final from = child.ageGroup;
+      if (from != null && group.index < from.index) {
+        throw StateError('A child is never moved down.');
+      }
+
+      final newJerseyId = jerseyIdFor(
+        child.category.name,
+        child.jerseyNo,
+        ageGroup: group.label,
+      );
+      final movesJersey = newJerseyId != child.jerseyId;
+      final newJerseyRef =
+          _db.doc(FirestorePaths.jersey(child.teamId, newJerseyId));
+      if (movesJersey && (await tx.get(newJerseyRef)).exists) {
+        throw MoveUpJerseyTakenException(child.jerseyNo, group.label);
+      }
+
+      var code = child.playerCode;
+      DocumentSnapshot<Map<String, dynamic>>? counter;
+      if (code == null) {
+        counter = await tx.get(_juvenileCounterRef);
+      }
+
+      // Then the writes
+      if (code == null) {
+        final next = (counter?.data()?['next'] as num?)?.toInt() ?? 1;
+        code = juvenilePlayerCodeFor(next, DateTime.now().toUtc().year);
+        if (counter?.exists ?? false) {
+          tx.update(_juvenileCounterRef, {'next': next + 1});
+        } else {
+          tx.set(_juvenileCounterRef, {'next': 2}); // the very first child
+        }
+      }
+
+      if (movesJersey) {
+        tx
+          ..delete(_jerseyRef(child))
+          ..set(newJerseyRef, {
+            'playerId': child.id,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+      }
+
+      // The team's bell: "3 juvenile players passed: Esi Mensah (GJ26-0001)…"
+      NotificationWriter(_db).forTeamInTransaction(
+        tx,
+        kind: NotificationKind.juvenilePassed,
+        teamId: child.teamId,
+        teamName: child.teamName,
+        name: from == null || from == group
+            ? '${child.fullName} ($code)'
+            : '${child.fullName} ($code, moved up to ${group.label})',
+      );
+
+      tx.update(playerRef, {
+        'status': ApprovalStatus.approved.name,
+        'playerCode': code,
+        'ageGroup': group.label,
+        'screeningDayId': dayId,
+        'approvedAt': FieldValue.serverTimestamp(),
+        'approvedBy': faUid,
+        'rejectionReason': null,
+        'changes': FieldValue.delete(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      return code;
+    }).timeout(_timeout);
+  }
+
+  /// FA, on the screening day: "Not eligible for Juvenile" with a
+  /// [reason] the team sees. Final for every juvenile group: the team can
+  /// no longer edit the child, and their player key stays taken.
+  Future<void> markNotEligible(
+    Player player, {
+    required String reason,
+    required String dayId,
+    required String faUid,
+  }) {
+    final batch = _db.batch()
+      ..update(_db.doc(FirestorePaths.player(player.id)), {
+        'status': ApprovalStatus.rejected.name,
+        'notEligible': true,
+        'screeningDayId': dayId,
+        'rejectionReason': reason.trim(),
+        'reviewedAt': FieldValue.serverTimestamp(),
+        'reviewedBy': faUid,
+        'changes': FieldValue.delete(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    NotificationWriter(_db).forTeamInBatch(
+      batch,
+      kind: NotificationKind.juvenileNotEligible,
+      teamId: player.teamId,
+      teamName: player.teamName,
+      name: player.fullName,
+    );
+    return batch.commit().timeout(_timeout);
+  }
+
+  /// FA, on the screening day (2.14d): "Needs correcting". Back to the
+  /// team with a [reason] (blurry photo, a typo…). Not final: the team
+  /// fixes it, and the child waits for screening again.
+  Future<void> sendBackJuvenile(
+    Player player, {
+    required String reason,
+    required String dayId,
+    required String faUid,
+  }) {
+    final batch = _db.batch()
+      ..update(_db.doc(FirestorePaths.player(player.id)), {
+        'status': ApprovalStatus.rejected.name,
+        'screeningDayId': dayId,
+        'rejectionReason': reason.trim(),
+        'reviewedAt': FieldValue.serverTimestamp(),
+        'reviewedBy': faUid,
+        'changes': FieldValue.delete(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    NotificationWriter(_db).forTeamInBatch(
+      batch,
+      kind: NotificationKind.juvenileToCorrect,
       teamId: player.teamId,
       teamName: player.teamName,
       name: player.fullName,

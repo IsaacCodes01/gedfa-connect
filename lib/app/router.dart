@@ -18,6 +18,7 @@ import 'package:gedfa_connect/features/fa/presentation/fa_player_review_screen.d
 import 'package:gedfa_connect/features/fa/presentation/fa_player_teams_screen.dart';
 import 'package:gedfa_connect/features/fa/presentation/fa_request_review_screen.dart';
 import 'package:gedfa_connect/features/fa/presentation/fa_requests_screen.dart';
+import 'package:gedfa_connect/features/fa/presentation/fa_juvenile_child_screen.dart';
 import 'package:gedfa_connect/features/fa/presentation/fa_team_juvenile_screen.dart';
 import 'package:gedfa_connect/features/fa/presentation/fa_team_players_screen.dart';
 import 'package:gedfa_connect/features/auth/presentation/verify_email_screen.dart';
@@ -41,6 +42,7 @@ import 'package:gedfa_connect/features/players/presentation/player_profile_edit_
 import 'package:gedfa_connect/features/players/presentation/player_profile_screen.dart';
 import 'package:gedfa_connect/features/players/presentation/team_positions_screen.dart';
 import 'package:gedfa_connect/features/screening/presentation/fa_screening_days_screen.dart';
+import 'package:gedfa_connect/features/screening/presentation/fa_screening_decision_screen.dart';
 import 'package:gedfa_connect/features/settings/presentation/change_email_screen.dart';
 import 'package:gedfa_connect/features/settings/presentation/more_screen.dart';
 import 'package:gedfa_connect/features/settings/presentation/my_profile_screen.dart';
@@ -152,6 +154,14 @@ final routerProvider = Provider<GoRouter>((ref) {
                       ),
                     ],
                   ),
+                  // One juvenile child, read only. Full-screen (2.14c).
+                  GoRoute(
+                    path: 'child/:playerId',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (_, state) => FaJuvenileChildScreen(
+                      playerId: state.pathParameters['playerId']!,
+                    ),
+                  ),
                   // Review one player. Full-screen, above the tabs.
                   GoRoute(
                     path: 'player/:playerId',
@@ -194,6 +204,17 @@ final routerProvider = Provider<GoRouter>((ref) {
                   GoRoute(
                     path: 'screening',
                     builder: (_, _) => const FaScreeningDaysScreen(),
+                    routes: [
+                      // One child after another (2.14c). Full screen.
+                      GoRoute(
+                        path: 'day/:dayId',
+                        parentNavigatorKey: rootNavigatorKey,
+                        builder: (_, state) => FaScreeningDecisionScreen(
+                          dayId: state.pathParameters['dayId']!,
+                          childId: state.uri.queryParameters['child'],
+                        ),
+                      ),
+                    ],
                   ),
                   // FA only: League settings (2.13d). Inside the More tab.
                   GoRoute(

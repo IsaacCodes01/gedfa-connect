@@ -357,7 +357,9 @@ class _SquadBody extends ConsumerWidget {
                       const SizedBox(width: 10),
                       _StatusTile(
                         value: rejected,
-                        label: 'Rejected',
+                        // Juvenile: decided at screening (2.14c)
+                        // Juvenile: to correct or not eligible (2.14d)
+                        label: isDivision ? 'Rejected' : 'Not passed',
                         color: scheme.error,
                         selected: status == ApprovalStatus.rejected,
                         onTap: () => pick(ApprovalStatus.rejected),

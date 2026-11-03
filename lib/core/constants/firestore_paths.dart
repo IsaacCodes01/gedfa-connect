@@ -70,6 +70,9 @@ class FirestorePaths {
   static const screeningDays = '$district/screeningDays';
   static String screeningDay(String id) => '$district/screeningDays/$id';
 
+  /// The next juvenile player-ID number (GJ26-…): `{ next: 5 }`. FA only.
+  static const juvenileCounter = '$district/settings/juvenileCounter';
+
   /// The next player-ID number: `{ next: 43 }`. FA only.
   static const playerCounter = '$district/settings/playerCounter';
 }

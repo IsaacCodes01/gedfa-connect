@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gedfa_connect/features/players/domain/age_group.dart';
 import 'package:gedfa_connect/features/screening/data/screening_repository.dart';
 import 'package:gedfa_connect/features/screening/domain/screening_day.dart';
+import 'package:gedfa_connect/features/screening/presentation/widgets/screening_countdown.dart';
 
 /// Board J1: the blue "JUVENILE SCREENING" card on the team's Squad tab
 /// (Juvenile side). One card per coming screening day; each one goes away
@@ -77,7 +78,27 @@ class _Card extends StatelessWidget {
                 fontWeight: FontWeight.w700,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
+            // "⏱ Starts in 2 days 3 h", then "Happening now" (Isaac,
+            // 3 Nov 2026). Ticks every second, like the FA's.
+            Row(
+              children: [
+                Icon(Icons.timer_outlined, size: 18, color: ink),
+                const SizedBox(width: 6),
+                ScreeningCountdown(
+                  key: ValueKey(day.id),
+                  startsAt: day.startsAt,
+                  prefix: 'Starts in ',
+                  nowText: 'Happening now',
+                  style: TextStyle(
+                    color: ink,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
             Text(
               '${day.groupsText} players.$bring Only children screened '
               'that day can play this season.',

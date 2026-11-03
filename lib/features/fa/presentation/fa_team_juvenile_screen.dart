@@ -23,7 +23,8 @@ import 'package:go_router/go_router.dart';
 /// U13 / U15 / U17 tabs with how many children are in each. Every child
 /// shows the photo, date of birth and parent, which is what the FA needs
 /// to prepare the screening day. The decision itself (pass / not
-/// eligible) comes in 2.14c, so the cards can't be tapped yet.
+/// eligible) is made in More › Juvenile screening; tapping a card shows
+/// the child's details.
 class FaTeamJuvenileScreen extends ConsumerStatefulWidget {
   const FaTeamJuvenileScreen({super.key, required this.teamId});
 
@@ -170,79 +171,86 @@ class _ChildCard extends StatelessWidget {
           isDark ? const Color(0xFF7BE3B0) : AppColors.approvedText,
         ),
       ApprovalStatus.rejected => (
-          'Not eligible',
+          player.notEligible ? 'Not eligible' : 'To correct',
           isDark ? const Color(0xFF4A1820) : AppColors.rejectedBg,
           isDark ? const Color(0xFFFF9DA6) : AppColors.rejectedText,
         ),
     };
 
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: scheme.surface,
+    // Tap: the child's details (Isaac, 3 Nov 2026)
+    return Material(
+      color: scheme.surface,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: scheme.outline),
+        side: BorderSide(color: scheme.outline),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          PlayerAvatar(name: player.fullName, url: player.thumbUrl, size: 52),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  player.fullName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.titleSmall
-                      ?.copyWith(fontWeight: FontWeight.w600),
-                ),
-                Text(
-                  '#${player.jerseyNo} · ${player.position.code}',
-                  style: muted,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Born ${formatDate(player.dob)} · $age in $year',
-                  style: textTheme.bodySmall,
-                ),
-                // Registered older than their age, e.g. a U13 in U15
-                if (own != null && group != null && own != group)
-                  Text(
-                    '${own.label} age, in the ${group.label} squad',
-                    style: textTheme.bodySmall?.copyWith(
-                      color: scheme.primary,
-                      fontWeight: FontWeight.w600,
+      child: InkWell(
+        onTap: () => context.push(Routes.adminJuvenileChild(player.id)),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              PlayerAvatar(name: player.fullName, url: player.thumbUrl, size: 52),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      player.fullName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.titleSmall
+                          ?.copyWith(fontWeight: FontWeight.w600),
                     ),
-                  ),
-                if (guardian != null)
-                  Text(
-                    '${guardian.relation.label}: ${guardian.name} · '
-                    '${guardian.phone}',
-                    style: muted,
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-            decoration: BoxDecoration(
-              color: pillBg,
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Text(
-              pillText,
-              style: TextStyle(
-                color: pillInk,
-                fontSize: 11.5,
-                fontWeight: FontWeight.w700,
+                    Text(
+                      '#${player.jerseyNo} · ${player.position.code}',
+                      style: muted,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Born ${formatDate(player.dob)} · $age in $year',
+                      style: textTheme.bodySmall,
+                    ),
+                    // Registered older than their age, e.g. a U13 in U15
+                    if (own != null && group != null && own != group)
+                      Text(
+                        '${own.label} age, in the ${group.label} squad',
+                        style: textTheme.bodySmall?.copyWith(
+                          color: scheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    if (guardian != null)
+                      Text(
+                        '${guardian.relation.label}: ${guardian.name} · '
+                        '${guardian.phone}',
+                        style: muted,
+                      ),
+                  ],
+                ),
               ),
-            ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                decoration: BoxDecoration(
+                  color: pillBg,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  pillText,
+                  style: TextStyle(
+                    color: pillInk,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

@@ -193,7 +193,7 @@ class _FaPlayerTeamsScreenState extends ConsumerState<FaPlayerTeamsScreen> {
                   _PlayerResult(
                     player: child,
                     onTap: () =>
-                        context.go(Routes.adminTeamJuvenile(child.teamId)),
+                        context.push(Routes.adminJuvenileChild(child.id)),
                   ),
                   const SizedBox(height: 8),
                 ],

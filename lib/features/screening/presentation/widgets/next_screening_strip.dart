@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gedfa_connect/app/routes.dart';
 import 'package:gedfa_connect/features/screening/data/screening_repository.dart';
+import 'package:gedfa_connect/features/screening/presentation/widgets/screening_countdown.dart';
 import 'package:go_router/go_router.dart';
 
 /// Board J5: "Next screening: Sat 14 Nov · Fetteh Park   Days ›" on the
@@ -33,22 +34,38 @@ class NextScreeningStrip extends ConsumerWidget {
           child: Row(
             children: [
               Expanded(
-                child: Text.rich(
-                  next == null
-                      ? const TextSpan(text: 'No screening day set yet')
-                      : TextSpan(
-                          children: [
-                            const TextSpan(
-                              text: 'Next screening: ',
-                              style: TextStyle(fontWeight: FontWeight.w700),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text.rich(
+                      next == null
+                          ? const TextSpan(text: 'No screening day set yet')
+                          : TextSpan(
+                              children: [
+                                const TextSpan(
+                                  text: 'Next screening: ',
+                                  style: TextStyle(fontWeight: FontWeight.w700),
+                                ),
+                                TextSpan(text: '${next.dateText} · ${next.venue}'),
+                              ],
                             ),
-                            TextSpan(text: '${next.dateText} · ${next.venue}'),
-                          ],
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.bodySmall
+                          ?.copyWith(fontSize: 12.5, color: ink),
+                    ),
+                    // 2.14d: "Opens in 2 h 14 min", or "Open now"
+                    if (next != null)
+                      ScreeningCountdown(
+                        key: ValueKey(next.id),
+                        startsAt: next.startsAt,
+                        style: textTheme.bodySmall?.copyWith(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: ink,
                         ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.bodySmall
-                      ?.copyWith(fontSize: 12.5, color: ink),
+                      ),
+                  ],
                 ),
               ),
               const SizedBox(width: 8),

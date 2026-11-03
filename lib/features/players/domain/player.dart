@@ -27,6 +27,7 @@ class Player {
     this.changes = const {},
     this.ageGroup,
     this.guardian,
+    this.notEligible = false,
   });
 
   /// Firestore document ID ('' for a player not saved yet).
@@ -64,6 +65,11 @@ class Player {
 
   /// Juvenile only: parent or guardian (required).
   final Guardian? guardian;
+
+  /// Juvenile only (2.14c): the FA found at screening that this child
+  /// can't play Juvenile (with [rejectionReason]). Final: the team can't
+  /// edit or re-add them.
+  final bool notEligible;
 
   bool get isJuvenile => category == Competition.juvenile;
 
@@ -154,6 +160,7 @@ class Player {
       changes: PlayerChange.mapFrom(data['changes']),
       ageGroup: AgeGroup.fromString(data['ageGroup'] as String?),
       guardian: Guardian.fromMap(data['guardian']),
+      notEligible: data['notEligible'] == true,
     );
   }
 }

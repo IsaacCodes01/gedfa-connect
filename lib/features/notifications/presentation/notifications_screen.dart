@@ -233,6 +233,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     final (look, target) = switch (n.kind) {
       NotificationKind.playersApproved => (_Look.ok, Routes.team),
       NotificationKind.playersRejected => (_Look.no, Routes.team),
+      NotificationKind.juvenilePassed => (_Look.ok, Routes.team),
+      NotificationKind.juvenileNotEligible => (_Look.no, Routes.team),
+      NotificationKind.juvenileToCorrect => (_Look.no, Routes.team),
       NotificationKind.teamApproved => (_Look.team, Routes.team),
       // One club: its request. Several (grouped): the list of requests.
       NotificationKind.teamRequest => (

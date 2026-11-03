@@ -342,7 +342,9 @@ class PlayerGridCard extends ConsumerWidget {
           ApprovalStatus.pending => player.isJuvenile
               ? '$pos · waiting for screening'
               : '$pos · awaiting FA',
-          ApprovalStatus.rejected => '$pos · needs correcting',
+          ApprovalStatus.rejected => player.notEligible
+              ? '$pos · not eligible'
+              : '$pos · needs correcting',
         },
       CardLine.fa =>
         approved && code != null ? '$code · $pos' : '$pos · $age',
@@ -355,6 +357,7 @@ class PlayerGridCard extends ConsumerWidget {
     ApprovalStatus status,
     bool isDark, {
     bool juvenile = false,
+    bool notEligible = false,
   }) =>
       switch (status) {
         ApprovalStatus.approved => (
@@ -368,7 +371,12 @@ class PlayerGridCard extends ConsumerWidget {
             const Color(0xFF3A2C00),
           ),
         ApprovalStatus.rejected => (
-            'Rejected',
+            // Juvenile (2.14d): final, or sent back to correct
+            !juvenile
+                ? 'Rejected'
+                : notEligible
+                    ? 'Not eligible'
+                    : 'To correct',
             isDark ? const Color(0xFF4A1820) : AppColors.rejectedBg,
             isDark ? const Color(0xFFFF9DA6) : AppColors.rejectedText,
           ),
@@ -412,7 +420,12 @@ class PlayerGridCard extends ConsumerWidget {
           isDark ? AppColors.darkBorder : const Color(0xFFE3EAF2),
           isDark ? const Color(0xFFCFE4FB) : const Color(0xFF33445A),
         ),
-      null => _registrationStrip(status, isDark, juvenile: player.isJuvenile),
+      null => _registrationStrip(
+          status,
+          isDark,
+          juvenile: player.isJuvenile,
+          notEligible: player.notEligible,
+        ),
     };
     final badge = extra?.badge;
     final extraLine = extra?.line;

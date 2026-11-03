@@ -59,6 +59,22 @@ class ScreeningDay {
         '${labels.last}';
   }
 
+  /// Screening opens at the start time, not before (Isaac, 3 Nov 2026).
+  bool hasStarted(DateTime now) => !now.isBefore(startsAt);
+
+  /// "7 days 2 h", "2 h 14 min", "4 min 30 s" until [startsAt] (2.14d).
+  static String countdownText(Duration left) {
+    if (left.inDays >= 1) {
+      final hours = left.inHours % 24;
+      final days = left.inDays == 1 ? '1 day' : '${left.inDays} days';
+      return hours == 0 ? days : '$days $hours h';
+    }
+    if (left.inHours >= 1) {
+      return '${left.inHours} h ${left.inMinutes % 60} min';
+    }
+    return '${left.inMinutes} min ${left.inSeconds % 60} s';
+  }
+
   /// The card stays on the team's Squad tab until the day after.
   bool isShownOn(DateTime now) {
     final d = startsAt.toLocal();

@@ -48,10 +48,12 @@ class FaPlayerReviewScreen extends ConsumerWidget {
         title: 'Review player',
         leading: BackButton(onPressed: () => _leave(context, player)),
       ),
-      bottomNavigationBar:
-          player != null && player.status == ApprovalStatus.pending
-              ? _ReviewActions(player: player)
-              : null,
+      // Juvenile children are decided at screening, never here (2.14c)
+      bottomNavigationBar: player != null &&
+              !player.isJuvenile &&
+              player.status == ApprovalStatus.pending
+          ? _ReviewActions(player: player)
+          : null,
       body: playerAsync.when(
         loading: () => const LoadingView(),
         error: (error, _) => ErrorView(message: appErrorMessage(error)),
