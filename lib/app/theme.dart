@@ -42,6 +42,41 @@ class AppColors {
   static const pendingText = Color(0xFF5C4700);
   static const rejectedBg = Color(0xFFFDE7EA);
   static const rejectedText = Color(0xFFA10E1F);
+
+  // Dashboard (2.12): softer card border, and the header gradient
+  static const cardBorder = Color(0xFFDCE5EF);
+  static const darkCardBorder = Color(0xFF22385A);
+  static const heroGradient = [heroDark, deepBlue, brandBlue];
+  static const darkHeroGradient = [
+    Color(0xFF081A30),
+    heroDark,
+    Color(0xFF15467F),
+  ];
+}
+
+/// The coloured icon chips on the dashboard (2.12): a soft background
+/// with a stronger icon colour, one pair for light and one for dark mode.
+enum AccentTone {
+  blue(Color(0xFFE3EEFB), Color(0xFF1259A8), Color(0xFF17345A),
+      Color(0xFF7DBBFA)),
+  violet(Color(0xFFECE8FB), Color(0xFF5B3FC4), Color(0xFF2A2450),
+      Color(0xFFB6A6FF)),
+  green(Color(0xFFE3F2EA), Color(0xFF00703F), Color(0xFF12382B),
+      Color(0xFF5BD39A)),
+  gold(Color(0xFFFFF4C2), Color(0xFF8A6A00), Color(0xFF3A3110),
+      Color(0xFFFCD116)),
+  red(Color(0xFFFDE7EA), Color(0xFFB3122A), Color(0xFF3D1820),
+      Color(0xFFFF8A94));
+
+  const AccentTone(this._bg, this._fg, this._darkBg, this._darkFg);
+
+  final Color _bg;
+  final Color _fg;
+  final Color _darkBg;
+  final Color _darkFg;
+
+  Color background(bool isDark) => isDark ? _darkBg : _bg;
+  Color foreground(bool isDark) => isDark ? _darkFg : _fg;
 }
 
 class AppTheme {

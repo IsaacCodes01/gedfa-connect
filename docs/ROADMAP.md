@@ -4,7 +4,7 @@
 **Platforms:** Flutter app: Android (APK) and web (iPhone users via "Add to Home Screen"); native iOS later (see Section 4, Distribution); separate React website by a colleague
 **Backend:** Firebase (Auth, Firestore, Cloud Storage, Hosting) on the Blaze plan
 **Projects:** `gedfa-connect-dev` (building/testing) and `gedfa-connect-prod` (real GEDFA data)
-**Status:** Phase 0 and Phase 1 complete · Phase 2: 2.0–2.8, 2.10, 2.11, 2.13 and 2.14 done; next 2.12 FA dashboard, 2.12 FA dashboard, then Phase 3 · web test link live on dev (27 Oct 2026)
+**Status:** Phase 0 and Phase 1 complete · Phase 2: 2.0–2.8, 2.10, 2.11, 2.12a, 2.13 and 2.14 done; next 2.12b, then Phase 3, then the UI/UX refresh and the pilot · web test link live on dev (27 Oct 2026)
 
 See also: `docs/DATA_MODEL.md` (the data contract).
 
@@ -202,6 +202,8 @@ Time estimates assume part-time work and are rough guides.
   - [x] 2.11c **Suspend a team** (C1–C5, chairman only): FA team page ⋮ › Suspend team… with a reason, ending on a date or when the chairman lifts it (after the FA board meets the club); red banner on the FA page (Lift suspension) and on the team's Squad tab; "Suspended" on the Teams list; Lift with why (fine paid, bond signed, board decision, other + note); history on the FA page; while in force the rules refuse adding or editing players, profile edits and change requests (later: team sheets); bell notes for the team. 285 rules tests *(done 7 Nov 2026)*
 
 - [ ] 2.12 **FA dashboard** (Home tab): totals of teams and players, players by competition and position group, waiting reviews; later referees, cards and suspensions. Uses Firestore count queries so it stays cheap as the league grows
+  - [x] 2.12a **Home tab and Needs you** (mockup 2.12-fa-dashboard): Home is the FA's first tab (Home · Teams · Players · More) and where the FA lands after signing in; blue header with greeting, date, season, team and player registration open or closed, and the bell; "Needs you" lists only what is waiting (new teams, team changes, players to approve, waiting for screening with the next screening day, payments to confirm, corrections sent back), each row opens its screen; "All caught up" when nothing waits. Live, from the same streams as the tab badges (no extra reads). No rules changes, 285 rules tests *(done 7 Nov 2026)*
+  - [ ] 2.12b **League at a glance and charts:** tiles for teams (both competitions, suspended), players approved (+ this week), fees collected (every FA official), squads ready (at least the matchday squad from League settings, 16); players by competition (Division, U17, U15, U13) and by position (GK, DEF, MID, FWD; Division | Juvenile); Season stats card (switched off until match reports); Coming later (fixtures, referee appointments, cards, player suspensions); count queries, pull down to refresh, numbers count up once
 
 > **Flutter and React:** the Flutter app (Android + web) is the working tool for the FA, team admins and referees. The React website (by a colleague) is the public face for fans: fixtures, results, table, news and approved teams. Both use the same Firebase project, `DATA_MODEL.md` and security rules. *(To be agreed with the colleague.)*
 
@@ -225,6 +227,8 @@ Time estimates assume part-time work and are rough guides.
 - [ ] 3.1–3.7 As before: select fixture, pick approved players within limits, captain/GK, formation, PDF, print/share, FA can view
 
 > **Before the pilot:** bundle fonts in the app (offline-safe), set up dev/prod switching (flavors), enable App Check, create the first FA Admin on prod, deploy rules to prod, set Storage CORS and Hosting on prod, set up Firebase App Distribution for the Android APK, consider weekly Firestore backups on prod, **phone push notifications** (Firebase Cloud Messaging, grouped the same way), deploy `firestore.indexes.json`.
+
+> **UI and UX refresh before the pilot** (Isaac, 7 Nov 2026): after Phase 3, a modern look with motion and animations, one screen group at a time, mockups first, never mixed with feature work. After the pilot, a second refresh from the clubs' feedback.
 
 > **PILOT MILESTONE:** registration, approval, team sheets and FA announcements usable. Pilot with the FA and one or two teams.
 
@@ -316,6 +320,7 @@ Work backwards from the GEDFA season start date to decide what the pilot must co
 | 12 Oct 2026 | Renamed to GEDFA Connect; dev/prod projects created |
 | 13 Oct 2026 | Phase 0 complete; added 0.8 design foundation, 1.0 emulators, 1.1a toasts/connectivity/responsive; invite-only roles (2.6); FA announcements (2.7); new Phase 5.5 League feed; navigation, connectivity and responsive standards; pre-pilot checklist |
 | 17 Oct 2026 | 1.1b, 1.2, 1.3 done; new 1.3b Competitions (Division / Juvenile, one registration per club); 1.4 split into Division first, Juvenile after GEDFA answers |
+| 7 Nov 2026 | 2.12a done: FA Home tab (dashboard) first, FA lands on it; header and Needs you. Season stats (top scorers, assists, clean sheets, best attack and defence) get their own screen in Phase 4; fourth officials will record assists. Order agreed: 2.12b, Phase 3, UI/UX refresh with motion and the "before the pilot" list, pilot, a second refresh from feedback, then Phase 4 (Isaac, 7 Nov 2026) |
 | 7 Nov 2026 | 2.11c done, 2.11 complete: the chairman suspends a team (ends on a date or when lifted with why) and lifts it; the rules lock the team's player, profile and change-request writes while it is in force |
 | 7 Nov 2026 | 2.11b done: the FA asks a team to correct (officials, kits, colours, players, club details); the team sends it back, the FA marks it done or asks again. One request per team at a time |
 | 7 Nov 2026 | 2.11 split into 2.11a–c; 2.11a done: the FA corrects only misspellings and obvious mistakes (club name, town, ground, directions, year founded, email), each with "What was wrong?" in a log the team can read; officials, kits and colours go to "ask the team" (2.11b). Suspensions: chairman only, end on a date or when lifted (fine paid, bond signed, board decision) (Isaac, 7 Nov 2026) |

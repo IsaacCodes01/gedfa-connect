@@ -8,7 +8,12 @@ class Routes {
   static const verifyEmail = '/verify-email';
   static const welcome = '/welcome';
   static const registerTeam = '/welcome/register';
+  /// The FA's area. [admin] itself is the Teams tab.
   static const admin = '/admin';
+
+  /// FA: the Home tab (dashboard), where the FA lands after signing in
+  /// (2.12a).
+  static const adminHome = '/admin/home';
   static String adminRequest(String uid) => '/admin/request/$uid';
 
   /// FA: Teams with the Changes switch on (2.10b), and all of one team's

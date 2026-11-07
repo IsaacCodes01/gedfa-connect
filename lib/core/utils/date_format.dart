@@ -12,6 +12,22 @@ String formatDateTime(DateTime date) {
       '$hour:$minute $period';
 }
 
+const _weekdayNames = [
+  'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday',
+  'Sunday',
+];
+const _monthNames = [
+  'January', 'February', 'March', 'April', 'May', 'June', 'July',
+  'August', 'September', 'October', 'November', 'December',
+];
+
+/// "Saturday, 7 November 2026" (the FA dashboard header)
+String formatLongDate(DateTime date) {
+  final local = date.toLocal();
+  return '${_weekdayNames[local.weekday - 1]}, ${local.day} '
+      '${_monthNames[local.month - 1]} ${local.year}';
+}
+
 String formatDate(DateTime date) =>
   '${date.day} ${_months[date.month - 1]} ${date.year}';
 

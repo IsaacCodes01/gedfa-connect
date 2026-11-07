@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.15, matches the rules after step 2.11c (7 Nov 2026)
+**Status:** v2.16, matches the rules after step 2.12a (7 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -695,6 +695,8 @@ Feed rules: never include dates of birth; player photos only if agreed with GEDF
 
 **Decided by Isaac (7 Nov 2026), for 2.11:** the FA corrects only misspellings and obvious mistakes itself (club name, town, ground, directions, year founded, email); officials (sensitive data), kits, colours and players it asks the team to correct. Only the **chairman** suspends a team and lifts a suspension. A suspension stops adding or editing players, profile edits and change requests (later: team sheets); the team still sees everything and pays its fee. It ends on a date (set by the offence) or lasts until the FA board has met the club; the chairman may lift it early, e.g. a fine was paid or a bond was signed.
 
+**Decided by Isaac (7 Nov 2026), for 2.12 and Phase 4:** a squad is "ready" on the dashboard with at least the matchday squad (`settings/league.matchdaySquad`, 16) of approved players. Fourth officials (and other match officials) will take notes during matches, so match reports can record **assists** as well as goals and cards. The FA appoints referees and other officials to each fixture (Phase 4).
+
 Still open:
 
 
@@ -724,6 +726,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 7 Nov 2026 | v2.16 (2.12a): no new collections or rules. The FA dashboard reads what is already there (team requests, team changes, players, waiting payments, correction requests, screening days). Section 7: squads ready = matchday squad (16); fourth officials record assists (Phase 4). |
 | 7 Nov 2026 | v2.15 (2.11c): suspensions by the chairman: `teams.suspension` and `teams/{teamId}/suspensions` (ends on a date or when lifted with why: fine paid, bond signed, board decision, other); while in force the team's player, profile and change-request writes are refused; notification kinds `teamSuspended`, `suspensionLifted`. 285 tests. |
 | 7 Nov 2026 | v2.14 (2.11b): new `correctionRequests/{teamId}` (the FA asks a team to correct officials, kits, colours, players or club details; asked → sent back → done, or asked again); notification kinds `correctionAsked`, `correctionSentBack`, `correctionDone`. 276 tests. |
 | 7 Nov 2026 | v2.13 (2.11a): FA corrections: new `teams/{teamId}/corrections` log and `teams.lastCorrectionId`; the FA corrects the name, town, ground, directions, year founded and email (never officials, kits or colours), a new spelling reserved in `teamNames` for the club; notification kind `teamCorrected`. Isaac's 2.11 decisions recorded in Section 7. 268 tests. |

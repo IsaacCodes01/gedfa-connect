@@ -85,10 +85,15 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
 - **2.11 FA corrections** done (7 Nov 2026, 285 rules tests): 2.11a the FA fixes misspellings itself
   (name, town, ground, directions, year, email; never officials, kits or colours), 2.11b asks the team to
   correct, 2.11c the chairman suspends and lifts. Isaac deploys the rules to dev himself.
-- **Next:** **2.12** FA dashboard,
+- **2.12a** FA Home tab (dashboard: header + Needs you) done (7 Nov 2026). FA tabs are now
+  Home · Teams · Players · More; the FA lands on `/admin/home`; `/admin` is still Teams.
+- **Next:** **2.12b** (tiles, charts, Season stats card, Coming later; mockup `2.12-fa-dashboard.html`),
   **Phase 3** team sheets (16 / 5 / 7 from settings, GFA play-up limits, kit in the top-left corner),
-  then the "before the pilot" list in the roadmap (push notifications, 3-day fee reminders, prod setup).
-- **Later (after Phase 3):** our own app icon (`flutter_launcher_icons`) and splash screens before
-  "Get started" (`flutter_native_splash` + an in-app intro). A UI and animation refresh is done as its
-  own steps, one screen group at a time, with mockups first, never mixed with feature work.
+  then the **UI/UX refresh with motion and animations** and the "before the pilot" list (push
+  notifications, 3-day fee reminders, prod setup), then the pilot, a second refresh from feedback, Phase 4.
+- **The refresh (after Phase 3, before the pilot):** our own app icon (`flutter_launcher_icons`), splash
+  screens before "Get started" (`flutter_native_splash` + an in-app intro), and a modern look with
+  motion, done as its own steps, one screen group at a time, mockups first, never mixed with feature work.
+- Phase 4 ideas agreed: a Season stats screen (top scorers, assists, clean sheets, best attack and defence;
+  fourth officials record assists) and referee appointments per fixture.
 - turn off the Co-Authored-By line in your commit settings for this project.

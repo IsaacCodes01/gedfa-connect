@@ -46,7 +46,14 @@ final teamDestinations = [
 ];
 
 /// The FA admin's tabs. The gold numbers are things waiting for the FA.
+/// Home (the dashboard, 2.12) comes first and has no number: its
+/// "Needs you" card lists them all.
 final adminDestinations = [
+  const ShellDestination(
+    icon: Icons.home_outlined,
+    selectedIcon: Icons.home_rounded,
+    label: 'Home',
+  ),
   ShellDestination(
     icon: Icons.shield_outlined,
     selectedIcon: Icons.shield_rounded,
