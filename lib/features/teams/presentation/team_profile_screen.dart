@@ -6,11 +6,14 @@ import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/initials.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
+import 'package:gedfa_connect/features/teams/data/team_change_repository.dart';
 import 'package:gedfa_connect/features/teams/data/team_profile_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/teams/domain/kit_slot.dart';
 import 'package:gedfa_connect/features/teams/domain/official.dart';
+import 'package:gedfa_connect/features/teams/domain/team_change.dart';
 import 'package:gedfa_connect/features/teams/domain/team_colours.dart';
+import 'package:gedfa_connect/features/teams/presentation/widgets/change_status_note.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/team_logo.dart';
 import 'package:go_router/go_router.dart';
 
@@ -18,7 +21,9 @@ import 'package:go_router/go_router.dart';
 ///
 /// Two cards:
 /// - **Name and logo** (gold "FA approves"): name, short name, logo and
-///   competitions. Changing them is a request to the FA (2.10b).
+///   competitions. "Ask to change" sends a request to the FA (2.10b); a
+///   gold note shows it is pending, red if the FA said no, green for a
+///   week after it was approved.
 /// - **Club details** (green "Saves straight away"): town, home ground,
 ///   colours, kits and officials. Each Edit opens its own screen; saving
 ///   tells the FA in the bell.
@@ -28,6 +33,7 @@ class TeamProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final detailsAsync = ref.watch(myTeamDetailsProvider);
+    final changes = ref.watch(myTeamChangesProvider).value ?? const [];
 
     return Scaffold(
       appBar: GedfaAppBar(
@@ -47,19 +53,25 @@ class TeamProfileScreen extends ConsumerWidget {
                 title: 'No team yet',
                 message: 'Your team appears here once the FA approves it.',
               )
-            : _Body(team: team),
+            : _Body(team: team, changes: changes),
       ),
     );
   }
 }
 
 class _Body extends StatelessWidget {
-  const _Body({required this.team});
+  const _Body({required this.team, required this.changes});
 
   final TeamDetails team;
 
+  /// The team's requests to the FA (one of each kind at most)
+  final List<TeamChange> changes;
+
   void _edit(BuildContext context, TeamSection section) =>
       context.push(Routes.teamClubEdit(section.name));
+
+  void _ask(BuildContext context, TeamChangeKind kind) =>
+      context.push(Routes.teamClubAsk(kind.name));
 
   @override
   Widget build(BuildContext context) {
@@ -86,6 +98,18 @@ class _Body extends StatelessWidget {
     final kitsText = both
         ? 'Division: $firstKits · Juvenile: $juvenileKits'
         : '${team.categories.first.label}: $firstKits';
+
+    // Pending first, then the FA's latest answers
+    final notes = changes.where(showsChangeNote).toList()
+      ..sort((a, b) {
+        if (a.isPending != b.isPending) return a.isPending ? -1 : 1;
+        final aTime = a.reviewedAt ?? a.createdAt ?? DateTime(0);
+        final bTime = b.reviewedAt ?? b.createdAt ?? DateTime(0);
+        return bTime.compareTo(aTime);
+      });
+    final toAdd = team.categories.contains(Competition.division)
+        ? Competition.juvenile
+        : Competition.division;
 
     final chairman = team.officialFor(OfficialRole.chairman) ??
         team.officialFor(OfficialRole.teamManager);
@@ -126,15 +150,40 @@ class _Body extends StatelessWidget {
                     ?.copyWith(color: scheme.onSurfaceVariant),
               ),
               const SizedBox(height: 16),
+              for (final change in notes) ...[
+                ChangeStatusNote(change: change),
+                const SizedBox(height: 14),
+              ],
               _Card(
                 title: 'Name and logo',
                 tag: 'FA approves',
                 tagBg: goldBg,
                 tagInk: goldInk,
                 rows: [
-                  _Row(label: 'Club name', value: team.teamName, soon: true),
-                  _Row(label: 'Short name', value: team.shortName, soon: true),
-                  const _Row(label: 'Logo', value: 'Your club badge', soon: true),
+                  _Row(
+                    label: 'Club name',
+                    value: team.teamName,
+                    onAsk: () => _ask(context, TeamChangeKind.name),
+                  ),
+                  _Row(
+                    label: 'Short name',
+                    value: team.shortName,
+                    onAsk: () => _ask(context, TeamChangeKind.shortName),
+                  ),
+                  _Row(
+                    label: 'Logo',
+                    value: '',
+                    valueWidget: Align(
+                      alignment: Alignment.centerLeft,
+                      child: TeamLogo(
+                        label: initialsFor(team.teamName),
+                        color: team.logoColor,
+                        url: team.logoUrl,
+                        size: 36,
+                      ),
+                    ),
+                    onAsk: () => _ask(context, TeamChangeKind.logo),
+                  ),
                   _Row(
                     label: 'Competitions',
                     value: competitions,
@@ -143,7 +192,11 @@ class _Body extends StatelessWidget {
                         : team.categories.contains(Competition.division)
                             ? 'Juvenile brings screening and Juvenile kits'
                             : 'Division brings its own kits and players',
-                    soon: !both,
+                    // Hidden for a club already in both
+                    askLabel: 'Add ${toAdd.label}',
+                    onAsk: both
+                        ? null
+                        : () => _ask(context, TeamChangeKind.competition),
                   ),
                 ],
               ),
@@ -297,7 +350,8 @@ class _Card extends StatelessWidget {
   }
 }
 
-/// "Label   Value (note)   ✎ Edit" or "Ask to change" (soon).
+/// "Label   Value (note)   ✎ Edit", or "Ask to change ›" for what the FA
+/// approves (2.10b).
 class _Row extends StatelessWidget {
   const _Row({
     required this.label,
@@ -305,7 +359,8 @@ class _Row extends StatelessWidget {
     this.valueWidget,
     this.note,
     this.onEdit,
-    this.soon = false,
+    this.onAsk,
+    this.askLabel = 'Ask to change',
   });
 
   final String label;
@@ -314,8 +369,9 @@ class _Row extends StatelessWidget {
   final String? note;
   final VoidCallback? onEdit;
 
-  /// Needs an FA request: comes with 2.10b
-  final bool soon;
+  /// Opens "Ask the FA to change" (2.10b)
+  final VoidCallback? onAsk;
+  final String askLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -370,11 +426,11 @@ class _Row extends StatelessWidget {
                 ),
               ],
             )
-          else if (soon)
+          else if (onAsk != null)
             Text(
-              'Ask the FA · soon',
+              '$askLabel ›',
               style: textTheme.bodySmall?.copyWith(
-                color: scheme.onSurfaceVariant,
+                color: scheme.primary,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -382,9 +438,8 @@ class _Row extends StatelessWidget {
       ),
     );
 
-    return onEdit == null
-        ? content
-        : InkWell(onTap: onEdit, child: content);
+    final onTap = onEdit ?? onAsk;
+    return onTap == null ? content : InkWell(onTap: onTap, child: content);
   }
 }
 

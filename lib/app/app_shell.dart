@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gedfa_connect/app/theme.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/features/players/data/player_repository.dart';
-import 'package:gedfa_connect/features/teams/data/team_request_repository.dart';
+import 'package:gedfa_connect/features/teams/data/team_change_repository.dart';
 import 'package:go_router/go_router.dart';
 
 /// One tab in the shell's navigation (bottom bar on phones, rail on wide
@@ -51,7 +51,8 @@ final adminDestinations = [
     icon: Icons.shield_outlined,
     selectedIcon: Icons.shield_rounded,
     label: 'Teams',
-    badge: pendingTeamRequestCountProvider,
+    // New teams + change requests waiting (2.10b)
+    badge: faTeamsWaitingCountProvider,
   ),
   ShellDestination(
     icon: Icons.groups_outlined,

@@ -116,9 +116,13 @@ class ReviewActionsBar extends StatelessWidget {
     required this.onReject,
     required this.onApprove,
     this.blockedText,
+    this.rejectLabel = 'Reject',
   });
 
   final String approveLabel;
+
+  /// "Not approve" for change requests (2.10b)
+  final String rejectLabel;
   final bool busy;
   final VoidCallback onReject;
 
@@ -171,7 +175,7 @@ class ReviewActionsBar extends StatelessWidget {
                             side: BorderSide(color: scheme.error, width: 1.5),
                             minimumSize: const Size.fromHeight(50),
                           ),
-                          child: const Text('Reject'),
+                          child: Text(rejectLabel),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -217,13 +221,16 @@ class ReviewActionsBar extends StatelessWidget {
 
 /// Opens the reject sheet and returns the reason, or null if cancelled.
 ///
-/// [quickReasons] are chips: tapping one adds it to the text box.
+/// [quickReasons] are chips: tapping one adds it to the text box, followed
+/// by [quickEnding].
 Future<String?> showReasonSheet(
   BuildContext context, {
   required String title,
   required String message,
   required String fieldLabel,
   required List<String> quickReasons,
+  String sendLabel = 'Send rejection',
+  String quickEnding = 'Please correct and resubmit.',
 }) {
   return showModalBottomSheet<String>(
     context: context,
@@ -234,6 +241,8 @@ Future<String?> showReasonSheet(
       message: message,
       fieldLabel: fieldLabel,
       quickReasons: quickReasons,
+      sendLabel: sendLabel,
+      quickEnding: quickEnding,
     ),
   );
 }
@@ -245,12 +254,16 @@ class ReasonSheet extends StatefulWidget {
     required this.message,
     required this.fieldLabel,
     required this.quickReasons,
+    this.sendLabel = 'Send rejection',
+    this.quickEnding = 'Please correct and resubmit.',
   });
 
   final String title;
   final String message;
   final String fieldLabel;
   final List<String> quickReasons;
+  final String sendLabel;
+  final String quickEnding;
 
   @override
   State<ReasonSheet> createState() => _ReasonSheetState();
@@ -273,7 +286,7 @@ class _ReasonSheetState extends State<ReasonSheet> {
       if (!_picked.remove(reason)) _picked.add(reason);
       _controller.text = _picked.isEmpty
           ? ''
-          : '${_picked.join('. ')}. Please correct and resubmit.';
+          : '${_picked.join('. ')}. ${widget.quickEnding}';
     });
   }
 
@@ -375,7 +388,7 @@ class _ReasonSheetState extends State<ReasonSheet> {
                         foregroundColor: Colors.white,
                         minimumSize: const Size.fromHeight(50),
                       ),
-                      child: const Text('Send rejection'),
+                      child: Text(widget.sendLabel),
                     ),
                   ),
                 ],

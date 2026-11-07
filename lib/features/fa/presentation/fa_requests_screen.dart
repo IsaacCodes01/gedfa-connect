@@ -10,24 +10,40 @@ import 'package:gedfa_connect/core/widgets/count_tabs.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/notification_bell.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
+import 'package:gedfa_connect/features/fa/presentation/widgets/fa_changes_view.dart';
+import 'package:gedfa_connect/features/teams/data/team_change_repository.dart';
 import 'package:gedfa_connect/features/teams/data/team_request_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/team_request.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/competition_picker.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/team_logo.dart';
 import 'package:go_router/go_router.dart';
 
-/// FA home, Teams tab: every team registration request, split into
-/// Pending / Rejected / Approved, with search.
+/// FA home, Teams tab, with a switch on top (2.10b, board P4):
+/// - **New teams**: every team registration request, split into
+///   Pending / Rejected / Approved, with search.
+/// - **Changes**: approved teams asking for a new name, short name or
+///   logo, or to add a competition ([FaChangesView]).
 class FaRequestsScreen extends ConsumerStatefulWidget {
-  const FaRequestsScreen({super.key});
+  const FaRequestsScreen({super.key, this.changes = false});
+
+  /// Open on Changes (`/admin?view=changes`, e.g. from the bell)
+  final bool changes;
 
   @override
   ConsumerState<FaRequestsScreen> createState() => _FaRequestsScreenState();
 }
 
 class _FaRequestsScreenState extends ConsumerState<FaRequestsScreen> {
+  late bool _changes = widget.changes;
   ApprovalStatus _tab = ApprovalStatus.pending;
   String _search = '';
+
+  @override
+  void didUpdateWidget(FaRequestsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // The tab keeps this screen alive; a new link (the bell) still decides
+    if (widget.changes != oldWidget.changes) _changes = widget.changes;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,7 +51,7 @@ class _FaRequestsScreenState extends ConsumerState<FaRequestsScreen> {
 
     return Scaffold(
       appBar: const GedfaAppBar(
-        title: 'Team requests',
+        title: 'Teams',
         subtitle: 'Gomoa East District FA',
         actions: [NotificationBell()],
       ),
@@ -84,6 +100,45 @@ class _FaRequestsScreenState extends ConsumerState<FaRequestsScreen> {
       ApprovalStatus.approved => 'These clubs are now teams in the league.',
     };
 
+    // New teams | Changes, both gold: waiting for the FA
+    final viewSwitch = CountTabs<bool>(
+      tabs: [
+        CountTab(
+          value: false,
+          label: 'New teams',
+          count: countOf(ApprovalStatus.pending),
+          highlight: true,
+        ),
+        CountTab(
+          value: true,
+          label: 'Changes',
+          count: ref.watch(pendingTeamChangeCountProvider),
+          highlight: true,
+        ),
+      ],
+      selected: _changes,
+      onChanged: (changes) => setState(() => _changes = changes),
+    );
+
+    if (_changes) {
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
+        children: [
+          ResponsiveCenter(
+            maxWidth: 720,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                viewSwitch,
+                const SizedBox(height: 16),
+                const FaChangesView(),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
       children: [
@@ -92,6 +147,8 @@ class _FaRequestsScreenState extends ConsumerState<FaRequestsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              viewSwitch,
+              const SizedBox(height: 12),
               CountTabs<ApprovalStatus>(
                 tabs: [
                   for (final status in ApprovalStatus.values)

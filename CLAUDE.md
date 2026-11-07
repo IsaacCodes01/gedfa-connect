@@ -73,26 +73,19 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
   "taking too long", restart the emulators and the app first.
 - Port 8080 busy: `netstat -ano | findstr :8080` then `taskkill /PID <pid> /F`.
 
-## Where we left off (6 Nov 2026)
+## Where we left off (7 Nov 2026)
 
-- Last pushed commit: `822aa1c` (2.14d, Juvenile complete).
-- **2.10a (team profile, direct edits)**: files written, NOT yet tested or committed. First job:
-  run `flutter analyze` and `npm test`, fix anything, let Isaac test in the app, then commit.
-- **Next: 2.10b change requests** (approved mockups P2, P4, P5):
-  - Team › Team profile › "Ask the FA to change": club name, short name, logo, or add a competition
-    (Division-only club → add Juvenile; Juvenile-only → add Division; hidden when in both).
-    A required "Why? (for the FA)" note. One pending request of each kind at a time.
-  - Until approved the old details are used everywhere; the team page shows "Name change pending"
-    (gold) or the refusal reason (red).
-  - FA Teams tab: switch **New teams | Changes**; each change shows now → asked for, the reason,
-    an app check that no other team uses the name; Approve or Not approve (reason required).
-  - Approving a name renames the club everywhere (players keep their IDs); adding Juvenile gives the
-    team the Juvenile side (they then add Juvenile kits and children for screening).
-  - The season fee stays GH₵ 1,000 per club (open question for GEDFA).
-  - Bell notes: the FA when a change is asked; the team when it is approved / refused.
-- Then: **2.11** FA corrections (edit, ask for a correction, suspend), **2.12** FA dashboard,
+- 2.10a (`9aa5b31`) is pushed and its rules are deployed to dev (Isaac, 7 Nov 2026).
+- **2.10b change requests built and committed** (7 Nov 2026, 257 rules tests): `teamChanges`
+  collection, team "Ask the FA to change" screen, FA Teams › New teams | Changes, change review.
+  **Not yet:** Isaac's test in the app, push, and deploying the 2.10b rules (`firestore:rules` AND
+  `storage`, since `storage.rules` changed) to dev: ask Isaac first.
+- Known and accepted in 2.10b: the old `teamRequests` doc keeps the old name (registration
+  history), and old payments / notifications keep the name they had.
+- **Next:** **2.11** FA corrections (edit, ask for a correction, suspend), **2.12** FA dashboard,
   **Phase 3** team sheets (16 / 5 / 7 from settings, GFA play-up limits, kit in the top-left corner),
   then the "before the pilot" list in the roadmap (push notifications, 3-day fee reminders, prod setup).
 - **Later (after Phase 3):** our own app icon (`flutter_launcher_icons`) and splash screens before
   "Get started" (`flutter_native_splash` + an in-app intro). A UI and animation refresh is done as its
   own steps, one screen group at a time, with mockups first, never mixed with feature work.
+- turn off the Co-Authored-By line in your commit settings for this project.

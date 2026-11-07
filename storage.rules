@@ -67,6 +67,16 @@ service firebase.storage {
         && request.resource.contentType == 'image/jpeg';
     }
 
+    // A new logo the team asks the FA for (2.10b): logo-<time>.jpg.
+    // The team only uses it once the FA approves; a refused one stays
+    // behind, unused (harmless). Every logo gets a new name.
+    match /districts/{districtId}/teams/{teamId}/{fileName} {
+      allow read: if isTeamAdminOf(districtId, teamId);
+      allow create: if isTeamAdminOf(districtId, teamId)
+        && fileName.matches('logo-[0-9]+[.]jpg')
+        && isSmallImage();
+    }
+
     // Everything else
     match /{allPaths=**} {
       allow read, write: if false;

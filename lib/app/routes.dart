@@ -10,6 +10,11 @@ class Routes {
   static const registerTeam = '/welcome/register';
   static const admin = '/admin';
   static String adminRequest(String uid) => '/admin/request/$uid';
+
+  /// FA: Teams with the Changes switch on, and one change to decide
+  /// (2.10b, boards P4 and P5).
+  static const adminChanges = '$admin?view=changes';
+  static String adminChange(String id) => '/admin/change/$id';
   static const adminNotifications = '/admin/notifications';
   static const adminAnnouncements = '/admin/more/announcements';
   static const adminNewAnnouncement = '/admin/more/announcements/new';
@@ -75,6 +80,10 @@ class Routes {
   /// officials). Not [teamProfile], which is the person's My profile.
   static const teamClub = '/team/more/club';
   static String teamClubEdit(String section) => '$teamClub/edit/$section';
+
+  /// Team profile › "Ask the FA to change" (2.10b, board P2), opened on
+  /// one kind: name, shortName, logo or competition.
+  static String teamClubAsk(String kind) => '$teamClub/ask?kind=$kind';
   static const teamAddPayment = '/team/more/fee/add';
   static const referee = '/referee';
   static const teamPlayer = '/team/player';

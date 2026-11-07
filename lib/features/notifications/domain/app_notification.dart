@@ -12,12 +12,15 @@ enum NotificationKind {
   paymentConfirmed, // season fee (2.13c)
   paymentNotFound,
   feeReminder,
+  changeApproved, // name, short name, logo or competition (2.10b)
+  changeRefused,
   // For the FA (written by teams, clubs, invited people)
   teamRequest,
   playersSubmitted,
   playersResubmitted,
   juvenileSubmitted, // new juvenile players, waiting for screening (2.14b)
   teamUpdated, // a team changed its kits, ground… directly (2.10a)
+  changeRequested, // a team asks to change its name, logo… (2.10b)
   inviteAccepted,
   paymentSent, // a team added a payment (2.13c)
   registrationChanged; // an FA official opened or closed registration
@@ -107,6 +110,13 @@ class AppNotification {
             ? 'Payment from $teamName'
             : '$people payments from $teamName',
         NotificationKind.registrationChanged => 'Registration changed',
+        NotificationKind.changeRequested => people == 1
+            ? '$teamName asked for a change'
+            : '$teamName asked for $people changes',
+        NotificationKind.changeApproved =>
+          people == 1 ? 'Change approved' : '$people changes approved',
+        NotificationKind.changeRefused =>
+          people == 1 ? 'Change not approved' : '$people changes not approved',
       };
 
   String get body => switch (kind) {
@@ -150,6 +160,12 @@ class AppNotification {
           '$namesText. Confirm it in More › Season fees.',
         NotificationKind.registrationChanged =>
           '$namesText. See More › League settings.',
+        NotificationKind.changeRequested =>
+          '$namesText. Open Teams › Changes to decide.',
+        NotificationKind.changeApproved =>
+          '$namesText. It is used everywhere from now on.',
+        NotificationKind.changeRefused =>
+          "$namesText. Open More › Team profile to read the FA's reason.",
       };
 
   static AppNotification? fromMap(String id, Map<String, dynamic> data) {

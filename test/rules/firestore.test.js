@@ -2186,6 +2186,253 @@ describe('Team profile (2.10a)', () => {
   });
 });
 
+describe('Change requests (2.10b)', () => {
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      const now = Timestamp.now();
+      await setDoc(doc(db, `${D}/teams/royal`), {
+        name: 'Royal Unique FC', nameLower: 'royal unique fc', nameKey: 'royal',
+        shortName: 'RUFC', town: 'Gomoa Fetteh', homeGround: 'Fetteh Park',
+        categories: ['division'], kits: KITS, juvenileKits: null, colours: COLOURS,
+        officials: OFFICIALS, logoUrl: 'https://example.com/logo.png',
+        adminUids: ['admin1'], requestUid: 'admin1', updatedAt: now,
+      });
+      await setDoc(doc(db, `${D}/teams/stars`), {
+        name: 'Gomoa Stars', shortName: 'GST', categories: ['juvenile'], kits: KITS,
+        adminUids: ['admin2'], requestUid: 'admin2', updatedAt: now,
+      });
+      await setDoc(doc(db, `${D}/teamNames/royal`), { uid: 'admin1', createdAt: now });
+      await setDoc(doc(db, `${D}/teamNames/gomoa-stars`), { uid: 'admin2', createdAt: now });
+    });
+  });
+
+  /** What the team sends for [kind] (pass changes to break it). */
+  const changeData = (kind, changes = {}) => ({
+    teamId: 'royal',
+    teamName: 'Royal Unique FC',
+    kind,
+    ...{
+      name: { from: 'Royal Unique FC', to: 'Royal Unique Stars FC', nameKey: 'royal-unique-stars-fc' },
+      shortName: { from: 'RUFC', to: 'RUSF' },
+      logo: { from: 'https://example.com/logo.png', to: 'https://example.com/logo-2.jpg' },
+      competition: { from: ['division'], to: 'juvenile' },
+    }[kind],
+    reason: 'The club merged with Fetteh Stars this season.',
+    status: 'pending',
+    askedBy: 'admin1',
+    askedByName: 'Kwame Asante',
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    ...changes,
+  });
+
+  const ask = (db, kind, changes = {}, id = `royal_${kind}`) =>
+    setDoc(doc(db, `${D}/teamChanges/${id}`), changeData(kind, changes));
+
+  /** Puts a pending request in place, with the rules off. */
+  const seedChange = (kind, changes = {}) =>
+    testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `${D}/teamChanges/royal_${kind}`),
+        { ...changeData(kind), createdAt: Timestamp.now(), updatedAt: Timestamp.now(), ...changes });
+    });
+
+  const decided = (db, batch, kind, status, changes = {}) =>
+    batch.update(doc(db, `${D}/teamChanges/royal_${kind}`), {
+      status, reviewedBy: 'fa1', reviewedAt: serverTimestamp(), updatedAt: serverTimestamp(), ...changes,
+    });
+
+  const teamUpdate = (db, batch, changes) =>
+    batch.update(doc(db, `${D}/teams/royal`), { ...changes, updatedAt: serverTimestamp() });
+
+  /** The FA's full "approve the new name" batch, as the app sends it. */
+  function approveName(db, { to = 'Royal Unique Stars FC', key = 'royal-unique-stars-fc', reserve = true, players = true } = {}) {
+    const batch = writeBatch(db);
+    decided(db, batch, 'name', 'approved');
+    teamUpdate(db, batch, { name: to, nameLower: to.toLowerCase() });
+    if (reserve) {
+      batch.set(doc(db, `${D}/teamNames/${key}`), { uid: 'admin1', teamId: 'royal', createdAt: serverTimestamp() });
+    }
+    if (players) {
+      batch.update(doc(db, `${D}/players/p1`), { teamName: to });
+      batch.update(doc(db, `${D}/players/p3`), { teamName: to });
+    }
+    return batch.commit();
+  }
+
+  it('the team asks for a new name, short name, logo or competition, with a bell note for the FA', async () => {
+    const db = dbAs('admin1');
+    const batch = writeBatch(db);
+    batch.set(doc(db, `${D}/teamChanges/royal_name`), changeData('name'));
+    batch.set(doc(db, `${D}/notifications/fa_changeRequested_royal_d`), {
+      audience: 'fa', kind: 'changeRequested', teamId: 'royal', teamName: 'Royal Unique FC',
+      names: arrayUnion('name'), count: increment(1), day: '2026-11-07', updatedAt: serverTimestamp(),
+    }, { merge: true });
+    await assertSucceeds(batch.commit());
+    await assertSucceeds(ask(db, 'shortName'));
+    await assertSucceeds(ask(db, 'logo'));
+    await assertSucceeds(ask(db, 'competition'));
+  });
+
+  it('one pending request of each kind; asking again only after the FA decided', async () => {
+    const db = dbAs('admin1');
+    await seedChange('name');
+    await assertFails(ask(db, 'name', { to: 'Royal Stars FC', nameKey: 'royal-stars-fc' }));
+    await seedChange('name', { status: 'rejected', rejectionReason: 'Too close to another club' });
+    await assertSucceeds(ask(db, 'name', { to: 'Royal Stars FC', nameKey: 'royal-stars-fc' }));
+  });
+
+  it('a name another club holds is refused; the club\'s own old name is fine', async () => {
+    const db = dbAs('admin1');
+    await assertFails(ask(db, 'name', { to: 'Gomoa Stars', nameKey: 'gomoa-stars' }));
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `${D}/teamNames/royal-fc`), { uid: 'admin1', teamId: 'royal', createdAt: Timestamp.now() });
+    });
+    await assertSucceeds(ask(db, 'name', { to: 'Royal FC', nameKey: 'royal-fc' }));
+  });
+
+  it('another team cannot ask for it, and the request must be complete', async () => {
+    await assertFails(ask(dbAs('admin2'), 'name'));
+    await assertFails(ask(dbAs('admin2'), 'name', { teamId: 'stars' }, 'royal_name'));
+    const db = dbAs('admin1');
+    await assertFails(ask(db, 'name', {}, 'royal_logo'));
+    await assertFails(ask(db, 'name', { reason: 'Why' }));
+    await assertFails(ask(db, 'name', { to: 'Royal Unique FC' }));
+    await assertFails(ask(db, 'name', { from: 'Somebody FC' }));
+    await assertFails(ask(db, 'name', { status: 'approved' }));
+    await assertFails(ask(db, 'name', { askedBy: 'admin2' }));
+    await assertFails(ask(db, 'shortName', { to: 'rufc2' }));
+    await assertFails(ask(db, 'shortName', { to: 'RUFC' }));
+    await assertFails(ask(db, 'logo', { to: 'https://example.com/logo.png' }));
+    // Already in Division
+    await assertFails(ask(db, 'competition', { to: 'division' }));
+    await assertFails(ask(db, 'competition', { to: 'futsal' }));
+  });
+
+  it('the team cannot approve its own request', async () => {
+    await seedChange('name');
+    const db = dbAs('admin1');
+    await assertFails(updateDoc(doc(db, `${D}/teamChanges/royal_name`), { status: 'approved' }));
+    await assertFails(updateDoc(doc(db, `${D}/teams/royal`), { name: 'Royal Unique Stars FC', updatedAt: serverTimestamp() }));
+  });
+
+  it('the team reads its own requests, not another team\'s; the FA reads all', async () => {
+    await seedChange('name');
+    await assertSucceeds(getDocs(query(collection(dbAs('admin1'), `${D}/teamChanges`), where('teamId', '==', 'royal'))));
+    await assertFails(getDocs(query(collection(dbAs('admin2'), `${D}/teamChanges`), where('teamId', '==', 'royal'))));
+    await assertFails(getDoc(doc(dbAs('newbie'), `${D}/teamChanges/royal_name`)));
+    await assertSucceeds(getDocs(collection(dbAs('fa1'), `${D}/teamChanges`)));
+  });
+
+  it('the FA approves a new name: the team, its players and the name reservation in one batch', async () => {
+    await seedChange('name');
+    await assertSucceeds(approveName(dbAs('fa1')));
+  });
+
+  it('approving a name needs the team renamed and the new name reserved', async () => {
+    await seedChange('name');
+    const db = dbAs('fa1');
+    const onlyApproved = writeBatch(db);
+    decided(db, onlyApproved, 'name', 'approved');
+    await assertFails(onlyApproved.commit());
+    await assertFails(approveName(db, { reserve: false }));
+    // Another name than the club asked for
+    await assertFails(approveName(db, { to: 'Royal Kings FC', key: 'royal-kings-fc' }));
+  });
+
+  it('the FA cannot rename a team or its players without an approved request', async () => {
+    const db = dbAs('fa1');
+    await assertFails(updateDoc(doc(db, `${D}/teams/royal`), { name: 'Royal Kings FC', nameLower: 'royal kings fc', updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(doc(db, `${D}/players/p1`), { teamName: 'Royal Kings FC' }));
+    await assertFails(setDoc(doc(db, `${D}/teamNames/royal-kings-fc`), { uid: 'admin1', teamId: 'royal', createdAt: serverTimestamp() }));
+  });
+
+  it('the club can never give up its team name reservation', async () => {
+    await seedChange('name');
+    await approveName(dbAs('fa1'));
+    await assertFails(deleteDoc(doc(dbAs('admin1'), `${D}/teamNames/royal-unique-stars-fc`)));
+  });
+
+  it('the FA approves a short name or a logo', async () => {
+    await seedChange('shortName');
+    await seedChange('logo');
+    const db = dbAs('fa1');
+    const shortName = writeBatch(db);
+    decided(db, shortName, 'shortName', 'approved');
+    teamUpdate(db, shortName, { shortName: 'RUSF' });
+    await assertSucceeds(shortName.commit());
+    const logo = writeBatch(db);
+    decided(db, logo, 'logo', 'approved');
+    teamUpdate(db, logo, { logoUrl: 'https://example.com/logo-2.jpg' });
+    await assertSucceeds(logo.commit());
+  });
+
+  it('applying a change touches only that change', async () => {
+    await seedChange('shortName');
+    const db = dbAs('fa1');
+    const batch = writeBatch(db);
+    decided(db, batch, 'shortName', 'approved');
+    teamUpdate(db, batch, { shortName: 'RUSF', town: 'Somewhere' });
+    await assertFails(batch.commit());
+  });
+
+  it('the FA adds Juvenile to a Division club', async () => {
+    await seedChange('competition');
+    const db = dbAs('fa1');
+    const batch = writeBatch(db);
+    decided(db, batch, 'competition', 'approved');
+    teamUpdate(db, batch, { categories: ['division', 'juvenile'] });
+    await assertSucceeds(batch.commit());
+  });
+
+  it('adding Division to a Juvenile club keeps its kits as the juvenile kits', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await updateDoc(doc(db, `${D}/teams/royal`), { categories: ['juvenile'] });
+      await setDoc(doc(db, `${D}/teamChanges/royal_competition`), {
+        ...changeData('competition', { from: ['juvenile'], to: 'division' }),
+        createdAt: Timestamp.now(), updatedAt: Timestamp.now(),
+      });
+    });
+    const db = dbAs('fa1');
+    const noKits = writeBatch(db);
+    decided(db, noKits, 'competition', 'approved');
+    teamUpdate(db, noKits, { categories: ['juvenile', 'division'] });
+    await assertFails(noKits.commit());
+    const batch = writeBatch(db);
+    decided(db, batch, 'competition', 'approved');
+    teamUpdate(db, batch, { categories: ['juvenile', 'division'], juvenileKits: KITS });
+    await assertSucceeds(batch.commit());
+  });
+
+  it('the FA refuses with a reason (10 to 500 characters)', async () => {
+    await seedChange('name');
+    const db = dbAs('fa1');
+    const ref = doc(db, `${D}/teamChanges/royal_name`);
+    const refuse = (reason) => updateDoc(ref, {
+      status: 'rejected', rejectionReason: reason, reviewedBy: 'fa1',
+      reviewedAt: serverTimestamp(), updatedAt: serverTimestamp(),
+    });
+    await assertFails(refuse('No'));
+    await assertSucceeds(refuse('Too close to Royal Kings FC in the same town.'));
+    // Decided: the FA can't change it again
+    await assertFails(refuse('Changed my mind about this one.'));
+  });
+
+  it('bell notes: the team tells the FA; only the FA tells the team', async () => {
+    await assertSucceeds(notify(dbAs('admin1'), 'fa_changeRequested_royal',
+      { audience: 'fa', kind: 'changeRequested', teamId: 'royal' }));
+    await assertFails(notify(dbAs('admin1'), 'fa_changeRequested_stars',
+      { audience: 'fa', kind: 'changeRequested', teamId: 'stars' }));
+    await assertSucceeds(notify(dbAs('fa1'), 'team-royal_changeApproved_royal',
+      { audience: 'team:royal', kind: 'changeApproved', teamId: 'royal' }));
+    await assertSucceeds(notify(dbAs('fa1'), 'team-royal_changeRefused_royal',
+      { audience: 'team:royal', kind: 'changeRefused', teamId: 'royal' }));
+    await assertFails(notify(dbAs('admin1'), 'team-royal_changeApproved_x',
+      { audience: 'team:royal', kind: 'changeApproved', teamId: 'royal' }));
+  });
+});
+
 describe('Notifications', () => {
   it('the FA notifies a team, and the counts add up in one notification', async () => {
     const db = dbAs('fa1');

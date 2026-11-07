@@ -14,6 +14,7 @@ import 'package:gedfa_connect/features/notifications/presentation/compose_announ
 import 'package:gedfa_connect/features/notifications/presentation/fa_announcement_screen.dart';
 import 'package:gedfa_connect/features/notifications/presentation/fa_announcements_screen.dart';
 import 'package:gedfa_connect/features/notifications/presentation/notifications_screen.dart';
+import 'package:gedfa_connect/features/fa/presentation/fa_change_review_screen.dart';
 import 'package:gedfa_connect/features/fa/presentation/fa_player_review_screen.dart';
 import 'package:gedfa_connect/features/fa/presentation/fa_player_teams_screen.dart';
 import 'package:gedfa_connect/features/fa/presentation/fa_request_review_screen.dart';
@@ -27,6 +28,8 @@ import 'package:gedfa_connect/features/auth/presentation/sign_up_screen.dart';
 import 'package:gedfa_connect/features/teams/presentation/welcome_screen.dart';
 import 'package:gedfa_connect/features/teams/presentation/register_team_screen.dart';
 import 'package:gedfa_connect/features/teams/data/team_profile_repository.dart';
+import 'package:gedfa_connect/features/teams/domain/team_change.dart';
+import 'package:gedfa_connect/features/teams/presentation/ask_change_screen.dart';
 import 'package:gedfa_connect/features/teams/presentation/team_edit_screen.dart';
 import 'package:gedfa_connect/features/teams/presentation/team_home_screen.dart';
 import 'package:gedfa_connect/features/teams/presentation/team_profile_screen.dart';
@@ -111,8 +114,19 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: Routes.admin,
-                builder: (_, _) => const FaRequestsScreen(),
+                // ?view=changes opens the Changes side (2.10b)
+                builder: (_, state) => FaRequestsScreen(
+                  changes: state.uri.queryParameters['view'] == 'changes',
+                ),
                 routes: [
+                  // One change request to decide. Full-screen (2.10b).
+                  GoRoute(
+                    path: 'change/:id',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (_, state) => FaChangeReviewScreen(
+                      changeId: state.pathParameters['id']!,
+                    ),
+                  ),
                   // Notifications (bell). Full-screen, above the tabs.
                   GoRoute(
                     path: 'notifications',
@@ -366,6 +380,16 @@ final routerProvider = Provider<GoRouter>((ref) {
                     path: 'club',
                     builder: (_, _) => const TeamProfileScreen(),
                     routes: [
+                      // Ask the FA to change (2.10b), e.g. ask?kind=name
+                      GoRoute(
+                        path: 'ask',
+                        parentNavigatorKey: rootNavigatorKey,
+                        builder: (_, state) => AskChangeScreen(
+                          kind: TeamChangeKind.fromString(
+                            state.uri.queryParameters['kind'],
+                          ),
+                        ),
+                      ),
                       GoRoute(
                         path: 'edit/:section',
                         parentNavigatorKey: rootNavigatorKey,

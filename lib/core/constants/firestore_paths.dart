@@ -20,6 +20,10 @@ class FirestorePaths {
   static const teams = '$district/teams';
   static String team(String teamId) => '$district/teams/$teamId';
 
+  /// A team's requests to the FA (2.10b), e.g. `teamChanges/royal_name`.
+  static const teamChanges = '$district/teamChanges';
+  static String teamChange(String id) => '$district/teamChanges/$id';
+
   static const players = '$district/players';
   static String player(String playerId) => '$district/players/$playerId';
 
@@ -95,6 +99,10 @@ class StoragePaths {
   /// Screenshot of a payment message (2.13c): `proof-<millis>.jpg`.
   static String paymentProof(String uid, String fileName) =>
       '${FirestorePaths.district}/payments/$uid/$fileName';
+
+  /// A new logo a team asks the FA for (2.10b): `logo-<millis>.jpg`.
+  static String teamLogo(String teamId, String fileName) =>
+      '${FirestorePaths.district}/teams/$teamId/$fileName';
 
   static String playerFile(String teamId, String playerId, String fileName) =>
     '${FirestorePaths.district}/teams/$teamId/players/$playerId/$fileName';

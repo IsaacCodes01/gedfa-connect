@@ -260,6 +260,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         (_Look.team, Routes.adminTeamFee(n.teamId)),
       NotificationKind.registrationChanged =>
         (_Look.fa, Routes.adminLeagueSettings),
+      // Change requests (2.10b): Teams › Changes, and the team's page
+      NotificationKind.changeRequested => (_Look.team, Routes.adminChanges),
+      NotificationKind.changeApproved => (_Look.ok, Routes.teamClub),
+      NotificationKind.changeRefused => (_Look.no, Routes.teamClub),
     };
     return _Item(
       look: look,

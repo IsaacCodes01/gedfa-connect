@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.11, matches the rules after step 2.10a (6 Nov 2026)
+**Status:** v2.12, matches the rules after step 2.10b (7 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -203,9 +203,11 @@ Stops two teams registering the same name, without letting anyone read other tea
 | Field         | Type      | Notes                            |
 | ------------- | --------- | -------------------------------- |
 | `uid`       | string    | The requester who holds the name |
+| `teamId`    | string?   | Only on a name the FA approved for an existing team (2.10b) |
 | `createdAt` | timestamp |                                  |
 
 - Created **only if it doesn't exist**, in the **same batch** as the team request.
+- **New club name (2.10b):** the FA's approval reserves the new name for the club (`uid` = the team's `requestUid`, `teamId` set), in the same batch. The old name stays reserved for the club too (the team ID is still the old key). A reservation with `teamId` is never deleted by the club.
 - If the team name changes while pending or rejected, the old reservation is deleted and the new one created in the same batch.
 - The holder may delete their own reservation; an FA admin may delete any (e.g. to free a name from an abandoned request).
 - Any signed-in user may `get` a single key, so the form can say "This name is taken" before submitting.
@@ -235,11 +237,37 @@ Created by an FA admin when approving a request.
 | `updatedAt`            | timestamp        |                                                            |
 
 - Created **only by the FA's Approve button** (since 2.2), in the same batch as the approval. The **team ID is the reserved name key** (e.g. `gomoa-united-fc`), so it is unique. The rules check: `nameKey == teamId`, `adminUids == [requestUid]`, the reservation belongs to that club, and the request becomes approved in the same batch.
-- **Team profile edits (2.10a):** the team's admin may change `town`, `homeGround`, `homeGroundDirections`, `colours`, `kits`, `juvenileKits` (club in both competitions only) and `officials` (2–7) straight away; each part is validated when it changes. Name, short name, logo and competitions need an FA request (2.10b). Each save writes a `teamUpdated` note to the FA's bell in the same batch.
+- **Team profile edits (2.10a):** the team's admin may change `town`, `homeGround`, `homeGroundDirections`, `colours`, `kits`, `juvenileKits` (club in both competitions only) and `officials` (2–7) straight away; each part is validated when it changes. Each save writes a `teamUpdated` note to the FA's bell in the same batch.
+- **Change requests (2.10b):** name, short name, logo and competitions change only when the FA approves a `teamChanges` request (Section 2.3a). The FA's batch may change only that kind's fields, to exactly what the team asked: `name` + `nameLower`; `shortName`; `logoUrl`; or `categories` (+ `juvenileKits`). Until then the old details are used everywhere. The team ID never changes.
+- **Adding a competition:** a Division club adding Juvenile gets `categories: [division, juvenile]` and no juvenile kits yet (it adds them in Kits › Edit). A Juvenile club adding Division keeps its `kits` as its `juvenileKits` (copied in the approval) and as its Division kits until it edits them.
 - **Open question for GEDFA (6 Nov 2026):** does adding a second competition mid-season change the season fee? For now: no, GH₵ 1,000 per club.
 - `logoUrl` reuses the request's logo download link (it keeps working). Copying the file to `teams/{teamId}/logo.jpg` needs a server function and is deferred.
 - FA admins can `get` and `list` teams; a team admin can `get` only their own.
 - Teams created by hand during Phase 1 testing may lack some fields.
+
+### 2.3a `teamChanges/{teamId}_{kind}` — change requests (2.10b)
+
+A team asks the FA to change its name, short name or logo, or to add the competition it is not in yet. The ID is the team and the kind (e.g. `royal_name`), so a team has **at most one request of each kind**. Asking again after the FA decided replaces the old request, so only the latest decision of each kind is kept.
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `teamId` | string | |
+| `teamName` | string | The team's name when it asked (must match the team) |
+| `kind` | string | `name`, `shortName`, `logo` or `competition` |
+| `from` | string? / array | The value now: name, short name, logo link (may be null), or the `categories` list |
+| `to` | string | The new name (2–60), short name (3–4 capitals), logo link, or the competition to add (`division` / `juvenile`, not one the club is in) |
+| `nameKey` | string? | `name` only: the new name's key. Refused if another club holds that reservation |
+| `reason` | string | "Why? (for the FA)", 5–300 characters |
+| `status` | string | `pending` → `approved` or `rejected` |
+| `askedBy`, `askedByName` | string | The team admin's uid and name |
+| `rejectionReason` | string? | FA, 10–500 characters ("Not approve") |
+| `reviewedBy`, `reviewedAt` | | FA |
+| `createdAt`, `updatedAt` | timestamp | |
+
+- **Ask:** the team's admin only, for its own team, while no request of that kind is pending. Same batch: a `changeRequested` note in the FA's bell. A new logo is uploaded first to `teams/{teamId}/logo-<millis>.jpg`.
+- **Approve (FA):** one batch: the request `approved` + the team's field(s) + the bell note `changeApproved` for the team. A **name** also updates `teamName` on every player of the team (player IDs never change) and reserves the new name in `teamNames`. The rules check that the team really has the new value after the batch.
+- **Not approve (FA):** `rejected` with a reason + `changeRefused` for the team. The team page shows the reason (red) for a week; the team may ask again.
+- Read: the team's admins (query by `teamId`) and FA admins.
 
 #### Subcollection `teams/{teamId}/jerseys/{category}-{number}` — jersey reservations
 
@@ -303,6 +331,7 @@ One collection for the whole district. Team admins see only their own team's pla
 - Only Division players can be added for now; Juvenile waits for GEDFA's answers.
 - **Juvenile players:** the age group (U13 / U15 / U17) is **calculated** from `dob` and the season's cut-off date, never stored as typed input. Extra fields planned, pending GEDFA: birth certificate photo, parent or guardian name and phone, consent. Juvenile player photos are **never shown publicly**.
 - Only an FA admin may set `status` to `approved` or `rejected`.
+- **Team renamed (2.10b):** the FA's approval of a new club name updates `teamName` (and nothing else) on every player of the team, in the same batch; the rules allow it only when it equals the team's new name.
 
 ### 2.4c `playerProfiles/{playerId}` — football details (2.3d)
 
@@ -420,12 +449,12 @@ Readable and writable only by FA admins. Created with `next: 2` by the very firs
 | Field | Notes |
 | ----- | ----- |
 | `audience` | `fa` or `team:<teamId>` |
-| `kind` | `playersApproved`, `playersRejected`, `teamApproved`, `paymentConfirmed`, `paymentNotFound`, `feeReminder` (for teams, written by the FA); `teamRequest`, `playersSubmitted`, `playersResubmitted`, `juvenileSubmitted`, `inviteAccepted`, `paymentSent` (for the FA) |
+| `kind` | `playersApproved`, `playersRejected`, `teamApproved`, `paymentConfirmed`, `paymentNotFound`, `feeReminder`, `changeApproved`, `changeRefused` (for teams, written by the FA); `teamRequest`, `playersSubmitted`, `playersResubmitted`, `juvenileSubmitted`, `inviteAccepted`, `paymentSent`, `teamUpdated`, `changeRequested` (for the FA) |
 | `teamId`, `teamName` | The team concerned (`teamRequest`: the club's uid) |
 | `names` | e.g. `Kojo Arthur (GE26-0011)`, `Yaw Boateng: Jersey number #10 → #14` |
 | `count`, `day`, `updatedAt` | |
 
-- Written in the **same batch or transaction** as the action. Teams write only `playersSubmitted` / `playersResubmitted` / `juvenileSubmitted` / `paymentSent` for their own team; only the FA writes team notifications.
+- Written in the **same batch or transaction** as the action. Teams write only `playersSubmitted` / `playersResubmitted` / `juvenileSubmitted` / `paymentSent` / `teamUpdated` / `changeRequested` for their own team; only the FA writes team notifications.
 - Read: the FA reads `fa`; a team admin reads `team:<their team>`.
 - Indexes: `audience` + `updatedAt` (desc); announcements `to` + `createdAt` (desc). See `firestore.indexes.json`.
 
@@ -523,6 +552,9 @@ These changes always happen together in **one batch** (all succeed or none do):
 | Submit team request                   | create`teamRequests/{uid}` + create `teamNames/{nameKey}`                                 |
 | Rename team while pending or rejected | update request + delete old`teamNames` doc + create new one                                 |
 | Edit the team profile (team admin)    | update `teams/{teamId}` (only the fields of one section + `updatedAt`) + FA notification `teamUpdated` |
+| Ask the FA to change (team admin)     | set `teamChanges/{teamId}_{kind}` (pending) + FA notification `changeRequested`               |
+| Approve a change (FA)                 | update the request (`approved`) + update `teams/{teamId}` (that kind's fields only) + team notification `changeApproved`. A new name also: update `teamName` on every player of the team + create `teamNames/{newKey}` (`uid`, `teamId`) |
+| Not approve a change (FA)             | update the request (`rejected`, `rejectionReason`) + team notification `changeRefused`         |
 | Approve team request (FA)             | update request (`status: approved`, `teamId`, `reviewedBy`, `reviewedAt`) + create `teams/{teamId}` + create `users/{uid}` (`role: teamAdmin`) |
 | Reject team request (FA)              | update request only (`status: rejected`, `rejectionReason`, review fields)                    |
 | Approve player (FA) — **transaction** | read player (must be pending) + read counter → update player (`approved`, `playerCode`, `approvedBy`, `approvedAt`) + set / update counter (`next + 1`). A player who already has an ID keeps it and the counter is not touched |
@@ -551,7 +583,7 @@ A leftover file is harmless; a player without a photo can't exist.
 | `districts/gomoa-east/teamRequests/{uid}/licence.pdf` or `licence.jpg`    | Optional club licence (PDF or photo, under 5 MB)    |
 | `districts/gomoa-east/payments/{uid}/proof-<millis>.jpg`                 | Payment screenshot (optional), under 1 MB |
 | `districts/gomoa-east/teamRequests/{uid}/kits/<set>-<slot>-<part>-<millis>.jpg` | Kit photo, e.g. `division-home-shirt-…`; shirt 600×600, shorts 600×360, socks 360×600, JPEG, under 1 MB |
-| `districts/gomoa-east/teams/{teamId}/logo.jpg`                            | Approved team logo *(Phase 2)*            |
+| `districts/gomoa-east/teams/{teamId}/logo-<millis>.jpg`                   | A new logo the team asks for (2.10b), image under 1 MB. Used only once the FA approves; a refused one stays unused |
 | `districts/gomoa-east/teams/{teamId}/players/{playerId}/photo-<millis>.jpg` | Passport photo, 300×400, JPEG quality 85  |
 | `districts/gomoa-east/teams/{teamId}/players/{playerId}/thumb-<millis>.jpg` | Thumbnail, 96×128, JPEG quality 80        |
 
@@ -625,6 +657,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 7 Nov 2026 | v2.12 (2.10b): new `teamChanges` (name, short name, logo, add a competition; one pending per kind; approve or not approve with a reason); the FA applies an approved change to the team, renames `teamName` on its players and reserves the new name (`teamNames.teamId`); notification kinds `changeRequested`, `changeApproved`, `changeRefused`. Storage: `teams/{teamId}/logo-<millis>.jpg`. 257 tests. |
 | 6 Nov 2026 | v2.11 (2.10a): team admins edit town, ground, colours, kits and officials of their approved team; kind `teamUpdated`. 241 tests. |
 | 3 Nov 2026 | v2.10 (2.14d): every screening decision carries `screeningDayId` and is refused before the day starts, a day after it, or for an age group the day doesn't cover; "needs correcting" (back to the team); kind `juvenileToCorrect`. 236 tests. |
 | 3 Nov 2026 | v2.9 (2.14c): juvenile IDs `GJ26-…` from `settings/juvenileCounter`; pass (move up only, jersey moves along) or `notEligible`; the FA may move a child's jersey reservation; notification kinds `juvenilePassed`, `juvenileNotEligible`. 231 tests. |

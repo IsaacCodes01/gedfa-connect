@@ -4,7 +4,7 @@
 **Platforms:** Flutter app: Android (APK) and web (iPhone users via "Add to Home Screen"); native iOS later (see Section 4, Distribution); separate React website by a colleague
 **Backend:** Firebase (Auth, Firestore, Cloud Storage, Hosting) on the Blaze plan
 **Projects:** `gedfa-connect-dev` (building/testing) and `gedfa-connect-prod` (real GEDFA data)
-**Status:** Phase 0 and Phase 1 complete · Phase 2: 2.0–2.8 done; GEDFA's answers in: 2.13 registration update done; next 2.14 Juvenile, then 2.14 Juvenile, then Phase 3 · web test link live on dev (27 Oct 2026)
+**Status:** Phase 0 and Phase 1 complete · Phase 2: 2.0–2.8, 2.10, 2.13 and 2.14 done; next 2.11 FA corrections, 2.12 FA dashboard, then Phase 3 · web test link live on dev (27 Oct 2026)
 
 See also: `docs/DATA_MODEL.md` (the data contract).
 
@@ -192,9 +192,9 @@ Time estimates assume part-time work and are rough guides.
 - [x] 2.7 **FA announcements**: any FA admin publishes (agreed in the officials' meeting first); to everyone, all teams, Division, Juvenile or referees; Important and Pinned; one-way; pinned card on top of Squad (each team can hide it); the FA sees who has seen it, by team logo *(done 24 Oct 2026)*
 - [x] 2.8 **Notifications** behind the bell, with a red unread count: teams get players approved / rejected and team approved; the FA gets team requests, new and resubmitted players (with the change) and accepted invitations; plus announcements. **Grouped**: one notification per kind, team and day that counts up (20 approvals = 1 notification). Written in the same batch as the action. Mark all read. 149 rules tests *(done 24 Oct 2026)*
 - [ ] 2.9 FA admin security rules, with rules tests added to `test/rules/` *(in progress: team requests and players done; corrections and settings to come)*
-- [ ] 2.10 **Team profile and change requests:** team admins view their team; kits, officials and home ground save directly; **name, short name and logo need FA approval** with a reason/note
+- [x] 2.10 **Team profile and change requests:** team admins view their team; kits, officials and home ground save directly; **name, short name and logo need FA approval** with a reason/note
   - [x] 2.10a **Team profile** (P1, P3): More › Team profile shows the club; town, home ground, colours, kits and officials save straight away (registration screens reused) and the FA gets "X updated their profile" in the bell. 241 rules tests *(done 6 Nov 2026)*
-  - [ ] 2.10b **Change requests** (P2, P4, P5): name, short name, logo and adding a competition go to the FA with a reason; FA Teams tab gets New teams | Changes; approve or refuse with a reason; "Name change pending" on the team page
+  - [x] 2.10b **Change requests** (P2, P4, P5): Team profile › "Ask to change" (club name, short name, logo) or "Add Juvenile / Division" with a required "Why?"; one pending request of each kind; the team page shows it pending (gold), not approved with the FA's reason (red) or approved (green, for a week). FA Teams tab: **New teams | Changes** (gold counts, also in the tab badge); a change shows now → asked for, why, who asked, and the app's name check; **Approve** (one batch: the team, every player's team name, the name reservation, the team's bell) or **Not approve** with a reason. Bell: the FA when asked, the team when decided. 257 rules tests *(done 7 Nov 2026)*
 - [ ] 2.11 **FA corrections** for approved teams: edit small mistakes directly (logged); **ask for a correction** (yellow banner on the team's squad screen, fix goes back to the FA); **suspend** a team for serious problems. An approved team is never moved back to Pending
 
 - [ ] 2.12 **FA dashboard** (Home tab): totals of teams and players, players by competition and position group, waiting reviews; later referees, cards and suspensions. Uses Firestore count queries so it stays cheap as the league grows
@@ -312,6 +312,7 @@ Work backwards from the GEDFA season start date to decide what the pilot must co
 | 12 Oct 2026 | Renamed to GEDFA Connect; dev/prod projects created |
 | 13 Oct 2026 | Phase 0 complete; added 0.8 design foundation, 1.0 emulators, 1.1a toasts/connectivity/responsive; invite-only roles (2.6); FA announcements (2.7); new Phase 5.5 League feed; navigation, connectivity and responsive standards; pre-pilot checklist |
 | 17 Oct 2026 | 1.1b, 1.2, 1.3 done; new 1.3b Competitions (Division / Juvenile, one registration per club); 1.4 split into Division first, Juvenile after GEDFA answers |
+| 7 Nov 2026 | 2.10b done: change requests (name, short name, logo, add a competition) and the FA's New teams / Changes switch; 2.10 complete. The old name stays reserved for the club after a rename; a Juvenile club adding Division keeps its kits as its Juvenile kits. Fee unchanged (still open with GEDFA) |
 | 6 Nov 2026 | 2.10a done: team profile with direct edits. Isaac: town and colours direct, adding a competition needs the FA, direct edits ping the FA, the old name stays until a change is approved; fee unchanged when a competition is added (for now) |
 | 3 Nov 2026 | 2.14d done (Isaac's review): server refuses screening before the day starts; "Needs correcting" with quick reasons; possible duplicates on the screening screen; Screen player on a child's page; countdown on screening days |
 | 3 Nov 2026 | 2.14c done: screening decisions, juvenile IDs `GJ26-…`. 2.14 Juvenile complete |

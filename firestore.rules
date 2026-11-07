@@ -73,8 +73,15 @@ service cloud.firestore {
           && get(userDoc(request.auth.uid)).data.get('teamId', '') == teamId;
       }
 
-            function teamDoc(teamId) {
+      function teamDoc(teamId) {
         return /databases/$(database)/documents/districts/$(districtId)/teams/$(teamId);
+      }
+
+      // A team's request to the FA (2.10b): one per team and kind,
+      // e.g. teamChanges/royal_name
+      function teamChangeDoc(teamId, kind) {
+        let changeId = teamId + '_' + kind;
+        return /databases/$(database)/documents/districts/$(districtId)/teamChanges/$(changeId);
       }
 
       // Position code → group. Must match position.dart
@@ -417,7 +424,8 @@ service cloud.firestore {
                            'juvenileSubmitted', 'inviteAccepted', 'paymentConfirmed', 'paymentNotFound',
                            'feeReminder', 'paymentSent', 'registrationChanged',
                            'juvenilePassed', 'juvenileNotEligible', 'juvenileToCorrect',
-                           'teamUpdated']
+                           'teamUpdated', 'changeRequested', 'changeApproved',
+                           'changeRefused']
           && data.teamId is string
           && data.teamName is string
           && data.names is list && data.names.size() <= 60
@@ -431,7 +439,8 @@ service cloud.firestore {
         return hasConfirmedEmail()
           && (isFaAdmin()
               || (data.kind in ['playersSubmitted', 'playersResubmitted',
-                                'juvenileSubmitted', 'paymentSent', 'teamUpdated']
+                                'juvenileSubmitted', 'paymentSent', 'teamUpdated',
+                                'changeRequested']
                   && isTeamAdminOf(data.teamId))
               || data.kind in ['teamRequest', 'inviteAccepted']);
       }
@@ -875,6 +884,92 @@ service cloud.firestore {
           && (isApproval(uid) || isRejection());
       }
 
+      // ---------- teamChanges/{teamId}_{kind} (2.10b) ----------
+      // A team asks the FA to change its name, short name or logo, or to
+      // add a competition. One document per team and kind, so there is
+      // only ever one pending request of each kind. Asking again after
+      // the FA decided replaces the old one.
+
+      // What the team sends: the new value, the old one (for the FA's
+      // "Now"), and why. Checked against the team as it is now.
+      function isValidTeamChange(data, changeId) {
+        let team = get(teamDoc(data.teamId)).data;
+        return data.keys().hasOnly(['teamId', 'teamName', 'kind', 'from', 'to',
+                                    'nameKey', 'reason', 'status', 'askedBy',
+                                    'askedByName', 'createdAt', 'updatedAt'])
+          && changeId == data.teamId + '_' + data.kind
+          && data.teamName == team.name
+          && isText(data.reason, 5, 300)
+          && isOptionalText(data, 'askedByName', 80)
+          && data.askedBy == request.auth.uid
+          && data.status == 'pending'
+          && data.createdAt == request.time
+          && data.updatedAt == request.time
+          && ((data.kind == 'name'
+                && isText(data.to, 2, 60)
+                && data.to != team.name
+                && data.from == team.name
+                && data.nameKey is string
+                && data.nameKey.matches('^[a-z0-9-]{2,60}$')
+                // Free, or already this club's (e.g. its old name)
+                && (!exists(teamNameDoc(data.nameKey))
+                    || get(teamNameDoc(data.nameKey)).data.uid == team.requestUid))
+              || (data.kind == 'shortName'
+                && data.to is string
+                && data.to.matches('^[A-Z]{3,4}$')
+                && data.to != team.get('shortName', '')
+                && data.from == team.get('shortName', ''))
+              || (data.kind == 'logo'
+                && isText(data.to, 10, 2000)
+                && data.to != team.get('logoUrl', null)
+                && data.from == team.get('logoUrl', null))
+              // Add the competition the club is not in yet
+              || (data.kind == 'competition'
+                && data.to in ['division', 'juvenile']
+                && !(data.to in team.categories)
+                && data.from == team.categories));
+      }
+
+      // The FA approves: the team really has the new value after the batch
+      // (and a new name is reserved for the club).
+      function isTeamChangeApplied(change) {
+        let team = getAfter(teamDoc(change.teamId)).data;
+        return (change.kind == 'name'
+              && team.name == change.to
+              && getAfter(teamNameDoc(change.nameKey)).data.uid == team.requestUid)
+          || (change.kind == 'shortName' && team.shortName == change.to)
+          || (change.kind == 'logo' && team.logoUrl == change.to)
+          || (change.kind == 'competition' && change.to in team.categories);
+      }
+
+      match /teamChanges/{changeId} {
+        allow get, list: if isFaAdmin() || isTeamAdminOf(resource.data.teamId);
+
+        // The team asks, for its own team only
+        allow create: if isTeamAdminOf(request.resource.data.teamId)
+          && isValidTeamChange(request.resource.data, changeId);
+
+        // ...and asks again once the FA has decided the last one
+        allow update: if isTeamAdminOf(request.resource.data.teamId)
+          && resource.data.status != 'pending'
+          && isValidTeamChange(request.resource.data, changeId);
+
+        // The FA approves (the team changes in the same batch) or
+        // refuses with a reason the team will see.
+        allow update: if isFaAdmin()
+          && resource.data.status == 'pending'
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['status', 'rejectionReason', 'reviewedBy', 'reviewedAt', 'updatedAt'])
+          && request.resource.data.reviewedBy == request.auth.uid
+          && request.resource.data.reviewedAt == request.time
+          && request.resource.data.updatedAt == request.time
+          && ((request.resource.data.status == 'approved'
+                && request.resource.data.get('rejectionReason', null) == null
+                && isTeamChangeApplied(resource.data))
+              || (request.resource.data.status == 'rejected'
+                && isText(request.resource.data.get('rejectionReason', null), 10, 500)));
+      }
+
       // ---------- teamNames/{nameKey} ----------
       match /teamNames/{nameKey} {
         allow get: if isSignedIn();
@@ -884,7 +979,18 @@ service cloud.firestore {
           && request.resource.data.createdAt == request.time
           && getAfter(teamRequestDoc(request.auth.uid)).data.nameKey == nameKey;
 
+        // The FA approves a new club name (2.10b): the new name is reserved
+        // for the club in the same batch. The old one stays the club's too.
+        allow create: if isFaAdmin()
+          && request.resource.data.keys().hasOnly(['uid', 'teamId', 'createdAt'])
+          && request.resource.data.createdAt == request.time
+          && getAfter(teamChangeDoc(request.resource.data.teamId, 'name')).data.status == 'approved'
+          && getAfter(teamChangeDoc(request.resource.data.teamId, 'name')).data.nameKey == nameKey
+          && request.resource.data.uid == get(teamDoc(request.resource.data.teamId)).data.requestUid;
+
+        // A team's name (one with a teamId) is never given up by the club
         allow delete: if isOwner(resource.data.uid)
+          && !('teamId' in resource.data)
           && (!existsAfter(teamRequestDoc(request.auth.uid))
               || getAfter(teamRequestDoc(request.auth.uid)).data.nameKey != nameKey);
       }
@@ -915,12 +1021,60 @@ service cloud.firestore {
                   && after.officials.size() >= 2 && after.officials.size() <= 7));
       }
 
+      // The team's request of this kind goes from pending to approved in
+      // this same batch (2.10b).
+      function isApprovingChange(teamId, kind) {
+        let change = teamChangeDoc(teamId, kind);
+        return exists(change)
+          && get(change).data.status == 'pending'
+          && getAfter(change).data.status == 'approved';
+      }
+
+      // 2.10b: the FA applies an approved change to the team. Only the
+      // fields of that one kind change, to exactly what the team asked.
+      function isFaTeamChange(teamId) {
+        let before = resource.data;
+        let after = request.resource.data;
+        let changed = after.diff(before).affectedKeys();
+        return after.updatedAt == request.time
+          && ((changed.hasAny(['name'])
+                && changed.hasOnly(['name', 'nameLower', 'updatedAt'])
+                && isApprovingChange(teamId, 'name')
+                && after.name == get(teamChangeDoc(teamId, 'name')).data.to
+                && after.nameLower == after.name.lower())
+              || (changed.hasAny(['shortName'])
+                && changed.hasOnly(['shortName', 'updatedAt'])
+                && isApprovingChange(teamId, 'shortName')
+                && after.shortName == get(teamChangeDoc(teamId, 'shortName')).data.to)
+              || (changed.hasAny(['logoUrl'])
+                && changed.hasOnly(['logoUrl', 'updatedAt'])
+                && isApprovingChange(teamId, 'logo')
+                && after.logoUrl == get(teamChangeDoc(teamId, 'logo')).data.to)
+              // Adding a competition: the club is then in both. A
+              // Juvenile-only club's kits become its juvenile kits (and stay
+              // as its Division kits until it edits them).
+              || (changed.hasAny(['categories'])
+                && changed.hasOnly(['categories', 'juvenileKits', 'updatedAt'])
+                && isApprovingChange(teamId, 'competition')
+                && after.categories.size() == 2
+                && after.categories.toSet() == before.categories.toSet()
+                     .union([get(teamChangeDoc(teamId, 'competition')).data.to].toSet())
+                && ((before.categories.hasAny(['juvenile'])
+                      && after.get('juvenileKits', null) == before.kits)
+                    || (before.categories.hasAny(['division'])
+                      && after.get('juvenileKits', null) == null))));
+      }
+
       match /teams/{teamId} {
         allow get: if isTeamAdminOf(teamId) || isFaAdmin();
         allow list: if isFaAdmin();
 
         // The team's own profile edits (2.10a)
         allow update: if isTeamAdminOf(teamId) && isTeamDirectEdit();
+
+        // The FA applies a name, short name, logo or competition change it
+        // approves (2.10b)
+        allow update: if isFaAdmin() && isFaTeamChange(teamId);
 
         // FA approves a request: the team is created from it, in the same
         // batch as the approval. Its ID is the reserved team-name key.
@@ -1234,6 +1388,12 @@ service cloud.firestore {
               || (resource.data.category == 'juvenile'
                 && (isJuvenilePass(playerId) || isJuvenileNotEligible()
                     || isJuvenileSendBack())));
+
+        // The FA approves a new club name (2.10b): the copy of the team
+        // name on every player follows, in the same batch. Nothing else.
+        allow update: if isFaAdmin()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['teamName'])
+          && request.resource.data.teamName == getAfter(teamDoc(resource.data.teamId)).data.name;
 
         // The team adds and edits its own players.
         allow create: if isTeamAdminOf(request.resource.data.teamId)
