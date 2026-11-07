@@ -29,7 +29,10 @@ const _monthCaps = [
 /// "Save and announce" saves the day AND publishes an announcement to
 /// Juvenile teams, which also puts the blue card on their Squad tab.
 class FaScreeningDaysScreen extends ConsumerStatefulWidget {
-  const FaScreeningDaysScreen({super.key});
+  const FaScreeningDaysScreen({super.key, this.fromHome = false});
+
+  /// Opened from a "Needs you" row on Home: back arrow to Home (2.12a)
+  final bool fromHome;
 
   @override
   ConsumerState<FaScreeningDaysScreen> createState() =>
@@ -180,13 +183,19 @@ class _FaScreeningDaysScreenState
             p.isWaitingForScreening && day.groups.contains(p.ageGroup))
         .length;
 
+    // Back goes to More, or to Home when opened from Home (2.12a)
+    final back = widget.fromHome ? Routes.adminHome : Routes.adminMore;
+
     return PopScope(
-      canPop: !_busy,
+      canPop: !_busy && !widget.fromHome,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && !_busy) context.go(back);
+      },
       child: Scaffold(
         appBar: GedfaAppBar(
           title: 'Juvenile screening',
           subtitle: 'District FA · More',
-          leading: BackButton(onPressed: () => context.go(Routes.adminMore)),
+          leading: BackButton(onPressed: () => context.go(back)),
         ),
         bottomNavigationBar: _SaveBar(busy: _busy, onSave: _save),
         body: daysAsync.when(

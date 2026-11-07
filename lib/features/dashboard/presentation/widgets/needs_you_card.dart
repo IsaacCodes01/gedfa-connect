@@ -252,9 +252,9 @@ class _NeedRow extends StatelessWidget {
       label: '${need.label}, ${need.count} waiting',
       excludeSemantics: true,
       child: InkWell(
-        // go, not push: these screens are tabs (Teams, Players) or
-        // More pages, and Back there works as it does today
-        onTap: () => context.go(need.route),
+        // go, not push: these screens are tabs (Teams, Players) or More
+        // pages. from=home gives them a back arrow to Home.
+        onTap: () => context.go(Routes.fromHome(need.route)),
         borderRadius: BorderRadius.circular(14),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

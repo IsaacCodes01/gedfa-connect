@@ -79,11 +79,12 @@ final adminDestinations = [
 ///
 /// - Phones (compact): bottom navigation bar.
 /// - Tablets and laptops (medium, expanded): navigation rail on the left.
-class AppShell extends ConsumerWidget {
+class AppShell extends ConsumerStatefulWidget {
   const AppShell({
     super.key,
     required this.navigationShell,
     required this.destinations,
+    this.openedFromHome = false,
   });
 
   /// Given by go_router. Holds one navigator per tab and knows which tab
@@ -91,16 +92,56 @@ class AppShell extends ConsumerWidget {
   final StatefulNavigationShell navigationShell;
   final List<ShellDestination> destinations;
 
+  /// The screen showing was opened from a "Needs you" row on the FA's
+  /// Home (`from=home`, 2.12a), so it has a back arrow to Home.
+  final bool openedFromHome;
+
+  @override
+  ConsumerState<AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends ConsumerState<AppShell> {
+  /// Tabs whose screen was opened from Home. Going back to one of them
+  /// with the navigation bar opens its first screen instead, so it looks
+  /// as usual (no back arrow).
+  final _openedFromHome = <int>{};
+
+  StatefulNavigationShell get navigationShell => widget.navigationShell;
+  List<ShellDestination> get destinations => widget.destinations;
+
+  @override
+  void initState() {
+    super.initState();
+    _noteFromHome();
+  }
+
+  @override
+  void didUpdateWidget(AppShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _noteFromHome();
+  }
+
+  void _noteFromHome() {
+    final tab = navigationShell.currentIndex;
+    if (widget.openedFromHome) {
+      _openedFromHome.add(tab);
+    } else {
+      _openedFromHome.remove(tab);
+    }
+  }
+
   void _goToTab(int index) {
-    // Tapping the tab you're already on takes you back to its first screen.
+    // Tapping the tab you're already on takes you back to its first
+    // screen, and so does a tab that was opened from Home.
+    final fromHome = _openedFromHome.remove(index);
     navigationShell.goBranch(
       index,
-      initialLocation: index == navigationShell.currentIndex,
+      initialLocation: fromHome || index == navigationShell.currentIndex,
     );
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
     // The badge number for each tab (0 = no bubble)

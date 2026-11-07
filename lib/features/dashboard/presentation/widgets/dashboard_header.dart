@@ -6,6 +6,7 @@ import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/core/widgets/flag_stripe.dart';
 import 'package:gedfa_connect/core/widgets/notification_bell.dart';
 import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
+import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/league/data/league_settings_repository.dart';
 
 /// The top of the FA dashboard (2.12a): a deep blue gradient with the
@@ -20,7 +21,10 @@ class DashboardHeader extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final name = ref.watch(appUserProvider).value?.displayName;
+    // The sign-in account's name (Google's for Google users), as on
+    // My profile; then the one on the user document
+    final name = AuthRepository.nameOf(ref.watch(currentUserProvider).value) ??
+        ref.watch(appUserProvider).value?.displayName;
     final settings = ref.watch(leagueSettingsProvider).value;
     final now = DateTime.now();
     // Under the phone's status bar the gradient goes on, the text doesn't

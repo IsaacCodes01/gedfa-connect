@@ -6,6 +6,7 @@ import 'package:gedfa_connect/core/constants/approval_status.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/initials.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/core/widgets/count_tabs.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/notification_bell.dart';
@@ -34,10 +35,17 @@ import 'package:go_router/go_router.dart';
 /// teams with their age groups. The switch lives in the address
 /// (`?view=juvenile`), so the bell and the Back button can open either.
 class FaPlayerTeamsScreen extends ConsumerStatefulWidget {
-  const FaPlayerTeamsScreen({super.key, this.juvenile = false});
+  const FaPlayerTeamsScreen({
+    super.key,
+    this.juvenile = false,
+    this.fromHome = false,
+  });
 
   /// True: the Juvenile side is showing.
   final bool juvenile;
+
+  /// Opened from a "Needs you" row on Home: back arrow to Home (2.12a)
+  final bool fromHome;
 
   @override
   ConsumerState<FaPlayerTeamsScreen> createState() =>
@@ -80,9 +88,10 @@ class _FaPlayerTeamsScreenState extends ConsumerState<FaPlayerTeamsScreen> {
             // A new search for each side
             onChanged: (value) {
               setState(() => _search = '');
-              context.go(
-                value ? Routes.adminPlayersJuvenile : Routes.adminPlayers,
-              );
+              final to =
+                  value ? Routes.adminPlayersJuvenile : Routes.adminPlayers;
+              // The back arrow to Home stays when switching sides
+              context.go(widget.fromHome ? Routes.fromHome(to) : to);
             },
           ),
           Expanded(
@@ -95,10 +104,11 @@ class _FaPlayerTeamsScreenState extends ConsumerState<FaPlayerTeamsScreen> {
     }
 
     return Scaffold(
-      appBar: const GedfaAppBar(
+      appBar: GedfaAppBar(
         title: 'Players',
         subtitle: 'Gomoa East District FA',
-        actions: [NotificationBell()],
+        leading: widget.fromHome ? const BackToHomeButton() : null,
+        actions: const [NotificationBell()],
       ),
       body: body,
     );

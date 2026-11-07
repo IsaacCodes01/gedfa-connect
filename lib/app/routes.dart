@@ -14,6 +14,12 @@ class Routes {
   /// FA: the Home tab (dashboard), where the FA lands after signing in
   /// (2.12a).
   static const adminHome = '/admin/home';
+
+  /// A screen opened from a "Needs you" row on Home gets `from=home`, so it
+  /// shows a back arrow to Home. Opened from the tabs, it has none.
+  static String fromHome(String route) =>
+      '$route${route.contains('?') ? '&' : '?'}from=home';
+  static bool isFromHome(Uri uri) => uri.queryParameters['from'] == 'home';
   static String adminRequest(String uid) => '/admin/request/$uid';
 
   /// FA: Teams with the Changes switch on (2.10b), and all of one team's

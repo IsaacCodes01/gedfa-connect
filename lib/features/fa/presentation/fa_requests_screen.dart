@@ -7,6 +7,7 @@ import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/core/utils/initials.dart';
 import 'package:gedfa_connect/core/utils/team_name_key.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/core/widgets/count_tabs.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/notification_bell.dart';
@@ -30,10 +31,17 @@ import 'package:go_router/go_router.dart';
 /// - **Changes**: approved teams asking for a new name, short name or
 ///   logo, or to add a competition ([FaChangesView]).
 class FaRequestsScreen extends ConsumerStatefulWidget {
-  const FaRequestsScreen({super.key, this.changes = false});
+  const FaRequestsScreen({
+    super.key,
+    this.changes = false,
+    this.fromHome = false,
+  });
 
   /// Open on Changes (`/admin?view=changes`, e.g. from the bell)
   final bool changes;
+
+  /// Opened from a "Needs you" row on Home: back arrow to Home (2.12a)
+  final bool fromHome;
 
   @override
   ConsumerState<FaRequestsScreen> createState() => _FaRequestsScreenState();
@@ -56,10 +64,11 @@ class _FaRequestsScreenState extends ConsumerState<FaRequestsScreen> {
     final requestsAsync = ref.watch(allTeamRequestsProvider);
 
     return Scaffold(
-      appBar: const GedfaAppBar(
+      appBar: GedfaAppBar(
         title: 'Teams',
         subtitle: 'Gomoa East District FA',
-        actions: [NotificationBell()],
+        leading: widget.fromHome ? const BackToHomeButton() : null,
+        actions: const [NotificationBell()],
       ),
       body: requestsAsync.when(
         data: _body,

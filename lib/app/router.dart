@@ -108,9 +108,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       // FA admin area: a shell with tabs (Home, Teams, Players, More).
       StatefulShellRoute.indexedStack(
-        builder: (_, _, navigationShell) => AppShell(
+        builder: (_, state, navigationShell) => AppShell(
           navigationShell: navigationShell,
           destinations: adminDestinations,
+          openedFromHome: Routes.isFromHome(state.uri),
         ),
         branches: [
           // Tab 0: Home (the dashboard, 2.12)
@@ -130,6 +131,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                 // ?view=changes opens the Changes side (2.10b)
                 builder: (_, state) => FaRequestsScreen(
                   changes: state.uri.queryParameters['view'] == 'changes',
+                  fromHome: Routes.isFromHome(state.uri),
                 ),
                 routes: [
                   // One team's change requests to decide. Full-screen (2.10c).
@@ -186,6 +188,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                 // ?view=juvenile opens the Juvenile side (2.14b)
                 builder: (_, state) => FaPlayerTeamsScreen(
                   juvenile: state.uri.queryParameters['view'] == 'juvenile',
+                  fromHome: Routes.isFromHome(state.uri),
                 ),
                 routes: [
                   // One team's players. Inside the tab (bottom bar stays).
@@ -253,7 +256,9 @@ final routerProvider = Provider<GoRouter>((ref) {
                   // FA only: Juvenile screening days (2.14b). More tab.
                   GoRoute(
                     path: 'screening',
-                    builder: (_, _) => const FaScreeningDaysScreen(),
+                    builder: (_, state) => FaScreeningDaysScreen(
+                      fromHome: Routes.isFromHome(state.uri),
+                    ),
                     routes: [
                       // One child after another (2.14c). Full screen.
                       GoRoute(
@@ -274,7 +279,9 @@ final routerProvider = Provider<GoRouter>((ref) {
                   // FA only: Season fees (2.13c). Inside the More tab.
                   GoRoute(
                     path: 'fees',
-                    builder: (_, _) => const FaFeesScreen(),
+                    builder: (_, state) => FaFeesScreen(
+                      fromHome: Routes.isFromHome(state.uri),
+                    ),
                     routes: [
                       GoRoute(
                         path: 'team/:teamId',

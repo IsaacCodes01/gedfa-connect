@@ -5,6 +5,7 @@ import 'package:gedfa_connect/core/constants/season.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/initials.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/core/widgets/count_tabs.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
@@ -22,7 +23,10 @@ enum _Filter { all, owing, paid }
 /// season, what's left and how many payments wait for the FA. Teams with
 /// payments to confirm come first, then the ones that owe the most.
 class FaFeesScreen extends ConsumerStatefulWidget {
-  const FaFeesScreen({super.key});
+  const FaFeesScreen({super.key, this.fromHome = false});
+
+  /// Opened from a "Needs you" row on Home: back arrow to Home (2.12a)
+  final bool fromHome;
 
   @override
   ConsumerState<FaFeesScreen> createState() => _FaFeesScreenState();
@@ -42,6 +46,7 @@ class _FaFeesScreenState extends ConsumerState<FaFeesScreen> {
         title: 'Season fees',
         subtitle: '${Season.label(Season.current)} · '
             '${cedis(Season.fee)} per team',
+        leading: widget.fromHome ? const BackToHomeButton() : null,
       ),
       body: teamsAsync.when(
         loading: () => const LoadingView(),

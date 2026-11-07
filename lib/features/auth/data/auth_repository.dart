@@ -55,7 +55,33 @@ class AuthRepository {
     final provider = GoogleAuthProvider()
       ..setCustomParameters({'prompt': 'select_account'});
 
-    await _auth.signInWithPopup(provider);
+    final credential = await _auth.signInWithPopup(provider);
+
+    // An account made with email and password first keeps an empty name
+    // when Google is added to it. Put Google's name on the account, so
+    // every screen (and the FA's Home greeting) can use it.
+    final user = credential.user;
+    final googleName = nameOf(user);
+    if (user != null &&
+        (user.displayName ?? '').trim().isEmpty &&
+        googleName != null) {
+      await user.updateDisplayName(googleName).timeout(_timeout);
+      await user.reload().timeout(_timeout);
+    }
+  }
+
+  /// The account's name, or the name from the way they signed in
+  /// (Google) when the account itself has none. Null if neither has one.
+  static String? nameOf(User? user) {
+    if (user == null) return null;
+    for (final name in [
+      user.displayName,
+      for (final info in user.providerData) info.displayName,
+    ]) {
+      final trimmed = name?.trim() ?? '';
+      if (trimmed.isNotEmpty) return trimmed;
+    }
+    return null;
   }
 
     Future<void> resendVerificationEmail() async {
