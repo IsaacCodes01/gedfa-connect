@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gedfa_connect/app/routes.dart';
 import 'package:gedfa_connect/app/theme.dart';
 import 'package:gedfa_connect/features/dashboard/domain/fa_waiting.dart';
+import 'package:gedfa_connect/features/dashboard/presentation/widgets/dashboard_card.dart';
 import 'package:gedfa_connect/features/screening/data/screening_repository.dart';
 import 'package:go_router/go_router.dart';
 
@@ -148,78 +149,6 @@ class AllCaughtUpCard extends StatelessWidget {
   }
 }
 
-/// The dashboard's white (dark: navy) card: soft border, round corners
-/// and a light shadow. 2.12b's tiles and charts use it too.
-class DashboardCard extends StatelessWidget {
-  const DashboardCard({super.key, required this.child, this.padding});
-
-  final Widget child;
-  final EdgeInsetsGeometry? padding;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      padding: padding,
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: dashboardBorder(context)),
-        boxShadow: [
-          if (isDark)
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.3),
-              blurRadius: 2,
-              offset: const Offset(0, 1),
-            )
-          else ...[
-            BoxShadow(
-              color: AppColors.ink.withValues(alpha: 0.05),
-              blurRadius: 2,
-              offset: const Offset(0, 1),
-            ),
-            BoxShadow(
-              color: AppColors.ink.withValues(alpha: 0.06),
-              blurRadius: 18,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ],
-      ),
-      child: child,
-    );
-  }
-}
-
-Color dashboardBorder(BuildContext context) =>
-    Theme.of(context).brightness == Brightness.dark
-        ? AppColors.darkCardBorder
-        : AppColors.cardBorder;
-
-/// A coloured square with an icon (the start of each row and tile).
-class AccentIcon extends StatelessWidget {
-  const AccentIcon({super.key, required this.icon, required this.tone});
-
-  final IconData icon;
-  final AccentTone tone;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      width: 38,
-      height: 38,
-      decoration: BoxDecoration(
-        color: tone.background(isDark),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Icon(icon, size: 20, color: tone.foreground(isDark)),
-    );
-  }
-}
-
 class _Need {
   const _Need({
     required this.icon,
@@ -304,10 +233,7 @@ class _NeedRow extends StatelessWidget {
                   ),
                 ),
               ),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: scheme.onSurfaceVariant,
-              ),
+              Icon(Icons.chevron_right_rounded, color: scheme.onSurfaceVariant),
             ],
           ),
         ),

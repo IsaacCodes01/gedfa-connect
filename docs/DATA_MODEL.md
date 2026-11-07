@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.16, matches the rules after step 2.12a (7 Nov 2026)
+**Status:** v2.17, matches the rules after step 2.12b (7 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -726,6 +726,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 7 Nov 2026 | v2.17 (2.12b): no new collections or rules. The dashboard's totals are worked out in the app from `teams`, `players` and `fees` (already streamed for the FA), not count queries. Squads ready = Division teams with at least `settings/league.matchdaySquad` approved Division players. |
 | 7 Nov 2026 | v2.16 (2.12a): no new collections or rules. The FA dashboard reads what is already there (team requests, team changes, players, waiting payments, correction requests, screening days). Section 7: squads ready = matchday squad (16); fourth officials record assists (Phase 4). |
 | 7 Nov 2026 | v2.15 (2.11c): suspensions by the chairman: `teams.suspension` and `teams/{teamId}/suspensions` (ends on a date or when lifted with why: fine paid, bond signed, board decision, other); while in force the team's player, profile and change-request writes are refused; notification kinds `teamSuspended`, `suspensionLifted`. 285 tests. |
 | 7 Nov 2026 | v2.14 (2.11b): new `correctionRequests/{teamId}` (the FA asks a team to correct officials, kits, colours, players or club details; asked → sent back → done, or asked again); notification kinds `correctionAsked`, `correctionSentBack`, `correctionDone`. 276 tests. |

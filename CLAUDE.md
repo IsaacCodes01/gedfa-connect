@@ -85,10 +85,12 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
 - **2.11 FA corrections** done (7 Nov 2026, 285 rules tests): 2.11a the FA fixes misspellings itself
   (name, town, ground, directions, year, email; never officials, kits or colours), 2.11b asks the team to
   correct, 2.11c the chairman suspends and lifts. Isaac deploys the rules to dev himself.
-- **2.12a** FA Home tab (dashboard: header + Needs you) done (7 Nov 2026). FA tabs are now
-  Home · Teams · Players · More; the FA lands on `/admin/home`; `/admin` is still Teams.
-- **Next:** **2.12b** (tiles, charts, Season stats card, Coming later; mockup `2.12-fa-dashboard.html`),
-  **Phase 3** team sheets (16 / 5 / 7 from settings, GFA play-up limits, kit in the top-left corner),
+- **2.12 FA dashboard** done (7 Nov 2026). FA tabs are Home · Teams · Players · More; the FA lands on
+  `/admin/home`; `/admin` is still Teams. Screens opened from Home carry `from=home` (back arrow to Home);
+  links on FA screens use `context.goKeepingHome` / `pushKeepingHome` (`core/widgets/back_to_home.dart`)
+  so the note travels. Dashboard numbers are live from the existing streams (no count queries yet).
+- Layout test: `flutter test` runs `test/dashboard_smoke_test.dart` (phone and laptop, light and dark).
+- **Next:** **Phase 3** team sheets (16 / 5 / 7 from settings, GFA play-up limits, kit in the top-left corner),
   then the **UI/UX refresh with motion and animations** and the "before the pilot" list (push
   notifications, 3-day fee reminders, prod setup), then the pilot, a second refresh from feedback, Phase 4.
 - **The refresh (after Phase 3, before the pilot):** our own app icon (`flutter_launcher_icons`), splash

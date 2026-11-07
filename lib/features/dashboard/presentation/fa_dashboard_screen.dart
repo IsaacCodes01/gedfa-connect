@@ -1,18 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:gedfa_connect/app/routes.dart';
+import 'package:gedfa_connect/core/constants/season.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/features/dashboard/data/dashboard_providers.dart';
+import 'package:gedfa_connect/features/dashboard/domain/dashboard_stats.dart';
+import 'package:gedfa_connect/features/dashboard/presentation/widgets/dashboard_card.dart';
 import 'package:gedfa_connect/features/dashboard/presentation/widgets/dashboard_header.dart';
+import 'package:gedfa_connect/features/dashboard/presentation/widgets/glance_tiles.dart';
 import 'package:gedfa_connect/features/dashboard/presentation/widgets/needs_you_card.dart';
+import 'package:gedfa_connect/features/dashboard/presentation/widgets/player_charts.dart';
+import 'package:gedfa_connect/features/dashboard/presentation/widgets/season_stats_card.dart';
+import 'package:go_router/go_router.dart';
 
 /// FA: the Home tab, the first screen after signing in (2.12, mockup
-/// 2.12-fa-dashboard). 2.12a: the header and "Needs you". 2.12b adds
-/// League at a glance, the two charts, Season stats and Coming later.
+/// 2.12-fa-dashboard).
 ///
-/// Phones: one column. Tablets and laptops: up to 1,100 px wide, with
-/// "Needs you" on the left and the charts on the right (2.12b).
+/// Phones, one column: Needs you, League at a glance, the two charts,
+/// Season stats, Coming later. Tablets and laptops, up to 1,100 px wide:
+/// the tiles 4 in a row first, then Needs you on the left and the charts
+/// on the right. Every number is live (no pull to refresh).
 class FaDashboardScreen extends ConsumerWidget {
   const FaDashboardScreen({super.key});
 
@@ -20,31 +29,100 @@ class FaDashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final wide = screenSizeOf(context) != ScreenSize.compact;
     final waitingAsync = ref.watch(faWaitingProvider);
+    final statsAsync = ref.watch(dashboardStatsProvider);
 
-    final needs = waitingAsync.when(
-      loading: () => const _LoadingCard(),
-      error: (error, _) => DashboardCard(
-        padding: const EdgeInsets.all(18),
-        child: Text(appErrorMessage(error)),
+    final needs = [
+      DashboardSectionTitle(
+        title: 'Needs you',
+        top: wide ? 26 : 2,
+        trailing: switch (waitingAsync.value) {
+          final w? when !w.isEmpty => '${w.total} waiting',
+          _ => null,
+        },
       ),
-      data: (waiting) => waiting.isEmpty
-          ? const AllCaughtUpCard()
-          : NeedsYouCard(waiting: waiting),
-    );
+      waitingAsync.when(
+        loading: () => const _LoadingCard(),
+        error: (error, _) => _ErrorCard(error: error),
+        data: (waiting) => waiting.isEmpty
+            ? const AllCaughtUpCard()
+            : NeedsYouCard(waiting: waiting),
+      ),
+    ];
 
-    final body = Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _SectionTitle(
-          title: 'Needs you',
-          trailing: switch (waitingAsync.value) {
-            final w? when !w.isEmpty => '${w.total} waiting',
-            _ => null,
-          },
-        ),
-        needs,
-      ],
+    /// One stats section: its title, then the card (or loading / error).
+    List<Widget> section(
+      String title,
+      Widget Function(DashboardStats stats) build, {
+      String? trailing,
+      VoidCallback? onTap,
+      double top = 20,
+    }) => [
+      DashboardSectionTitle(
+        title: title,
+        trailing: trailing,
+        onTap: onTap,
+        top: top,
+      ),
+      statsAsync.when(
+        loading: () => const _LoadingCard(),
+        error: (error, _) => _ErrorCard(error: error),
+        data: build,
+      ),
+    ];
+
+    final glance = section(
+      'League at a glance',
+      (s) => GlanceTiles(stats: s, wide: wide),
+      trailing: 'Season ${Season.label(Season.current)}',
+      top: wide ? 2 : 20,
     );
+    final charts = [
+      ...section(
+        'Players by competition',
+        (s) => CompetitionChart(stats: s),
+        trailing: 'Players ›',
+        onTap: () => context.go(Routes.fromHome(Routes.adminPlayers)),
+        top: wide ? 26 : 20,
+      ),
+      ...section('Players by position', (s) => PositionChart(stats: s)),
+    ];
+    final later = [
+      const DashboardSectionTitle(
+        title: 'Season stats',
+        trailing: 'After the first match report',
+      ),
+      SeasonStatsCard(wide: wide),
+      const DashboardSectionTitle(title: 'Coming later', trailing: 'Phase 4'),
+      ComingLater(wide: wide),
+      const _LiveNote(),
+    ];
+
+    final List<Widget> content = wide
+        ? [
+            ...glance,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 5,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: needs,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  flex: 7,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: charts,
+                  ),
+                ),
+              ],
+            ),
+            ...later,
+          ]
+        : [...needs, ...glance, ...charts, ...later];
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       // White status bar icons over the blue header
@@ -62,18 +140,10 @@ class FaDashboardScreen extends ConsumerWidget {
                   padding: wide
                       ? const EdgeInsets.fromLTRB(28, 22, 28, 30)
                       : const EdgeInsets.fromLTRB(14, 16, 14, 22),
-                  child: wide
-                      // Left column (5 of 12); the charts fill the right
-                      // one in 2.12b
-                      ? Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(flex: 5, child: body),
-                            const SizedBox(width: 16),
-                            const Expanded(flex: 7, child: SizedBox()),
-                          ],
-                        )
-                      : body,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: content,
+                  ),
                 ),
               ),
             ),
@@ -84,38 +154,45 @@ class FaDashboardScreen extends ConsumerWidget {
   }
 }
 
-/// "Needs you" … "33 waiting"
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle({required this.title, this.trailing});
-
-  final String title;
-  final String? trailing;
+/// The line at the bottom: the numbers change by themselves.
+class _LiveNote extends StatelessWidget {
+  const _LiveNote();
 
   @override
   Widget build(BuildContext context) {
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 2, 4, 10),
+      padding: const EdgeInsets.only(top: 18),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.baseline,
-        textBaseline: TextBaseline.alphabetic,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Expanded(
+          Icon(Icons.bolt_rounded, size: 15, color: muted),
+          const SizedBox(width: 6),
+          Flexible(
             child: Text(
-              title,
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+              'Live · updates by itself',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 11.5, color: muted),
             ),
           ),
-          if (trailing != null)
-            Text(
-              trailing!,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
         ],
       ),
+    );
+  }
+}
+
+class _ErrorCard extends StatelessWidget {
+  const _ErrorCard({required this.error});
+
+  final Object error;
+
+  @override
+  Widget build(BuildContext context) {
+    return DashboardCard(
+      padding: const EdgeInsets.all(18),
+      child: Text(appErrorMessage(error)),
     );
   }
 }
@@ -129,13 +206,13 @@ class _LoadingCard extends StatelessWidget {
     final grey = dashboardBorder(context);
 
     Widget block(double width, double height, double radius) => Container(
-          width: width,
-          height: height,
-          decoration: BoxDecoration(
-            color: grey,
-            borderRadius: BorderRadius.circular(radius),
-          ),
-        );
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: grey,
+        borderRadius: BorderRadius.circular(radius),
+      ),
+    );
 
     return DashboardCard(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

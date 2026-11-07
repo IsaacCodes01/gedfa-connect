@@ -23,7 +23,8 @@ class DashboardHeader extends ConsumerWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     // The sign-in account's name (Google's for Google users), as on
     // My profile; then the one on the user document
-    final name = AuthRepository.nameOf(ref.watch(currentUserProvider).value) ??
+    final name =
+        AuthRepository.nameOf(ref.watch(currentUserProvider).value) ??
         ref.watch(appUserProvider).value?.displayName;
     final settings = ref.watch(leagueSettingsProvider).value;
     final now = DateTime.now();
@@ -51,7 +52,10 @@ class DashboardHeader extends ConsumerWidget {
                 Positioned(
                   right: -60,
                   top: -70,
-                  child: _Ring(size: 220, color: Colors.white.withValues(alpha: 0.06)),
+                  child: _Ring(
+                    size: 220,
+                    color: Colors.white.withValues(alpha: 0.06),
+                  ),
                 ),
                 Positioned(
                   right: 40,
@@ -88,8 +92,9 @@ class DashboardHeader extends ConsumerWidget {
                             data: IconButtonThemeData(
                               style: IconButton.styleFrom(
                                 foregroundColor: Colors.white,
-                                backgroundColor:
-                                    Colors.white.withValues(alpha: 0.14),
+                                backgroundColor: Colors.white.withValues(
+                                  alpha: 0.14,
+                                ),
                               ),
                             ),
                             child: const NotificationBell(),
@@ -123,9 +128,8 @@ class DashboardHeader extends ConsumerWidget {
                         children: [
                           _Tag(
                             icon: Icons.emoji_events_outlined,
-                            label: 'Season ${Season.label(
-                              settings?.season ?? Season.current,
-                            )}',
+                            label:
+                                'Season ${Season.label(settings?.season ?? Season.current)}',
                           ),
                           if (settings != null) ...[
                             _Tag(
@@ -160,8 +164,8 @@ class DashboardHeader extends ConsumerWidget {
     final part = now.hour < 12
         ? 'morning'
         : now.hour < 17
-            ? 'afternoon'
-            : 'evening';
+        ? 'afternoon'
+        : 'evening';
     final first = displayName?.trim().split(RegExp(r'\s+')).first ?? '';
     return first.isEmpty ? 'Good $part' : 'Good $part, $first';
   }
