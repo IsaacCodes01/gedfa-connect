@@ -57,3 +57,6 @@ emulator-data/
 test/rules/node_modules/
 # Design mockups (HTML, for Isaac only; never committed)
 docs/mockups/
+
+# Firebase CLI deploy cache (local only)
+.firebase/
