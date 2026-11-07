@@ -12,6 +12,7 @@ import 'package:gedfa_connect/core/utils/initials.dart';
 import 'package:gedfa_connect/core/utils/open_link.dart';
 import 'package:gedfa_connect/core/utils/phone_call.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/core/widgets/status_badge.dart';
@@ -46,7 +47,6 @@ import 'package:gedfa_connect/features/teams/presentation/widgets/file_upload_ro
 import 'package:gedfa_connect/features/teams/presentation/widgets/colour_pair_row.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/kit_thumb.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/team_logo.dart';
-import 'package:go_router/go_router.dart';
 
 /// FA: everything a club sent, to check before approving or rejecting.
 /// While the request is pending, Reject and Approve sit at the bottom.
@@ -64,7 +64,8 @@ class FaRequestReviewScreen extends ConsumerWidget {
     return Scaffold(
       appBar: GedfaAppBar(
         title: 'Review request',
-        leading: BackButton(onPressed: () => context.go(Routes.admin)),
+        leading: BackButton(onPressed: () =>
+            context.goKeepingHome(Routes.admin)),
         // An approved team: Ask the team to correct… (2.11b, B1)
         actions: request != null && request.status == ApprovalStatus.approved
             ? [_TeamMenu(teamId: teamNameKey(request.teamName))]
@@ -275,7 +276,8 @@ class _ApprovedBodyState extends ConsumerState<_ApprovedBody> {
                 'Club details',
                 onEdit: _busy
                     ? null
-                    : () => context.push(Routes.adminCorrectDetails(_teamId)),
+                    : () =>
+                        context.pushKeepingHome(Routes.adminCorrectDetails(_teamId)),
               ),
               TileGroup(
                 children: [
@@ -347,7 +349,7 @@ class _TeamMenu extends ConsumerWidget {
         if (team == null) return;
         switch (value) {
           case 'ask':
-            context.push(Routes.adminAskCorrection(teamId));
+            context.pushKeepingHome(Routes.adminAskCorrection(teamId));
           case 'suspend':
             suspendTeam(context, ref, team);
           case 'lift' when suspension != null:
@@ -454,7 +456,7 @@ class _AskHint extends StatelessWidget {
     return Align(
       alignment: Alignment.centerLeft,
       child: TextButton(
-        onPressed: () => context.push(
+        onPressed: () => context.pushKeepingHome(
           Routes.adminAskCorrection(teamId, item: item.name),
         ),
         child: const Text('Wrong? Ask the team to correct it.'),
@@ -891,7 +893,7 @@ class _ReviewActionsState extends ConsumerState<_ReviewActions> {
           .approve(request, faUid: faUid);
       if (!mounted) return;
       AppToast.success(context, '${request.teamName} approved.');
-      context.go(Routes.admin);
+      context.goKeepingHome(Routes.admin);
     } catch (error) {
       if (mounted) AppToast.error(context, _messageFor(error));
     } finally {
@@ -929,7 +931,7 @@ class _ReviewActionsState extends ConsumerState<_ReviewActions> {
         context,
         'Request rejected. The club can see your reason.',
       );
-      context.go(Routes.admin);
+      context.goKeepingHome(Routes.admin);
     } catch (error) {
       if (mounted) AppToast.error(context, _messageFor(error));
     } finally {

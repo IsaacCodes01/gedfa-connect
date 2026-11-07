@@ -5,6 +5,7 @@ import 'package:gedfa_connect/app/routes.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
@@ -38,7 +39,8 @@ class FaAskCorrectionScreen extends ConsumerWidget {
       return Scaffold(
         appBar: GedfaAppBar(
           title: 'Ask to correct',
-          leading: CloseButton(onPressed: () => context.go(Routes.admin)),
+          leading: CloseButton(onPressed: () =>
+              context.goKeepingHome(Routes.admin)),
         ),
         body: error != null
             ? ErrorView(message: appErrorMessage(error))
@@ -91,7 +93,7 @@ class _FormState extends ConsumerState<_Form> {
     if (context.canPop()) {
       context.pop();
     } else {
-      context.go(Routes.admin);
+      context.goKeepingHome(Routes.admin);
     }
   }
 

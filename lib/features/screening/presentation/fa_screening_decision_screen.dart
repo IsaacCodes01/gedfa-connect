@@ -9,6 +9,7 @@ import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
@@ -107,7 +108,7 @@ class _FaScreeningDecisionScreenState
     super.dispose();
   }
 
-  void _back() => context.go(Routes.adminScreening);
+  void _back() => context.goKeepingHome(Routes.adminScreening);
 
   /// Waiting children for this day: by team, age group and number, with
   /// skipped children at the end.

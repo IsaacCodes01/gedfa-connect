@@ -15,7 +15,6 @@ import 'package:gedfa_connect/features/payments/presentation/widgets/fee_progres
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/team.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/team_logo.dart';
-import 'package:go_router/go_router.dart';
 
 enum _Filter { all, owing, paid }
 
@@ -263,7 +262,7 @@ class _TeamFeeTile extends StatelessWidget {
         side: BorderSide(color: scheme.outline),
       ),
       child: InkWell(
-        onTap: () => context.go(Routes.adminTeamFee(team.id)),
+        onTap: () => context.goKeepingHome(Routes.adminTeamFee(team.id)),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Row(

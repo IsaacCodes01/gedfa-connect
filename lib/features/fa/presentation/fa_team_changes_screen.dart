@@ -8,6 +8,7 @@ import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/core/utils/initials.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
@@ -19,7 +20,6 @@ import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/teams/domain/team.dart';
 import 'package:gedfa_connect/features/teams/domain/team_change.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/team_logo.dart';
-import 'package:go_router/go_router.dart';
 
 /// FA › Teams › Changes › one team (2.10c, mockup C): everything the team
 /// asked for, one card each (newest first). Each change is approved or
@@ -49,7 +49,7 @@ class _FaTeamChangesScreenState extends ConsumerState<FaTeamChangesScreen> {
 
   String? get _faUid => ref.read(authRepositoryProvider).currentUser?.uid;
 
-  void _back() => context.go(Routes.adminChanges);
+  void _back() => context.goKeepingHome(Routes.adminChanges);
 
   /// Friendly message when Firestore refuses the change.
   String _messageFor(Object error) {

@@ -5,6 +5,7 @@ import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/core/utils/initials.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/fa/presentation/widgets/review_widgets.dart';
 import 'package:gedfa_connect/features/teams/data/correction_request_repository.dart';
@@ -12,7 +13,6 @@ import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/correction_request.dart';
 import 'package:gedfa_connect/features/teams/domain/team.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/team_logo.dart';
-import 'package:go_router/go_router.dart';
 
 /// FA › Teams › Changes, at the top: corrections the FA asked for
 /// (2.11b, mockup B4). Sent back first (the FA marks them Done or asks
@@ -128,7 +128,7 @@ class _CorrectionCardState extends ConsumerState<_CorrectionCard> {
         // The FA's team page, to look at what the team changed
         onTap: requestUid == null
             ? null
-            : () => context.push(Routes.adminRequest(requestUid)),
+            : () => context.pushKeepingHome(Routes.adminRequest(requestUid)),
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Column(
@@ -178,7 +178,7 @@ class _CorrectionCardState extends ConsumerState<_CorrectionCard> {
                       child: OutlinedButton(
                         onPressed: _busy
                             ? null
-                            : () => context.push(
+                            : () => context.pushKeepingHome(
                                   Routes.adminAskCorrection(request.teamId),
                                 ),
                         style: OutlinedButton.styleFrom(

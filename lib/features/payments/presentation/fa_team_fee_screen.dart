@@ -5,6 +5,7 @@ import 'package:gedfa_connect/core/constants/season.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/features/payments/data/payment_repository.dart';
@@ -13,7 +14,6 @@ import 'package:gedfa_connect/features/payments/presentation/widgets/fa_payment_
 import 'package:gedfa_connect/features/settings/presentation/widgets/settings_widgets.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/team.dart';
-import 'package:go_router/go_router.dart';
 
 /// FA: one approved team's season fee. The same payment card as the
 /// registration review (green tick, not found, record cash), plus
@@ -31,7 +31,8 @@ class FaTeamFeeScreen extends ConsumerWidget {
       appBar: GedfaAppBar(
         title: 'Season fee',
         subtitle: teamAsync.value?.name,
-        leading: BackButton(onPressed: () => context.go(Routes.adminFees)),
+        leading: BackButton(onPressed: () =>
+            context.goKeepingHome(Routes.adminFees)),
       ),
       body: teamAsync.when(
         loading: () => const LoadingView(),

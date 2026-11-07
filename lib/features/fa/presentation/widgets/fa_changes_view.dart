@@ -6,6 +6,7 @@ import 'package:gedfa_connect/core/constants/approval_status.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/core/utils/initials.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/features/teams/data/team_change_repository.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
@@ -13,7 +14,6 @@ import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/teams/domain/team.dart';
 import 'package:gedfa_connect/features/teams/domain/team_change.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/team_logo.dart';
-import 'package:go_router/go_router.dart';
 
 /// How many decided changes the FA sees under "Decided".
 const _decidedShown = 10;
@@ -82,7 +82,8 @@ class FaChangesView extends ConsumerWidget {
                   // Newest first, like the team's screen
                   changes: changes.reversed.toList(),
                   team: teamOf(teamId),
-                  onTap: () => context.go(Routes.adminTeamChanges(teamId)),
+                  onTap: () =>
+                      context.goKeepingHome(Routes.adminTeamChanges(teamId)),
                 ),
                 const SizedBox(height: 10),
               ],

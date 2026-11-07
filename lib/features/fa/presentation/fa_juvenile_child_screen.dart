@@ -7,6 +7,7 @@ import 'package:gedfa_connect/core/constants/season.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/features/players/data/player_repository.dart';
@@ -35,9 +36,9 @@ class FaJuvenileChildScreen extends ConsumerWidget {
       if (context.canPop()) {
         context.pop();
       } else if (player != null) {
-        context.go(Routes.adminTeamJuvenile(player.teamId));
+        context.goKeepingHome(Routes.adminTeamJuvenile(player.teamId));
       } else {
-        context.go(Routes.adminPlayersJuvenile);
+        context.goKeepingHome(Routes.adminPlayersJuvenile);
       }
     }
 
@@ -302,7 +303,7 @@ class _ScreenButtonState extends ConsumerState<_ScreenButton> {
                   FilledButton.icon(
                     onPressed: openDay == null
                         ? null
-                        : () => context.go(Routes.adminScreeningDay(
+                        : () => context.goKeepingHome(Routes.adminScreeningDay(
                               openDay.id,
                               childId: player.id,
                             )),

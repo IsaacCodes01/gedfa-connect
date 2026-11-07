@@ -21,7 +21,6 @@ import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/teams/domain/team.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/team_logo.dart';
-import 'package:go_router/go_router.dart';
 
 /// FA, Players tab: every team with how many players it has, how many are
 /// approved and how many are waiting. Teams with players to review come
@@ -88,10 +87,10 @@ class _FaPlayerTeamsScreenState extends ConsumerState<FaPlayerTeamsScreen> {
             // A new search for each side
             onChanged: (value) {
               setState(() => _search = '');
-              final to =
-                  value ? Routes.adminPlayersJuvenile : Routes.adminPlayers;
               // The back arrow to Home stays when switching sides
-              context.go(widget.fromHome ? Routes.fromHome(to) : to);
+              context.goKeepingHome(
+                value ? Routes.adminPlayersJuvenile : Routes.adminPlayers,
+              );
             },
           ),
           Expanded(
@@ -203,7 +202,7 @@ class _FaPlayerTeamsScreenState extends ConsumerState<FaPlayerTeamsScreen> {
                   _PlayerResult(
                     player: child,
                     onTap: () =>
-                        context.push(Routes.adminJuvenileChild(child.id)),
+                        context.pushKeepingHome(Routes.adminJuvenileChild(child.id)),
                   ),
                   const SizedBox(height: 8),
                 ],
@@ -228,7 +227,8 @@ class _FaPlayerTeamsScreenState extends ConsumerState<FaPlayerTeamsScreen> {
                   _JuvenileTeamCard(
                     team: team,
                     groups: stats[team.id] ?? const {},
-                    onTap: () => context.go(Routes.adminTeamJuvenile(team.id)),
+                    onTap: () =>
+                        context.goKeepingHome(Routes.adminTeamJuvenile(team.id)),
                   ),
                   const SizedBox(height: 8),
                 ],
@@ -347,7 +347,8 @@ class _FaPlayerTeamsScreenState extends ConsumerState<FaPlayerTeamsScreen> {
                 for (final player in matchingPlayers) ...[
                   _PlayerResult(
                     player: player,
-                    onTap: () => context.push(Routes.adminPlayer(player.id)),
+                    onTap: () =>
+                        context.pushKeepingHome(Routes.adminPlayer(player.id)),
                   ),
                   const SizedBox(height: 8),
                 ],
@@ -371,7 +372,8 @@ class _FaPlayerTeamsScreenState extends ConsumerState<FaPlayerTeamsScreen> {
                   _TeamCard(
                     team: team,
                     stats: stats[team.id] ?? _TeamStats(),
-                    onTap: () => context.go(Routes.adminTeamPlayers(team.id)),
+                    onTap: () =>
+                        context.goKeepingHome(Routes.adminTeamPlayers(team.id)),
                   ),
                   const SizedBox(height: 8),
                 ],

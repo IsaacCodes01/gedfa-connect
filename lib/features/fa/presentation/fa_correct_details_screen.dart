@@ -6,6 +6,7 @@ import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/validators.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
@@ -33,7 +34,8 @@ class FaCorrectDetailsScreen extends ConsumerWidget {
       return Scaffold(
         appBar: GedfaAppBar(
           title: 'Correct club details',
-          leading: BackButton(onPressed: () => context.go(Routes.admin)),
+          leading: BackButton(onPressed: () =>
+              context.goKeepingHome(Routes.admin)),
         ),
         body: detailsAsync.hasError
             ? ErrorView(message: appErrorMessage(detailsAsync.error!))
@@ -110,7 +112,7 @@ class _FormState extends ConsumerState<_Form> {
     if (context.canPop()) {
       context.pop();
     } else {
-      context.go(Routes.admin);
+      context.goKeepingHome(Routes.admin);
     }
   }
 

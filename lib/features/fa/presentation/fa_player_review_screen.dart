@@ -7,6 +7,7 @@ import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/core/utils/player_code.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/core/widgets/status_badge.dart';
@@ -75,9 +76,9 @@ void _leave(BuildContext context, Player? player) {
   if (context.canPop()) {
     context.pop();
   } else if (player != null) {
-    context.go(Routes.adminTeamPlayers(player.teamId));
+    context.goKeepingHome(Routes.adminTeamPlayers(player.teamId));
   } else {
-    context.go(Routes.adminPlayers);
+    context.goKeepingHome(Routes.adminPlayers);
   }
 }
 
@@ -478,7 +479,8 @@ class _Duplicates extends ConsumerWidget {
               side: BorderSide(color: scheme.error, width: 1.5),
             ),
             child: InkWell(
-              onTap: () => context.push(Routes.adminPlayer(match.player.id)),
+              onTap: () =>
+                  context.pushKeepingHome(Routes.adminPlayer(match.player.id)),
               child: Padding(
                 padding: const EdgeInsets.all(10),
                 child: Row(

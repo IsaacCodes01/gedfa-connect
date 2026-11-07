@@ -6,6 +6,7 @@ import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/player_code.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/core/widgets/count_tabs.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
@@ -15,7 +16,6 @@ import 'package:gedfa_connect/features/players/data/player_repository.dart';
 import 'package:gedfa_connect/features/players/domain/player.dart';
 import 'package:gedfa_connect/features/players/presentation/widgets/position_rows.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
-import 'package:go_router/go_router.dart';
 
 /// The three tabs on this screen.
 enum _Tab { toReview, approved, all }
@@ -60,7 +60,7 @@ class _FaTeamPlayersScreenState extends ConsumerState<FaTeamPlayersScreen> {
       if (player.status == ApprovalStatus.pending) _toggle(player);
       return;
     }
-    context.push(Routes.adminPlayer(player.id));
+    context.pushKeepingHome(Routes.adminPlayer(player.id));
   }
 
   Future<void> _approveSelected(List<Player> teamPlayers) async {
@@ -148,7 +148,8 @@ class _FaTeamPlayersScreenState extends ConsumerState<FaTeamPlayersScreen> {
       appBar: GedfaAppBar(
         title: team?.name ?? 'Team players',
         subtitle: subtitle,
-        leading: BackButton(onPressed: () => context.go(Routes.adminPlayers)),
+        leading: BackButton(onPressed: () =>
+            context.goKeepingHome(Routes.adminPlayers)),
         actions: [
           if (pending > 0)
             TextButton(

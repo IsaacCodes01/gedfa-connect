@@ -7,6 +7,7 @@ import 'package:gedfa_connect/core/constants/season.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/core/widgets/count_tabs.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
@@ -16,7 +17,6 @@ import 'package:gedfa_connect/features/players/domain/player.dart';
 import 'package:gedfa_connect/features/players/presentation/widgets/player_photo.dart';
 import 'package:gedfa_connect/features/players/presentation/widgets/position_rows.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
-import 'package:go_router/go_router.dart';
 
 /// FA: one team's juvenile players, by age group (2.14b, board J5).
 ///
@@ -73,7 +73,7 @@ class _FaTeamJuvenileScreenState extends ConsumerState<FaTeamJuvenileScreen> {
         title: team?.name ?? 'Juvenile players',
         subtitle: subtitle,
         leading: BackButton(
-          onPressed: () => context.go(Routes.adminPlayersJuvenile),
+          onPressed: () => context.goKeepingHome(Routes.adminPlayersJuvenile),
         ),
       ),
       body: body,
@@ -186,7 +186,8 @@ class _ChildCard extends StatelessWidget {
         side: BorderSide(color: scheme.outline),
       ),
       child: InkWell(
-        onTap: () => context.push(Routes.adminJuvenileChild(player.id)),
+        onTap: () =>
+            context.pushKeepingHome(Routes.adminJuvenileChild(player.id)),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Row(

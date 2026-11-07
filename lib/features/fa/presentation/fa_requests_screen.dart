@@ -23,7 +23,6 @@ import 'package:gedfa_connect/features/teams/domain/team_request.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/competition_picker.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/previous_name_pill.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/team_logo.dart';
-import 'package:go_router/go_router.dart';
 
 /// FA home, Teams tab, with a switch on top (2.10b, board P4):
 /// - **New teams**: every team registration request, split into
@@ -229,7 +228,8 @@ class _FaRequestsScreenState extends ConsumerState<FaRequestsScreen> {
                 for (final request in shown) ...[
                   _RequestCard(
                     request: request,
-                    onTap: () => context.go(Routes.adminRequest(request.uid)),
+                    onTap: () =>
+                        context.goKeepingHome(Routes.adminRequest(request.uid)),
                   ),
                   const SizedBox(height: 8),
                 ],

@@ -7,6 +7,7 @@ import 'package:gedfa_connect/app/routes.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
@@ -219,7 +220,7 @@ class _FaScreeningDaysScreenState
                       onCancel: _cancel,
                       // Board J4: one child after another (2.14c)
                       onStart: (day) =>
-                          context.go(Routes.adminScreeningDay(day.id)),
+                          context.goKeepingHome(Routes.adminScreeningDay(day.id)),
                       // The countdown reached 0: show Start screening
                       onStarted: () {
                         if (mounted) setState(() {});
