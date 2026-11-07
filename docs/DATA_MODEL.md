@@ -697,6 +697,10 @@ Feed rules: never include dates of birth; player photos only if agreed with GEDF
 
 **Decided by Isaac (7 Nov 2026), for 2.12 and Phase 4:** a squad is "ready" on the dashboard with at least the matchday squad (`settings/league.matchdaySquad`, 16) of approved players. Fourth officials (and other match officials) will take notes during matches, so match reports can record **assists** as well as goals and cards. The FA appoints referees and other officials to each fixture (Phase 4).
 
+**Answered by Isaac (7 Nov 2026), for Phase 3:** simple fixtures come first (3.0), because a team sheet belongs to a match. The FA sees every team sheet and gets a copy. A team sheet must be sent **1 hour before kick-off**. Juvenile play-up follows the GFA limits. The paper sheet follows a standard match sheet until GEDFA's own copy arrives.
+
+**GFA colts guidelines 2023/24 (found online, 7 Nov 2026):** U13 players may play for U15 and U15 players for U17; in a U17 match at most 1 U13 player and 5 U15 players. Match length U17 2 × 45, U15 2 × 40, U13 2 × 25 minutes. Not stated: how many U13 players in a U15 match (asked GEDFA).
+
 Still open:
 
 
