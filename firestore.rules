@@ -445,7 +445,8 @@ service cloud.firestore {
                            'feeReminder', 'paymentSent', 'registrationChanged',
                            'juvenilePassed', 'juvenileNotEligible', 'juvenileToCorrect',
                            'teamUpdated', 'changeRequested', 'changeApproved',
-                           'changeRefused', 'teamCorrected']
+                           'changeRefused', 'teamCorrected', 'correctionAsked',
+                           'correctionSentBack', 'correctionDone']
           && data.teamId is string
           && data.teamName is string
           && data.names is list && data.names.size() <= 60
@@ -460,7 +461,7 @@ service cloud.firestore {
           && (isFaAdmin()
               || (data.kind in ['playersSubmitted', 'playersResubmitted',
                                 'juvenileSubmitted', 'paymentSent', 'teamUpdated',
-                                'changeRequested']
+                                'changeRequested', 'correctionSentBack']
                   && isTeamAdminOf(data.teamId))
               || data.kind in ['teamRequest', 'inviteAccepted']);
       }
@@ -988,6 +989,67 @@ service cloud.firestore {
                 && isTeamChangeApplied(resource.data))
               || (request.resource.data.status == 'rejected'
                 && isText(request.resource.data.get('rejectionReason', null), 10, 500)));
+      }
+
+      // ---------- correctionRequests/{teamId} (2.11b) ----------
+      // The FA asks an approved team to correct something it should fix
+      // itself (officials are sensitive; kits, colours, players…). One
+      // per team: asked -> sentBack (by the team) -> done, or asked again.
+      function isCorrectionAsk(data, teamId) {
+        return data.keys().hasOnly(['teamId', 'teamName', 'items', 'message',
+                                    'status', 'askedBy', 'askedByName',
+                                    'askedAt', 'round', 'updatedAt'])
+          && data.teamId == teamId
+          && data.teamName == get(teamDoc(teamId)).data.name
+          && data.items is list
+          && data.items.size() >= 1
+          && data.items.size() <= 4
+          && data.items.hasOnly(['clubDetails', 'officials', 'kits', 'players'])
+          && isText(data.message, 10, 500)
+          && data.status == 'asked'
+          && data.askedBy == request.auth.uid
+          && isOptionalText(data, 'askedByName', 80)
+          && data.askedAt == request.time
+          && data.updatedAt == request.time
+          && data.round is int;
+      }
+
+      match /correctionRequests/{teamId} {
+        allow get: if isFaAdmin() || isTeamAdminOf(teamId);
+        allow list: if isFaAdmin();
+
+        // The first request for this team
+        allow create: if isFaAdmin()
+          && exists(teamDoc(teamId))
+          && isCorrectionAsk(request.resource.data, teamId)
+          && request.resource.data.round == 1;
+
+        // Ask again: after the team sent it back, or a new request once
+        // the last one is done. Never while the team is still on it.
+        allow update: if isFaAdmin()
+          && resource.data.status in ['sentBack', 'done']
+          && isCorrectionAsk(request.resource.data, teamId)
+          && request.resource.data.round == resource.data.round + 1;
+
+        // The team sends it back once it has fixed it
+        allow update: if isTeamAdminOf(teamId)
+          && resource.data.status == 'asked'
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['status', 'sentBackAt', 'sentBackBy', 'updatedAt'])
+          && request.resource.data.status == 'sentBack'
+          && request.resource.data.sentBackBy == request.auth.uid
+          && request.resource.data.sentBackAt == request.time
+          && request.resource.data.updatedAt == request.time;
+
+        // The FA checks it and marks it done
+        allow update: if isFaAdmin()
+          && resource.data.status == 'sentBack'
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['status', 'doneAt', 'doneBy', 'updatedAt'])
+          && request.resource.data.status == 'done'
+          && request.resource.data.doneBy == request.auth.uid
+          && request.resource.data.doneAt == request.time
+          && request.resource.data.updatedAt == request.time;
       }
 
       // ---------- teamNames/{nameKey} ----------

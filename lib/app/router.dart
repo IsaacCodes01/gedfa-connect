@@ -14,6 +14,7 @@ import 'package:gedfa_connect/features/notifications/presentation/compose_announ
 import 'package:gedfa_connect/features/notifications/presentation/fa_announcement_screen.dart';
 import 'package:gedfa_connect/features/notifications/presentation/fa_announcements_screen.dart';
 import 'package:gedfa_connect/features/notifications/presentation/notifications_screen.dart';
+import 'package:gedfa_connect/features/fa/presentation/fa_ask_correction_screen.dart';
 import 'package:gedfa_connect/features/fa/presentation/fa_correct_details_screen.dart';
 import 'package:gedfa_connect/features/fa/presentation/fa_team_changes_screen.dart';
 import 'package:gedfa_connect/features/fa/presentation/fa_player_review_screen.dart';
@@ -29,6 +30,7 @@ import 'package:gedfa_connect/features/auth/presentation/sign_up_screen.dart';
 import 'package:gedfa_connect/features/teams/presentation/welcome_screen.dart';
 import 'package:gedfa_connect/features/teams/presentation/register_team_screen.dart';
 import 'package:gedfa_connect/features/teams/data/team_profile_repository.dart';
+import 'package:gedfa_connect/features/teams/domain/correction_request.dart';
 import 'package:gedfa_connect/features/teams/domain/team_change.dart';
 import 'package:gedfa_connect/features/teams/presentation/ask_change_screen.dart';
 import 'package:gedfa_connect/features/teams/presentation/team_edit_screen.dart';
@@ -134,6 +136,18 @@ final routerProvider = Provider<GoRouter>((ref) {
                     parentNavigatorKey: rootNavigatorKey,
                     builder: (_, state) => FaCorrectDetailsScreen(
                       teamId: state.pathParameters['teamId']!,
+                    ),
+                  ),
+                  // The FA asks a team to correct (2.11b). Full-screen.
+                  GoRoute(
+                    path: 'ask/:teamId',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (_, state) => FaAskCorrectionScreen(
+                      teamId: state.pathParameters['teamId']!,
+                      item: CorrectionItem.values
+                          .where((i) =>
+                              i.name == state.uri.queryParameters['item'])
+                          .firstOrNull,
                     ),
                   ),
                   // Notifications (bell). Full-screen, above the tabs.

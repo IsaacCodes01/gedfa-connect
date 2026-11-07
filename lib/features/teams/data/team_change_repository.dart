@@ -11,10 +11,12 @@ import 'package:gedfa_connect/core/utils/team_name_key.dart';
 import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/features/notifications/data/notification_writer.dart';
 import 'package:gedfa_connect/features/notifications/domain/app_notification.dart';
+import 'package:gedfa_connect/features/teams/data/correction_request_repository.dart';
 import 'package:gedfa_connect/features/teams/data/team_profile_repository.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/data/team_request_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
+import 'package:gedfa_connect/features/teams/domain/correction_request.dart';
 import 'package:gedfa_connect/features/teams/domain/team.dart';
 import 'package:gedfa_connect/features/teams/domain/team_change.dart';
 
@@ -275,15 +277,6 @@ final teamChangeProvider =
   return ref.watch(teamChangeRepositoryProvider).watch(id);
 });
 
-/// FA: how many TEAMS have changes waiting (one card each, 2.10c).
-final pendingTeamChangeCountProvider = Provider<int>((ref) {
-  final changes = ref.watch(allTeamChangesProvider).value ?? const [];
-  return {
-    for (final change in changes)
-      if (change.isPending) change.teamId,
-  }.length;
-});
-
 /// FA: an approved team as it is NOW, and its name before the latest
 /// approved rename (null if it still has its registered name). For the
 /// Approved tiles: "Previously Golden Unity FC" (2.10c).
@@ -310,10 +303,24 @@ final currentTeamProvider = Provider.family<CurrentTeam?,
   return (team: team, previousName: rename?.from ?? key.registeredName);
 });
 
+/// FA: the gold number on Changes: teams with changes waiting, or with a
+/// correction they sent back (2.11b). A team with both counts once.
+final faChangesWaitingCountProvider = Provider<int>((ref) {
+  final changes = ref.watch(allTeamChangesProvider).value ?? const [];
+  final corrections =
+      ref.watch(allCorrectionRequestsProvider).value ?? const [];
+  return {
+    for (final change in changes)
+      if (change.isPending) change.teamId,
+    for (final correction in corrections)
+      if (correction.status == CorrectionStatus.sentBack) correction.teamId,
+  }.length;
+});
+
 /// FA: the gold number on the Teams tab: new teams + changes waiting.
 final faTeamsWaitingCountProvider = Provider<int>((ref) {
   return ref.watch(pendingTeamRequestCountProvider) +
-      ref.watch(pendingTeamChangeCountProvider);
+      ref.watch(faChangesWaitingCountProvider);
 });
 
 /// The app's check of a new name for the FA: is it reserved by another

@@ -137,9 +137,13 @@ class SheetButtons extends StatelessWidget {
     required this.saveLabel,
     required this.onSave,
     this.busy = false,
+    this.onCancel,
   });
 
   final String cancelLabel;
+
+  /// Defaults to closing the box
+  final VoidCallback? onCancel;
   final String saveLabel;
 
   /// Null greys out Save
@@ -152,7 +156,9 @@ class SheetButtons extends StatelessWidget {
       children: [
         Expanded(
           child: OutlinedButton(
-            onPressed: busy ? null : () => Navigator.of(context).pop(),
+            onPressed: busy
+                ? null
+                : onCancel ?? () => Navigator.of(context).pop(),
             style: OutlinedButton.styleFrom(
               minimumSize: const Size.fromHeight(50),
             ),

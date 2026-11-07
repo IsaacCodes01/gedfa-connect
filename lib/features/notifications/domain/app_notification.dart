@@ -15,6 +15,8 @@ enum NotificationKind {
   changeApproved, // name, short name, logo or competition (2.10b)
   changeRefused,
   teamCorrected, // the FA corrected a mistake itself (2.11a)
+  correctionAsked, // the FA asks the team to correct something (2.11b)
+  correctionDone, // the FA checked the team's correction
   // For the FA (written by teams, clubs, invited people)
   teamRequest,
   playersSubmitted,
@@ -22,6 +24,7 @@ enum NotificationKind {
   juvenileSubmitted, // new juvenile players, waiting for screening (2.14b)
   teamUpdated, // a team changed its kits, ground… directly (2.10a)
   changeRequested, // a team asks to change its name, logo… (2.10b)
+  correctionSentBack, // a team corrected what the FA asked (2.11b)
   inviteAccepted,
   paymentSent, // a team added a payment (2.13c)
   registrationChanged; // an FA official opened or closed registration
@@ -121,6 +124,10 @@ class AppNotification {
         NotificationKind.teamCorrected => people == 1
             ? 'The FA corrected your team profile'
             : '$people corrections by the FA',
+        NotificationKind.correctionAsked => 'The FA asked for a correction',
+        NotificationKind.correctionDone => 'The FA marked your correction done',
+        NotificationKind.correctionSentBack =>
+          '$teamName sent their correction back',
       };
 
   String get body => switch (kind) {
@@ -172,6 +179,13 @@ class AppNotification {
           "$namesText. Open More › Team profile to read the FA's reason.",
         NotificationKind.teamCorrected =>
           '$namesText. See More › Team profile.',
+        NotificationKind.correctionAsked =>
+          "To correct: ${names.lastOrNull ?? ''}. Read the FA's message on "
+              'your Squad tab.',
+        NotificationKind.correctionDone =>
+          '${names.lastOrNull ?? 'Your correction'}: all good.',
+        NotificationKind.correctionSentBack =>
+          '${names.lastOrNull ?? ''}. Check it in Teams › Changes.',
       };
 
   static AppNotification? fromMap(String id, Map<String, dynamic> data) {

@@ -23,8 +23,10 @@ import 'package:gedfa_connect/features/payments/presentation/widgets/fa_payment_
 import 'package:gedfa_connect/features/settings/presentation/widgets/settings_widgets.dart';
 import 'package:gedfa_connect/core/utils/team_name_key.dart';
 import 'package:gedfa_connect/features/teams/data/team_change_repository.dart';
+import 'package:gedfa_connect/features/teams/data/correction_request_repository.dart';
 import 'package:gedfa_connect/features/teams/data/team_correction_repository.dart';
 import 'package:gedfa_connect/features/teams/data/team_profile_repository.dart';
+import 'package:gedfa_connect/features/teams/domain/correction_request.dart';
 import 'package:gedfa_connect/features/teams/domain/team_correction.dart';
 import 'package:gedfa_connect/features/teams/data/team_request_repository.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/previous_name_pill.dart';
@@ -57,6 +59,10 @@ class FaRequestReviewScreen extends ConsumerWidget {
       appBar: GedfaAppBar(
         title: 'Review request',
         leading: BackButton(onPressed: () => context.go(Routes.admin)),
+        // An approved team: Ask the team to correct… (2.11b, B1)
+        actions: request != null && request.status == ApprovalStatus.approved
+            ? [_TeamMenu(teamId: teamNameKey(request.teamName))]
+            : null,
       ),
       bottomNavigationBar:
           request != null && request.status == ApprovalStatus.pending
@@ -263,12 +269,14 @@ class _ApprovedBodyState extends ConsumerState<_ApprovedBody> {
                 children: [
                   for (final official in team.officials)
                     _OfficialRow(official: official),
+                  _AskHint(teamId: _teamId, item: CorrectionItem.officials),
                 ],
               ),
               const SizedBox(height: 22),
 
               const SectionTitle('Colours and kits'),
               _Kits(request: team),
+              _AskHint(teamId: _teamId, item: CorrectionItem.kits),
 
               CorrectionsLog(teamId: _teamId),
               const SizedBox(height: 22),
@@ -287,6 +295,58 @@ class _ApprovedBodyState extends ConsumerState<_ApprovedBody> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// The ⋮ menu of an approved team (2.11b, B1). While the team is still
+/// correcting the last request, the FA waits for it.
+class _TeamMenu extends ConsumerWidget {
+  const _TeamMenu({required this.teamId});
+
+  final String teamId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final request = ref.watch(correctionRequestProvider(teamId)).value;
+    final waiting = request?.status == CorrectionStatus.asked;
+
+    return PopupMenuButton<String>(
+      tooltip: 'More',
+      onSelected: (_) => context.push(Routes.adminAskCorrection(teamId)),
+      itemBuilder: (_) => [
+        PopupMenuItem(
+          value: 'ask',
+          enabled: !waiting,
+          child: Text(
+            waiting
+                ? 'Waiting for the team to correct'
+                : 'Ask the team to correct…',
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// "Wrong? Ask the team to correct it." under officials and kits: the FA
+/// doesn't correct those itself (2.11a).
+class _AskHint extends StatelessWidget {
+  const _AskHint({required this.teamId, required this.item});
+
+  final String teamId;
+  final CorrectionItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton(
+        onPressed: () => context.push(
+          Routes.adminAskCorrection(teamId, item: item.name),
+        ),
+        child: const Text('Wrong? Ask the team to correct it.'),
+      ),
     );
   }
 }

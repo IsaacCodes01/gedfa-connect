@@ -13,6 +13,7 @@ import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/features/notifications/data/notifications_repository.dart';
 import 'package:gedfa_connect/features/notifications/domain/announcement.dart';
 import 'package:gedfa_connect/features/notifications/domain/app_notification.dart';
+import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:go_router/go_router.dart';
 
 enum _Tab { all, fromFa }
@@ -228,6 +229,16 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     );
   }
 
+  /// The club account a team was registered with (its FA page's ID).
+  /// Only FA notes use it (teams cannot list teams); watched, so the
+  /// link is right once the teams have loaded.
+  String? _requestUidOf(String teamId) => ref
+      .watch(allTeamsProvider)
+      .value
+      ?.where((t) => t.id == teamId)
+      .firstOrNull
+      ?.requestUid;
+
   /// Where each kind of notification goes when tapped, and how it looks.
   _Item _fromNotification(AppNotification n) {
     final (look, target) = switch (n.kind) {
@@ -246,9 +257,14 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         (_Look.ok, Routes.adminTeamPlayers(n.teamId)),
       NotificationKind.playersResubmitted =>
         (_Look.no, Routes.adminTeamPlayers(n.teamId)),
-      // No FA team page yet (2.11): the team's players
-      NotificationKind.teamUpdated =>
-        (_Look.fa, Routes.adminTeamPlayers(n.teamId)),
+      // The FA's team page (2.11b), found by the club's account
+      NotificationKind.teamUpdated => (
+          _Look.fa,
+          switch (_requestUidOf(n.teamId)) {
+            final uid? => Routes.adminRequest(uid),
+            null => Routes.adminTeamPlayers(n.teamId),
+          },
+        ),
       // Players › Juvenile › that team's children
       NotificationKind.juvenileSubmitted =>
         (_Look.fa, Routes.adminTeamJuvenile(n.teamId)),
@@ -265,6 +281,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       NotificationKind.changeApproved => (_Look.ok, Routes.teamClub),
       NotificationKind.changeRefused => (_Look.no, Routes.teamClub),
       NotificationKind.teamCorrected => (_Look.fa, Routes.teamClub),
+      // Ask the team to correct (2.11b): the banner on the Squad tab
+      NotificationKind.correctionAsked => (_Look.no, Routes.team),
+      NotificationKind.correctionDone => (_Look.ok, Routes.team),
+      NotificationKind.correctionSentBack => (_Look.team, Routes.adminChanges),
     };
     return _Item(
       look: look,

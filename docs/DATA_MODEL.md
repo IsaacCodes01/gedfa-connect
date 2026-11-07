@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.13, matches the rules after step 2.11a (7 Nov 2026)
+**Status:** v2.14, matches the rules after step 2.11b (7 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -290,6 +290,29 @@ One line per correction the FA makes itself. Written in the same batch as the co
 - Same batch: the team's bell `teamCorrected` ("The FA corrected your team profile", one per team and day).
 - Read: FA admins and the team's admins.
 
+### 2.3c `correctionRequests/{teamId}` — the FA asks a team to correct (2.11b)
+
+What the FA can't (or shouldn't) correct itself: officials (sensitive), kits and colours, players, or club details it isn't sure about. **One per team**; asking again replaces it.
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `teamId`, `teamName` | string | `teamName` must match the team |
+| `items` | array of strings | 1–4 of `clubDetails`, `officials`, `kits`, `players` |
+| `message` | string | "Message to the team", 10–500 characters |
+| `status` | string | `asked` → `sentBack` (the team) → `done` (the FA) |
+| `round` | number | 1, then + 1 each time the FA asks again |
+| `askedBy`, `askedByName`, `askedAt` | | FA |
+| `sentBackBy`, `sentBackAt` | | The team admin ("Send back to the FA") |
+| `doneBy`, `doneAt` | | FA |
+| `updatedAt` | timestamp | |
+
+- **Ask (FA):** creates it (`round` 1), or replaces it after `sentBack` or `done` (`round` + 1); never while the team is still on it (`asked`). Same batch: `correctionAsked` in the team's bell.
+- **Send back (team):** only `status`, `sentBackBy`, `sentBackAt`, `updatedAt`, from `asked`. Same batch: `correctionSentBack` in the FA's bell.
+- **Done (FA):** only from `sentBack`. Same batch: `correctionDone` in the team's bell.
+- The team fixes things with its usual screens (Team profile, players re-checked by the FA as before); this document only carries the request.
+- Read: the FA (get and list) and the team's admins (get their own).
+- The team sees a yellow banner on its Squad tab while `asked`; the FA sees it in Teams › Changes (sent back ones count in the gold number).
+
 #### Subcollection `teams/{teamId}/jerseys/{category}-{number}` — jersey reservations
 
 One document per jersey number in use **within this team and competition**. The document ID is the competition and the number, e.g. `division-9`, so a club's Division and Juvenile sides can both use #9. Other teams have their own jersey subcollection.
@@ -470,12 +493,12 @@ Readable and writable only by FA admins. Created with `next: 2` by the very firs
 | Field | Notes |
 | ----- | ----- |
 | `audience` | `fa` or `team:<teamId>` |
-| `kind` | `playersApproved`, `playersRejected`, `teamApproved`, `paymentConfirmed`, `paymentNotFound`, `feeReminder`, `changeApproved`, `changeRefused`, `teamCorrected` (for teams, written by the FA); `teamRequest`, `playersSubmitted`, `playersResubmitted`, `juvenileSubmitted`, `inviteAccepted`, `paymentSent`, `teamUpdated`, `changeRequested` (for the FA) |
+| `kind` | `playersApproved`, `playersRejected`, `teamApproved`, `paymentConfirmed`, `paymentNotFound`, `feeReminder`, `changeApproved`, `changeRefused`, `teamCorrected`, `correctionAsked`, `correctionDone` (for teams, written by the FA); `teamRequest`, `playersSubmitted`, `playersResubmitted`, `juvenileSubmitted`, `inviteAccepted`, `paymentSent`, `teamUpdated`, `changeRequested`, `correctionSentBack` (for the FA) |
 | `teamId`, `teamName` | The team concerned (`teamRequest`: the club's uid) |
 | `names` | e.g. `Kojo Arthur (GE26-0011)`, `Yaw Boateng: Jersey number #10 → #14` |
 | `count`, `day`, `updatedAt` | |
 
-- Written in the **same batch or transaction** as the action. Teams write only `playersSubmitted` / `playersResubmitted` / `juvenileSubmitted` / `paymentSent` / `teamUpdated` / `changeRequested` for their own team; only the FA writes team notifications.
+- Written in the **same batch or transaction** as the action. Teams write only `playersSubmitted` / `playersResubmitted` / `juvenileSubmitted` / `paymentSent` / `teamUpdated` / `changeRequested` / `correctionSentBack` for their own team; only the FA writes team notifications.
 - Read: the FA reads `fa`; a team admin reads `team:<their team>`.
 - Indexes: `audience` + `updatedAt` (desc); announcements `to` + `createdAt` (desc). See `firestore.indexes.json`.
 
@@ -680,6 +703,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 7 Nov 2026 | v2.14 (2.11b): new `correctionRequests/{teamId}` (the FA asks a team to correct officials, kits, colours, players or club details; asked → sent back → done, or asked again); notification kinds `correctionAsked`, `correctionSentBack`, `correctionDone`. 276 tests. |
 | 7 Nov 2026 | v2.13 (2.11a): FA corrections: new `teams/{teamId}/corrections` log and `teams.lastCorrectionId`; the FA corrects the name, town, ground, directions, year founded and email (never officials, kits or colours), a new spelling reserved in `teamNames` for the club; notification kind `teamCorrected`. Isaac's 2.11 decisions recorded in Section 7. 268 tests. |
 | 7 Nov 2026 | v2.12.1 (2.10c): no field or rule changes. "Approve all" = one batch per change, oldest first; requests grouped by team for the FA. 257 tests. |
 | 7 Nov 2026 | v2.12 (2.10b): new `teamChanges` (name, short name, logo, add a competition; one pending per kind; approve or not approve with a reason); the FA applies an approved change to the team, renames `teamName` on its players and reserves the new name (`teamNames.teamId`); notification kinds `changeRequested`, `changeApproved`, `changeRefused`. Storage: `teams/{teamId}/logo-<millis>.jpg`. 257 tests. |

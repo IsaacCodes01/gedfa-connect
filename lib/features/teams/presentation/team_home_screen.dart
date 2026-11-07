@@ -17,6 +17,8 @@ import 'package:gedfa_connect/features/players/data/player_repository.dart';
 import 'package:gedfa_connect/features/players/domain/age_group.dart';
 import 'package:gedfa_connect/features/players/presentation/widgets/position_rows.dart';
 import 'package:gedfa_connect/features/screening/presentation/widgets/screening_card.dart';
+import 'package:gedfa_connect/features/teams/data/correction_request_repository.dart';
+import 'package:gedfa_connect/features/teams/presentation/widgets/correction_banner.dart';
 import 'package:gedfa_connect/features/settings/presentation/widgets/settings_widgets.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
@@ -149,6 +151,8 @@ class _TeamHomeScreenState extends ConsumerState<TeamHomeScreen> {
           : null,
       body: Column(
         children: [
+          // The FA asked for a correction (2.11b)
+          const _CorrectionSlot(),
           if (!playersOpen)
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 14, 16, 0),
@@ -602,6 +606,21 @@ class _StatusTile extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The yellow banner, or nothing (no gap) when the FA asked for nothing.
+class _CorrectionSlot extends ConsumerWidget {
+  const _CorrectionSlot();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final request = ref.watch(myCorrectionRequestProvider).value;
+    if (request == null || !request.isOpen) return const SizedBox.shrink();
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(16, 14, 16, 0),
+      child: ResponsiveCenter(child: CorrectionBanner()),
     );
   }
 }

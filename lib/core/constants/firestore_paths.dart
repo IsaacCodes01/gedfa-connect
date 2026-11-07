@@ -24,6 +24,11 @@ class FirestorePaths {
   static const teamChanges = '$district/teamChanges';
   static String teamChange(String id) => '$district/teamChanges/$id';
 
+  /// What the FA asked a team to correct (2.11b), one per team.
+  static const correctionRequests = '$district/correctionRequests';
+  static String correctionRequest(String teamId) =>
+      '$district/correctionRequests/$teamId';
+
   /// The FA's corrections log of a team (2.11a), one line per correction.
   static String teamCorrections(String teamId) =>
       '${team(teamId)}/corrections';

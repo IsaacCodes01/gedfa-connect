@@ -18,6 +18,12 @@ class Routes {
 
   /// The FA corrects an approved team's club details (2.11a)
   static String adminCorrectDetails(String teamId) => '/admin/correct/$teamId';
+
+  /// The FA asks a team to correct something (2.11b); [item] ticks one
+  static String adminAskCorrection(String teamId, {String? item}) =>
+      item == null
+          ? '/admin/ask/$teamId'
+          : '/admin/ask/$teamId?item=$item';
   static const adminNotifications = '/admin/notifications';
   static const adminAnnouncements = '/admin/more/announcements';
   static const adminNewAnnouncement = '/admin/more/announcements/new';

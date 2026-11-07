@@ -12,6 +12,7 @@ import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/notification_bell.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/features/fa/presentation/widgets/fa_changes_view.dart';
+import 'package:gedfa_connect/features/fa/presentation/widgets/fa_corrections_view.dart';
 import 'package:gedfa_connect/features/teams/data/team_change_repository.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/data/team_request_repository.dart';
@@ -127,7 +128,7 @@ class _FaRequestsScreenState extends ConsumerState<FaRequestsScreen> {
         CountTab(
           value: true,
           label: 'Changes',
-          count: ref.watch(pendingTeamChangeCountProvider),
+          count: ref.watch(faChangesWaitingCountProvider),
           highlight: true,
         ),
       ],
@@ -146,6 +147,8 @@ class _FaRequestsScreenState extends ConsumerState<FaRequestsScreen> {
               children: [
                 viewSwitch,
                 const SizedBox(height: 16),
+                // What the FA asked teams to correct (2.11b)
+                const FaCorrectionsView(),
                 const FaChangesView(),
               ],
             ),

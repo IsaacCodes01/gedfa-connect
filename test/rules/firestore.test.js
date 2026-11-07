@@ -2579,6 +2579,122 @@ describe('FA corrections (2.11a)', () => {
   });
 });
 
+describe('Ask the team to correct (2.11b)', () => {
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `${D}/teams/royal`), {
+        name: 'Royal Unique FC', shortName: 'RUFC', categories: ['division'],
+        adminUids: ['admin1'], requestUid: 'admin1', updatedAt: Timestamp.now(),
+      });
+    });
+  });
+
+  const ref = (db) => doc(db, `${D}/correctionRequests/royal`);
+
+  /** What the FA sends (pass changes to break it). */
+  const askData = (changes = {}) => ({
+    teamId: 'royal',
+    teamName: 'Royal Unique FC',
+    items: ['officials', 'players'],
+    message: "The head coach's phone number doesn't work.",
+    status: 'asked',
+    askedBy: 'fa1',
+    askedByName: 'Ama Owusu',
+    askedAt: serverTimestamp(),
+    round: 1,
+    updatedAt: serverTimestamp(),
+    ...changes,
+  });
+
+  /** Puts a request in place with the rules off. */
+  const seed = (changes = {}) => testEnv.withSecurityRulesDisabled(async (context) => {
+    await setDoc(ref(context.firestore()), {
+      ...askData(), askedAt: Timestamp.now(), updatedAt: Timestamp.now(), ...changes,
+    });
+  });
+
+  const sendBack = (db, changes = {}) => updateDoc(ref(db), {
+    status: 'sentBack', sentBackBy: 'admin1', sentBackAt: serverTimestamp(), updatedAt: serverTimestamp(), ...changes,
+  });
+
+  const markDone = (db, changes = {}) => updateDoc(ref(db), {
+    status: 'done', doneBy: 'fa1', doneAt: serverTimestamp(), updatedAt: serverTimestamp(), ...changes,
+  });
+
+  it('the FA asks an approved team to correct something', async () => {
+    await assertSucceeds(setDoc(ref(dbAs('fa1')), askData()));
+  });
+
+  it('the request must be complete; a team admin cannot ask', async () => {
+    const db = dbAs('fa1');
+    await assertFails(setDoc(ref(db), askData({ message: 'Fix it' })));
+    await assertFails(setDoc(ref(db), askData({ items: [] })));
+    await assertFails(setDoc(ref(db), askData({ items: ['logo'] })));
+    await assertFails(setDoc(ref(db), askData({ teamName: 'Somebody FC' })));
+    await assertFails(setDoc(ref(db), askData({ status: 'sentBack' })));
+    await assertFails(setDoc(ref(db), askData({ askedBy: 'fa2' })));
+    await assertFails(setDoc(ref(db), askData({ round: 2 })));
+    await assertFails(setDoc(doc(db, `${D}/correctionRequests/nobody`), askData({ teamId: 'nobody' })));
+    await assertFails(setDoc(ref(dbAs('admin1')), askData({ askedBy: 'admin1' })));
+  });
+
+  it('the team sends it back; another team cannot', async () => {
+    await seed();
+    await assertFails(sendBack(dbAs('admin2'), { sentBackBy: 'admin2' }));
+    await assertSucceeds(sendBack(dbAs('admin1')));
+  });
+
+  it('the team cannot change what was asked, or mark it done', async () => {
+    await seed();
+    const db = dbAs('admin1');
+    await assertFails(sendBack(db, { message: 'Nothing to fix here, sorry.' }));
+    await assertFails(sendBack(db, { items: ['players'] }));
+    await assertFails(markDone(db, { doneBy: 'admin1' }));
+  });
+
+  it('the FA marks it done only after the team sent it back', async () => {
+    await seed();
+    const db = dbAs('fa1');
+    await assertFails(markDone(db));
+    await sendBack(dbAs('admin1'));
+    await assertSucceeds(markDone(db));
+    // Done is done: the team cannot send it again
+    await assertFails(sendBack(dbAs('admin1')));
+  });
+
+  it('the FA asks again after the team sent it back (or after done), never while the team is on it', async () => {
+    await seed();
+    const db = dbAs('fa1');
+    await assertFails(setDoc(ref(db), askData({ round: 2 })));
+    await sendBack(dbAs('admin1'));
+    await assertFails(setDoc(ref(db), askData({ round: 1 })));
+    await assertSucceeds(setDoc(ref(db), askData({ round: 2, items: ['players'] })));
+    await seed({ status: 'done', round: 2 });
+    await assertSucceeds(setDoc(ref(db), askData({ round: 3 })));
+  });
+
+  it('the team reads its own request, not another team\'s; only the FA lists them', async () => {
+    await seed();
+    await assertSucceeds(getDoc(ref(dbAs('admin1'))));
+    await assertFails(getDoc(ref(dbAs('admin2'))));
+    await assertFails(getDocs(collection(dbAs('admin1'), `${D}/correctionRequests`)));
+    await assertSucceeds(getDocs(collection(dbAs('fa1'), `${D}/correctionRequests`)));
+  });
+
+  it('bell notes: the FA asks and marks done; the team tells the FA it sent it back', async () => {
+    await assertSucceeds(notify(dbAs('fa1'), 'team-royal_correctionAsked_royal',
+      { audience: 'team:royal', kind: 'correctionAsked', teamId: 'royal' }));
+    await assertSucceeds(notify(dbAs('fa1'), 'team-royal_correctionDone_royal',
+      { audience: 'team:royal', kind: 'correctionDone', teamId: 'royal' }));
+    await assertSucceeds(notify(dbAs('admin1'), 'fa_correctionSentBack_royal',
+      { audience: 'fa', kind: 'correctionSentBack', teamId: 'royal' }));
+    await assertFails(notify(dbAs('admin1'), 'fa_correctionSentBack_stars',
+      { audience: 'fa', kind: 'correctionSentBack', teamId: 'stars' }));
+    await assertFails(notify(dbAs('admin1'), 'team-royal_correctionDone_x',
+      { audience: 'team:royal', kind: 'correctionDone', teamId: 'royal' }));
+  });
+});
+
 describe('Notifications', () => {
   it('the FA notifies a team, and the counts add up in one notification', async () => {
     const db = dbAs('fa1');
