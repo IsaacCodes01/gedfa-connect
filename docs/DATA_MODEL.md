@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.14, matches the rules after step 2.11b (7 Nov 2026)
+**Status:** v2.15, matches the rules after step 2.11c (7 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -234,6 +234,7 @@ Created by an FA admin when approving a request.
 | `adminUids`            | array of strings | Users who manage this team (one or more)                   |
 | `requestUid`           | string           | The`teamRequests` document it came from                  |
 | `lastCorrectionId`     | string?          | The FA's latest correction (`corrections/{id}`, 2.11a)     |
+| `suspension`           | map?             | Set by the chairman (2.11c): `id`, `reason`, `since`, `until` (null = until lifted), `byUid`, `byName` |
 | `createdAt`            | timestamp        | Approval time                                              |
 | `updatedAt`            | timestamp        |                                                            |
 
@@ -289,6 +290,26 @@ One line per correction the FA makes itself. Written in the same batch as the co
 
 - Same batch: the team's bell `teamCorrected` ("The FA corrected your team profile", one per team and day).
 - Read: FA admins and the team's admins.
+
+### 2.3d `teams/{teamId}/suspensions/{id}` — suspensions (2.11c)
+
+**Chairman only.** A suspension is the team's `suspension` map plus its line here (same `id`), written in one batch. The team stays approved.
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `reason` | string | 10–500 characters; the team sees it (same as on the team) |
+| `since` | timestamp | |
+| `until` | timestamp? | When it ends: the start of the day after the last day the chairman picked (Ghana = UTC). Null: until the chairman lifts it (after the FA board meets the club) |
+| `byUid`, `byName` | string | The chairman |
+| `liftedAt`, `liftedBy`, `liftedByName` | | Set once, when lifted |
+| `liftReason` | string? | `finePaid`, `bondSigned`, `boardDecision` or `other` |
+| `liftNote` | string? | Up to 300 characters; required (5+) for `other` |
+
+- **In force** while `suspension` is on the team and `until` is null or still to come. A dated suspension ends by itself: the rules compare `until` with the time of each write.
+- **While in force** the rules refuse the team's own writes to `players` (add or edit), `teams` (profile edits) and `teamChanges` (asks). The team still reads everything, pays its fee and sends back corrections. Later: no team sheets (Phase 3).
+- **Suspend:** only when not in force (an ended dated one may be replaced). Same batch: `teamSuspended` in the team's bell.
+- **Lift:** removes `suspension` from the team and writes `liftedAt` … on its line, in one batch (also for an ended dated one). Same batch: `suspensionLifted` in the team's bell.
+- Lines are never deleted. Read: FA admins and the team's admins.
 
 ### 2.3c `correctionRequests/{teamId}` — the FA asks a team to correct (2.11b)
 
@@ -493,7 +514,7 @@ Readable and writable only by FA admins. Created with `next: 2` by the very firs
 | Field | Notes |
 | ----- | ----- |
 | `audience` | `fa` or `team:<teamId>` |
-| `kind` | `playersApproved`, `playersRejected`, `teamApproved`, `paymentConfirmed`, `paymentNotFound`, `feeReminder`, `changeApproved`, `changeRefused`, `teamCorrected`, `correctionAsked`, `correctionDone` (for teams, written by the FA); `teamRequest`, `playersSubmitted`, `playersResubmitted`, `juvenileSubmitted`, `inviteAccepted`, `paymentSent`, `teamUpdated`, `changeRequested`, `correctionSentBack` (for the FA) |
+| `kind` | `playersApproved`, `playersRejected`, `teamApproved`, `paymentConfirmed`, `paymentNotFound`, `feeReminder`, `changeApproved`, `changeRefused`, `teamCorrected`, `correctionAsked`, `correctionDone`, `teamSuspended`, `suspensionLifted` (for teams, written by the FA); `teamRequest`, `playersSubmitted`, `playersResubmitted`, `juvenileSubmitted`, `inviteAccepted`, `paymentSent`, `teamUpdated`, `changeRequested`, `correctionSentBack` (for the FA) |
 | `teamId`, `teamName` | The team concerned (`teamRequest`: the club's uid) |
 | `names` | e.g. `Kojo Arthur (GE26-0011)`, `Yaw Boateng: Jersey number #10 → #14` |
 | `count`, `day`, `updatedAt` | |
@@ -703,6 +724,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 7 Nov 2026 | v2.15 (2.11c): suspensions by the chairman: `teams.suspension` and `teams/{teamId}/suspensions` (ends on a date or when lifted with why: fine paid, bond signed, board decision, other); while in force the team's player, profile and change-request writes are refused; notification kinds `teamSuspended`, `suspensionLifted`. 285 tests. |
 | 7 Nov 2026 | v2.14 (2.11b): new `correctionRequests/{teamId}` (the FA asks a team to correct officials, kits, colours, players or club details; asked → sent back → done, or asked again); notification kinds `correctionAsked`, `correctionSentBack`, `correctionDone`. 276 tests. |
 | 7 Nov 2026 | v2.13 (2.11a): FA corrections: new `teams/{teamId}/corrections` log and `teams.lastCorrectionId`; the FA corrects the name, town, ground, directions, year founded and email (never officials, kits or colours), a new spelling reserved in `teamNames` for the club; notification kind `teamCorrected`. Isaac's 2.11 decisions recorded in Section 7. 268 tests. |
 | 7 Nov 2026 | v2.12.1 (2.10c): no field or rule changes. "Approve all" = one batch per change, oldest first; requests grouped by team for the FA. 257 tests. |

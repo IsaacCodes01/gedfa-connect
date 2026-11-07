@@ -29,6 +29,10 @@ class FirestorePaths {
   static String correctionRequest(String teamId) =>
       '$district/correctionRequests/$teamId';
 
+  /// A team's suspensions, one line each (2.11c).
+  static String teamSuspensions(String teamId) =>
+      '${team(teamId)}/suspensions';
+
   /// The FA's corrections log of a team (2.11a), one line per correction.
   static String teamCorrections(String teamId) =>
       '${team(teamId)}/corrections';

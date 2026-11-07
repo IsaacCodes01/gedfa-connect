@@ -19,7 +19,7 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
    - test steps he can do himself in the app
 5. **Before every commit**, run (and show the result):
    - `flutter analyze` → must be **0 issues**
-   - `cd test/rules && npm test` → **all** rules tests pass (241 after 2.10a)
+   - `cd test/rules && npm test` → **all** rules tests pass (285 after 2.11c)
 6. **Commit after each step** with a clear message, e.g.
    `feat(teams): change requests for name, short name, logo and competitions; 250 rules tests; docs v2.12`
 7. **Deploy rules only after the tests pass**, and only to the dev project:
@@ -82,7 +82,10 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
 - Mockups go in `docs/mockups/` (ignored by git): never commit them.
 - Known and accepted in 2.10b: the old `teamRequests` doc keeps the old name (registration
   history), and old payments / notifications keep the name they had.
-- **Next:** **2.11** FA corrections (edit, ask for a correction, suspend), **2.12** FA dashboard,
+- **2.11 FA corrections** done (7 Nov 2026, 285 rules tests): 2.11a the FA fixes misspellings itself
+  (name, town, ground, directions, year, email; never officials, kits or colours), 2.11b asks the team to
+  correct, 2.11c the chairman suspends and lifts. Isaac deploys the rules to dev himself.
+- **Next:** **2.12** FA dashboard,
   **Phase 3** team sheets (16 / 5 / 7 from settings, GFA play-up limits, kit in the top-left corner),
   then the "before the pilot" list in the roadmap (push notifications, 3-day fee reminders, prod setup).
 - **Later (after Phase 3):** our own app icon (`flutter_launcher_icons`) and splash screens before

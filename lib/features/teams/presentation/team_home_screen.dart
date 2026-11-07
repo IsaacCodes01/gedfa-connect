@@ -19,6 +19,7 @@ import 'package:gedfa_connect/features/players/presentation/widgets/position_row
 import 'package:gedfa_connect/features/screening/presentation/widgets/screening_card.dart';
 import 'package:gedfa_connect/features/teams/data/correction_request_repository.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/correction_banner.dart';
+import 'package:gedfa_connect/features/fa/presentation/widgets/suspension_widgets.dart';
 import 'package:gedfa_connect/features/settings/presentation/widgets/settings_widgets.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
@@ -45,6 +46,11 @@ class _TeamHomeScreenState extends ConsumerState<TeamHomeScreen> {
   }
 
   void _addPlayer({bool juvenile = false}) {
+    // Suspended by the chairman (2.11c): no adding players
+    if (ref.read(myTeamProvider).value?.isSuspended ?? false) {
+      AppToast.warning(context, suspendedMessage);
+      return;
+    }
     // The FA can close player registration (2.13d)
     final open =
         ref.read(leagueSettingsProvider).value?.playerRegistrationOpen ?? true;
@@ -107,9 +113,12 @@ class _TeamHomeScreenState extends ConsumerState<TeamHomeScreen> {
         isDivision ? 'Add player' : 'Add ${_ageGroup.label} player';
     void add() => _addPlayer(juvenile: !isDivision);
 
+    // Suspended (2.11c): the button greys out like a closed registration
+    final suspension = team.isSuspended ? team.suspension : null;
     final playersOpen =
-        ref.watch(leagueSettingsProvider).value?.playerRegistrationOpen ??
-            true;
+        (ref.watch(leagueSettingsProvider).value?.playerRegistrationOpen ??
+                true) &&
+            suspension == null;
 
     return Scaffold(
       appBar: GedfaAppBar(
@@ -145,15 +154,33 @@ class _TeamHomeScreenState extends ConsumerState<TeamHomeScreen> {
                       Theme.of(context).colorScheme.surfaceContainerHighest,
                   foregroundColor:
                       Theme.of(context).colorScheme.onSurfaceVariant,
-                  icon: const Icon(Icons.lock_outline_rounded),
-                  label: Text('$addLabel (closed)'),
+                  icon: Icon(
+                    suspension == null
+                        ? Icons.lock_outline_rounded
+                        : Icons.block_rounded,
+                  ),
+                  label: Text(
+                    suspension == null ? '$addLabel (closed)' : addLabel,
+                  ),
                 )
           : null,
       body: Column(
         children: [
+          // Suspended by the chairman (2.11c, C2)
+          if (suspension != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+              child: ResponsiveCenter(
+                child: SuspendedBanner(
+                  title: '${team.name} is suspended',
+                  suspension: suspension,
+                  message: 'Contact the FA.',
+                ),
+              ),
+            ),
           // The FA asked for a correction (2.11b)
           const _CorrectionSlot(),
-          if (!playersOpen)
+          if (!playersOpen && suspension == null)
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 14, 16, 0),
               child: ResponsiveCenter(child: _ClosedBanner()),

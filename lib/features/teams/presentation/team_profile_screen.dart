@@ -16,6 +16,9 @@ import 'package:gedfa_connect/features/teams/domain/team_colours.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/change_status_note.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/team_logo.dart';
 import 'package:go_router/go_router.dart';
+import 'package:gedfa_connect/core/widgets/app_toast.dart';
+import 'package:gedfa_connect/features/teams/data/team_repository.dart';
+import 'package:gedfa_connect/features/teams/domain/team.dart';
 
 /// Team: More › Team profile (2.10a, board P1).
 ///
@@ -34,6 +37,8 @@ class TeamProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final detailsAsync = ref.watch(myTeamDetailsProvider);
     final changes = ref.watch(myTeamChangesProvider).value ?? const [];
+    // Suspended (2.11c): no edits or change requests
+    final suspended = ref.watch(myTeamProvider).value?.isSuspended ?? false;
 
     return Scaffold(
       appBar: GedfaAppBar(
@@ -53,25 +58,40 @@ class TeamProfileScreen extends ConsumerWidget {
                 title: 'No team yet',
                 message: 'Your team appears here once the FA approves it.',
               )
-            : _Body(team: team, changes: changes),
+            : _Body(team: team, changes: changes, suspended: suspended),
       ),
     );
   }
 }
 
 class _Body extends StatelessWidget {
-  const _Body({required this.team, required this.changes});
+  const _Body({
+    required this.team,
+    required this.changes,
+    required this.suspended,
+  });
 
   final TeamDetails team;
+  final bool suspended;
 
   /// The team's requests to the FA (one of each kind at most)
   final List<TeamChange> changes;
 
-  void _edit(BuildContext context, TeamSection section) =>
+  void _edit(BuildContext context, TeamSection section) {
+    if (suspended) {
+      AppToast.warning(context, suspendedMessage);
+    } else {
       context.push(Routes.teamClubEdit(section.name));
+    }
+  }
 
-  void _ask(BuildContext context, TeamChangeKind kind) =>
+  void _ask(BuildContext context, TeamChangeKind kind) {
+    if (suspended) {
+      AppToast.warning(context, suspendedMessage);
+    } else {
       context.push(Routes.teamClubAsk(kind.name));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

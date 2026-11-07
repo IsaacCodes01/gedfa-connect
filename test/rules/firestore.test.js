@@ -2695,6 +2695,141 @@ describe('Ask the team to correct (2.11b)', () => {
   });
 });
 
+describe('Suspensions (2.11c)', () => {
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `${D}/teams/royal`), {
+        name: 'Royal Unique FC', shortName: 'RUFC', town: 'Gomoa Fetteh',
+        homeGround: 'Fetteh Park', categories: ['division'], kits: KITS,
+        colours: COLOURS, officials: OFFICIALS, adminUids: ['admin1'],
+        requestUid: 'admin1', updatedAt: Timestamp.now(),
+      });
+    });
+  });
+
+  const REASON = 'Fielded an unregistered player against Gomoa Stars on 2 Nov.';
+  const inDays = (days) => Timestamp.fromMillis(Date.now() + days * 86400000);
+
+  /** The chairman's suspend batch: the team and its history line. */
+  function suspend(db, { uid = 'chair', id = 's1', until = null, team = {}, line = {} } = {}) {
+    const batch = writeBatch(db);
+    batch.update(doc(db, `${D}/teams/royal`), {
+      suspension: {
+        id, reason: REASON, since: serverTimestamp(), until, byUid: uid, byName: 'Kwesi Arthur', ...team,
+      },
+      updatedAt: serverTimestamp(),
+    });
+    batch.set(doc(db, `${D}/teams/royal/suspensions/${id}`), {
+      reason: REASON, since: serverTimestamp(), until, byUid: uid, byName: 'Kwesi Arthur', ...line,
+    });
+    return batch.commit();
+  }
+
+  /** The chairman's lift batch: the team's suspension goes, the line says why. */
+  function lift(db, { uid = 'chair', id = 's1', line = {}, clear = true } = {}) {
+    const batch = writeBatch(db);
+    if (clear) {
+      batch.update(doc(db, `${D}/teams/royal`), { suspension: deleteField(), updatedAt: serverTimestamp() });
+    }
+    batch.update(doc(db, `${D}/teams/royal/suspensions/${id}`), {
+      liftedAt: serverTimestamp(), liftedBy: uid, liftReason: 'finePaid',
+      liftNote: 'GH₵ 500 paid, receipt GEDFA-2026-0031.', liftedByName: 'Kwesi Arthur', ...line,
+    });
+    return batch.commit();
+  }
+
+  /** Puts a suspension in place with the rules off. */
+  const seedSuspension = (until = null) => testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    const since = Timestamp.fromMillis(Date.now() - 10 * 86400000);
+    await updateDoc(doc(db, `${D}/teams/royal`), {
+      suspension: { id: 's0', reason: REASON, since, until, byUid: 'chair' },
+    });
+    await setDoc(doc(db, `${D}/teams/royal/suspensions/s0`), { reason: REASON, since, until, byUid: 'chair' });
+  });
+
+  it('the chairman suspends a team, until lifted or until a date', async () => {
+    await assertSucceeds(suspend(dbAs('chair')));
+    await lift(dbAs('chair'));
+    await assertSucceeds(suspend(dbAs('chair'), { id: 's2', until: inDays(20) }));
+  });
+
+  it('only the chairman: not another FA official, not a team admin', async () => {
+    await assertFails(suspend(dbAs('fa1'), { uid: 'fa1' }));
+    await assertFails(suspend(dbAs('admin1'), { uid: 'admin1' }));
+  });
+
+  it('a suspension needs a reason, a history line that matches, and a future end date', async () => {
+    const db = dbAs('chair');
+    await assertFails(suspend(db, { team: { reason: 'Bad' }, line: { reason: 'Bad' } }));
+    await assertFails(suspend(db, { line: { reason: 'Something else entirely.' } }));
+    await assertFails(suspend(db, { until: inDays(-1) }));
+    await assertFails(suspend(db, { team: { byUid: 'fa1' } }));
+    // No history line
+    await assertFails(updateDoc(doc(db, `${D}/teams/royal`), {
+      suspension: { id: 's1', reason: REASON, since: serverTimestamp(), until: null, byUid: 'chair' },
+      updatedAt: serverTimestamp(),
+    }));
+  });
+
+  it('a suspended team cannot add or edit players, edit its profile or ask for changes', async () => {
+    await seedSuspension();
+    const db = dbAs('admin1');
+    await assertFails(addPlayer(db, 'p9', playerData({ fullName: 'Kojo Arthur', playerKey: 'kojo-arthur_2004-01-01', jerseyNo: 22 })));
+    await assertFails(updateDoc(doc(db, `${D}/players/p3`), { position: 'ST', positionGroup: 'FWD', updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(doc(db, `${D}/teams/royal`), { homeGround: 'Afransi Park', updatedAt: serverTimestamp() }));
+    await assertFails(setDoc(doc(db, `${D}/teamChanges/royal_shortName`), {
+      teamId: 'royal', teamName: 'Royal Unique FC', kind: 'shortName', from: 'RUFC', to: 'RUSF',
+      reason: 'The club merged this season.', status: 'pending', askedBy: 'admin1',
+      createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+    }));
+    // It still reads its team
+    await assertSucceeds(getDoc(doc(db, `${D}/teams/royal`)));
+  });
+
+  it('a dated suspension ends by itself: the team can edit again after the date', async () => {
+    await seedSuspension(inDays(-1));
+    await assertSucceeds(updateDoc(doc(dbAs('admin1'), `${D}/teams/royal`), { homeGround: 'Afransi Park', updatedAt: serverTimestamp() }));
+  });
+
+  it('a team cannot be suspended twice, but can again once a dated one has ended', async () => {
+    await seedSuspension();
+    await assertFails(suspend(dbAs('chair'), { id: 's2' }));
+    await seedSuspension(inDays(-1));
+    await assertSucceeds(suspend(dbAs('chair'), { id: 's2' }));
+  });
+
+  it('the chairman lifts it with why; "Other" needs a note', async () => {
+    await seedSuspension();
+    const db = dbAs('chair');
+    await assertFails(lift(db, { id: 's0', line: { liftReason: 'other', liftNote: null } }));
+    await assertFails(lift(db, { id: 's0', line: { liftReason: 'paidSomeone' } }));
+    // The team's suspension must go in the same batch
+    await assertFails(lift(db, { id: 's0', clear: false }));
+    await assertFails(lift(dbAs('fa1'), { id: 's0', uid: 'fa1' }));
+    await assertSucceeds(lift(db, { id: 's0' }));
+    // Lifted once only
+    await assertFails(updateDoc(doc(db, `${D}/teams/royal/suspensions/s0`), { liftReason: 'bondSigned' }));
+  });
+
+  it('the history: the FA and the team read it; nobody deletes it', async () => {
+    await seedSuspension();
+    await assertSucceeds(getDocs(collection(dbAs('admin1'), `${D}/teams/royal/suspensions`)));
+    await assertSucceeds(getDocs(collection(dbAs('fa1'), `${D}/teams/royal/suspensions`)));
+    await assertFails(getDocs(collection(dbAs('admin2'), `${D}/teams/royal/suspensions`)));
+    await assertFails(deleteDoc(doc(dbAs('chair'), `${D}/teams/royal/suspensions/s0`)));
+  });
+
+  it('bell notes for the team: suspended and lifted (FA only)', async () => {
+    await assertSucceeds(notify(dbAs('chair'), 'team-royal_teamSuspended_royal',
+      { audience: 'team:royal', kind: 'teamSuspended', teamId: 'royal' }));
+    await assertSucceeds(notify(dbAs('chair'), 'team-royal_suspensionLifted_royal',
+      { audience: 'team:royal', kind: 'suspensionLifted', teamId: 'royal' }));
+    await assertFails(notify(dbAs('admin1'), 'team-royal_suspensionLifted_x',
+      { audience: 'team:royal', kind: 'suspensionLifted', teamId: 'royal' }));
+  });
+});
+
 describe('Notifications', () => {
   it('the FA notifies a team, and the counts add up in one notification', async () => {
     const db = dbAs('fa1');

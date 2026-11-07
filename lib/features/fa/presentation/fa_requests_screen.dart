@@ -13,6 +13,7 @@ import 'package:gedfa_connect/core/widgets/notification_bell.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/features/fa/presentation/widgets/fa_changes_view.dart';
 import 'package:gedfa_connect/features/fa/presentation/widgets/fa_corrections_view.dart';
+import 'package:gedfa_connect/features/fa/presentation/widgets/suspension_widgets.dart';
 import 'package:gedfa_connect/features/teams/data/team_change_repository.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/data/team_request_repository.dart';
@@ -324,6 +325,11 @@ class _RequestCard extends ConsumerWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
+                  // Suspended by the chairman (2.11c, C3)
+                  if (team?.isSuspended ?? false) ...[
+                    const _SuspendedPill(),
+                    const SizedBox(height: 6),
+                  ],
                   if (previousName != null) ...[
                     PreviousNamePill(name: previousName),
                     const SizedBox(height: 6),
@@ -359,5 +365,31 @@ class _RequestCard extends ConsumerWidget {
     if (days == 1) return 'Yesterday';
     if (days < 7) return '$days days ago';
     return formatDate(local);
+  }
+}
+
+/// Small red "Suspended" on an approved team's tile (2.11c).
+class _SuspendedPill extends StatelessWidget {
+  const _SuspendedPill();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = suspensionColours(context);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: c.bg,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        'Suspended',
+        style: TextStyle(
+          color: c.ink,
+          fontSize: 10.5,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
   }
 }

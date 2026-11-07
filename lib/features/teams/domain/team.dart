@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/teams/domain/kit.dart';
+import 'package:gedfa_connect/features/teams/domain/suspension.dart';
 import 'package:gedfa_connect/features/teams/domain/team_colours.dart';
+
+/// What a suspended team reads when it tries to add or edit (2.11c).
+const suspendedMessage =
+    'Your team is suspended. You can add and edit again once the FA lifts '
+    'it. Contact the FA.';
 
 /// An approved team (`teams/{teamId}`).
 class Team {
@@ -16,6 +22,7 @@ class Team {
     this.homeKit,
     this.colours,
     this.requestUid,
+    this.suspension,
   });
 
   final String id;
@@ -33,6 +40,13 @@ class Team {
   /// The club's account that registered the team. Its season fee is kept
   /// under this uid (2.13c).
   final String? requestUid;
+
+  /// Set by the chairman (2.11c); may have ended (see [isSuspended]).
+  final Suspension? suspension;
+
+  /// Suspended now: no adding or editing players, profile edits or
+  /// change requests.
+  bool get isSuspended => suspension?.isActive ?? false;
 
   /// Colour behind the initials when there is no logo.
   Color get logoColor =>
@@ -56,6 +70,9 @@ class Team {
       homeKit: Kit.fromMap(kits?['home'] as Map<String, dynamic>?),
       colours: TeamColours.fromMap(data['colours'] as Map<String, dynamic>?),
       requestUid: data['requestUid'] as String?,
+      suspension: Suspension.fromTeamMap(
+        data['suspension'] as Map<String, dynamic>?,
+      ),
     );
   }
 }

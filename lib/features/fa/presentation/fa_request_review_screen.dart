@@ -16,6 +16,12 @@ import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/core/widgets/status_badge.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
+import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
+import 'package:gedfa_connect/features/fa/presentation/widgets/suspension_widgets.dart';
+import 'package:gedfa_connect/features/teams/data/suspension_repository.dart';
+import 'package:gedfa_connect/features/teams/data/team_repository.dart';
+import 'package:gedfa_connect/features/teams/domain/suspension.dart';
+import 'package:gedfa_connect/features/teams/domain/team.dart';
 import 'package:gedfa_connect/features/fa/presentation/widgets/correction_widgets.dart';
 import 'package:gedfa_connect/features/fa/presentation/widgets/review_widgets.dart';
 import 'package:gedfa_connect/features/payments/data/payment_repository.dart';
@@ -225,6 +231,9 @@ class _ApprovedBodyState extends ConsumerState<_ApprovedBody> {
     final fixed = {for (final c in corrections) ...c.fields};
     final directions = team.homeGroundDirections;
     final email = team.email;
+    final liveTeam = ref.watch(teamByIdProvider(_teamId)).value;
+    final suspension = liveTeam?.suspension;
+    final isChairman = ref.watch(appUserProvider).value?.isChairman ?? false;
 
     DetailRow row(String label, String? value, String field) => DetailRow(
           label,
@@ -244,6 +253,22 @@ class _ApprovedBodyState extends ConsumerState<_ApprovedBody> {
                 request: request,
                 onCorrectName: _busy ? null : () => _correctName(team),
               ),
+              // Suspended (2.11c, C3); Lift for the chairman
+              if (liveTeam != null && suspension != null && liveTeam.isSuspended)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: SuspendedBanner(
+                    title: switch (suspension.since) {
+                      final since? => 'Suspended since ${formatDayMonth(since)}',
+                      null => 'Suspended',
+                    },
+                    suspension: suspension,
+                    onLift: isChairman
+                        ? () =>
+                            liftSuspension(context, ref, liveTeam, suspension)
+                        : null,
+                  ),
+                ),
               const SizedBox(height: 22),
 
               _EditTitle(
@@ -279,6 +304,7 @@ class _ApprovedBodyState extends ConsumerState<_ApprovedBody> {
               _AskHint(teamId: _teamId, item: CorrectionItem.kits),
 
               CorrectionsLog(teamId: _teamId),
+              SuspensionHistory(teamId: _teamId),
               const SizedBox(height: 22),
 
               SectionTitle('${Season.label(Season.current)} season fee'),
@@ -310,10 +336,24 @@ class _TeamMenu extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final request = ref.watch(correctionRequestProvider(teamId)).value;
     final waiting = request?.status == CorrectionStatus.asked;
+    final team = ref.watch(teamByIdProvider(teamId)).value;
+    // Suspend and lift: the chairman only (2.11c)
+    final isChairman = ref.watch(appUserProvider).value?.isChairman ?? false;
+    final suspension = team?.suspension;
 
     return PopupMenuButton<String>(
       tooltip: 'More',
-      onSelected: (_) => context.push(Routes.adminAskCorrection(teamId)),
+      onSelected: (value) {
+        if (team == null) return;
+        switch (value) {
+          case 'ask':
+            context.push(Routes.adminAskCorrection(teamId));
+          case 'suspend':
+            suspendTeam(context, ref, team);
+          case 'lift' when suspension != null:
+            liftSuspension(context, ref, team, suspension);
+        }
+      },
       itemBuilder: (_) => [
         PopupMenuItem(
           value: 'ask',
@@ -324,8 +364,80 @@ class _TeamMenu extends ConsumerWidget {
                 : 'Ask the team to correct…',
           ),
         ),
+        if (isChairman && team != null)
+          team.isSuspended
+              ? const PopupMenuItem(
+                  value: 'lift',
+                  child: Text('Lift suspension…'),
+                )
+              : PopupMenuItem(
+                  value: 'suspend',
+                  child: Text(
+                    'Suspend team…',
+                    style:
+                        TextStyle(color: Theme.of(context).colorScheme.error),
+                  ),
+                ),
       ],
     );
+  }
+}
+
+/// The chairman suspends [team] (C1): the box, then one batch.
+Future<void> suspendTeam(BuildContext context, WidgetRef ref, Team team) async {
+  final input = await showSuspendSheet(context, teamName: team.name);
+  if (input == null || !context.mounted) return;
+  final user = ref.read(authRepositoryProvider).currentUser;
+  if (user == null) return;
+  try {
+    await ref.read(suspensionRepositoryProvider).suspend(
+          teamId: team.id,
+          teamName: team.name,
+          reason: input.reason,
+          lastDay: input.lastDay,
+          chairUid: user.uid,
+          chairName: user.displayName,
+        );
+    if (context.mounted) {
+      AppToast.success(
+        context,
+        '${team.name} is suspended. They have been told.',
+      );
+    }
+  } catch (error) {
+    if (context.mounted) AppToast.error(context, appErrorMessage(error));
+  }
+}
+
+/// The chairman lifts [suspension] (C4), with why.
+Future<void> liftSuspension(
+  BuildContext context,
+  WidgetRef ref,
+  Team team,
+  Suspension suspension,
+) async {
+  final input = await showLiftSheet(context, teamName: team.name);
+  if (input == null || !context.mounted) return;
+  final user = ref.read(authRepositoryProvider).currentUser;
+  if (user == null) return;
+  try {
+    await ref.read(suspensionRepositoryProvider).lift(
+          teamId: team.id,
+          teamName: team.name,
+          suspension: suspension,
+          reason: input.reason,
+          note: input.note,
+          chairUid: user.uid,
+          chairName: user.displayName,
+        );
+    if (context.mounted) {
+      AppToast.success(
+        context,
+        'Suspension lifted. ${team.name} has been told.',
+      );
+    }
+  } catch (error) {
+    if (context.mounted) AppToast.error(context, appErrorMessage(error));
   }
 }
 

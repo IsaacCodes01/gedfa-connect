@@ -97,6 +97,26 @@ service cloud.firestore {
         return log.createdAt == request.time ? log : null;
       }
 
+      // ---------- Suspensions (2.11c) ----------
+
+      // One suspension in a team's history: teams/{teamId}/suspensions/{id}
+      function suspensionDoc(teamId, suspensionId) {
+        return /databases/$(database)/documents/districts/$(districtId)/teams/$(teamId)/suspensions/$(suspensionId);
+      }
+
+      // A team's `suspension` map is in force: no end date (until the
+      // chairman lifts it), or the end date hasn't come yet
+      function isActiveSuspension(suspension) {
+        return suspension != null
+          && (suspension.get('until', null) == null || request.time < suspension.until);
+      }
+
+      // The team is suspended now: it can't add or edit players, edit its
+      // profile or ask for changes. It still reads everything and pays.
+      function isSuspended(teamId) {
+        return isActiveSuspension(get(teamDoc(teamId)).data.get('suspension', null));
+      }
+
       // This batch corrects the spelling of the team's name to [nameKey]'s
       // name (2.11a)
       function isCorrectingNameTo(teamId, nameKey) {
@@ -446,7 +466,8 @@ service cloud.firestore {
                            'juvenilePassed', 'juvenileNotEligible', 'juvenileToCorrect',
                            'teamUpdated', 'changeRequested', 'changeApproved',
                            'changeRefused', 'teamCorrected', 'correctionAsked',
-                           'correctionSentBack', 'correctionDone']
+                           'correctionSentBack', 'correctionDone',
+                           'teamSuspended', 'suspensionLifted']
           && data.teamId is string
           && data.teamName is string
           && data.names is list && data.names.size() <= 60
@@ -966,12 +987,14 @@ service cloud.firestore {
       match /teamChanges/{changeId} {
         allow get, list: if isFaAdmin() || isTeamAdminOf(resource.data.teamId);
 
-        // The team asks, for its own team only
+        // The team asks, for its own team only (not while suspended, 2.11c)
         allow create: if isTeamAdminOf(request.resource.data.teamId)
+          && !isSuspended(request.resource.data.teamId)
           && isValidTeamChange(request.resource.data, changeId);
 
         // ...and asks again once the FA has decided the last one
         allow update: if isTeamAdminOf(request.resource.data.teamId)
+          && !isSuspended(request.resource.data.teamId)
           && resource.data.status != 'pending'
           && isValidTeamChange(request.resource.data, changeId);
 
@@ -1148,6 +1171,40 @@ service cloud.firestore {
                   && getAfter(teamNameDoc(log.nameKey)).data.uid == before.requestUid));
       }
 
+      // 2.11c: the chairman suspends a team that isn't suspended now. The
+      // same batch writes its line in the team's history.
+      function isSuspending(teamId) {
+        let before = resource.data;
+        let after = request.resource.data;
+        let s = after.get('suspension', null);
+        return after.diff(before).affectedKeys().hasOnly(['suspension', 'updatedAt'])
+          && after.updatedAt == request.time
+          && !isActiveSuspension(before.get('suspension', null))
+          && s is map
+          && s.keys().hasOnly(['id', 'reason', 'since', 'until', 'byUid', 'byName'])
+          && s.get('id', null) is string
+          && isText(s.get('reason', null), 10, 500)
+          && s.get('since', null) == request.time
+          && (s.get('until', null) == null
+              || (s.until is timestamp && s.until > request.time))
+          && s.get('byUid', null) == request.auth.uid
+          && isOptionalText(s, 'byName', 80)
+          && getAfter(suspensionDoc(teamId, s.id)).data.since == request.time;
+      }
+
+      // 2.11c: the chairman lifts it (also an ended dated one); the
+      // history line gets why, in the same batch.
+      function isLiftingSuspension(teamId) {
+        let before = resource.data;
+        let after = request.resource.data;
+        return after.diff(before).affectedKeys().hasOnly(['suspension', 'updatedAt'])
+          && after.updatedAt == request.time
+          && before.get('suspension', null) != null
+          && after.get('suspension', null) == null
+          && getAfter(suspensionDoc(teamId, before.suspension.id)).data
+               .get('liftedAt', null) == request.time;
+      }
+
       // The team's request of this kind goes from pending to approved in
       // this same batch (2.10b).
       function isApprovingChange(teamId, kind) {
@@ -1196,8 +1253,44 @@ service cloud.firestore {
         allow get: if isTeamAdminOf(teamId) || isFaAdmin();
         allow list: if isFaAdmin();
 
-        // The team's own profile edits (2.10a)
-        allow update: if isTeamAdminOf(teamId) && isTeamDirectEdit();
+        // The team's own profile edits (2.10a), not while suspended (2.11c)
+        allow update: if isTeamAdminOf(teamId) && isTeamDirectEdit()
+          && !isSuspended(teamId);
+
+        // The chairman suspends a team or lifts its suspension (2.11c)
+        allow update: if isChairman()
+          && (isSuspending(teamId) || isLiftingSuspension(teamId));
+
+        // ---------- teams/{teamId}/suspensions/{suspensionId} (2.11c) ----------
+        // The team's history: one line per suspension, written with it.
+        // Lifting adds why (fine paid, bond signed, board decision, other).
+        match /suspensions/{suspensionId} {
+          allow get, list: if isFaAdmin() || isTeamAdminOf(teamId);
+
+          allow create: if isChairman()
+            && request.resource.data.keys().hasOnly(['reason', 'since', 'until', 'byUid', 'byName'])
+            && getAfter(teamDoc(teamId)).data.suspension.id == suspensionId
+            && request.resource.data.reason == getAfter(teamDoc(teamId)).data.suspension.reason
+            && request.resource.data.get('until', null)
+                 == getAfter(teamDoc(teamId)).data.suspension.get('until', null)
+            && request.resource.data.since == request.time
+            && request.resource.data.byUid == request.auth.uid
+            && isOptionalText(request.resource.data, 'byName', 80);
+
+          allow update: if isChairman()
+            && !('liftedAt' in resource.data)
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['liftedAt', 'liftReason', 'liftNote', 'liftedBy', 'liftedByName'])
+            && request.resource.data.liftedAt == request.time
+            && request.resource.data.liftedBy == request.auth.uid
+            && request.resource.data.liftReason in ['finePaid', 'bondSigned', 'boardDecision', 'other']
+            && isOptionalText(request.resource.data, 'liftNote', 300)
+            // "Other" needs a note
+            && (request.resource.data.liftReason != 'other'
+                || isText(request.resource.data.get('liftNote', null), 5, 300))
+            && isOptionalText(request.resource.data, 'liftedByName', 80)
+            && getAfter(teamDoc(teamId)).data.get('suspension', null) == null;
+        }
 
         // The FA applies a name, short name, logo or competition change it
         // approves (2.10b)
@@ -1554,6 +1647,8 @@ service cloud.firestore {
 
         // The team adds and edits its own players.
         allow create: if isTeamAdminOf(request.resource.data.teamId)
+          // Not while the team is suspended (2.11c)
+          && !isSuspended(request.resource.data.teamId)
           // The FA can close player registration (2.13d)
           && leagueValue('playerRegistrationOpen', true) == true
           && isValidPlayer(request.resource.data)
@@ -1570,6 +1665,7 @@ service cloud.firestore {
           && request.resource.data.updatedAt == request.time;
 
         allow update: if isTeamAdminOf(resource.data.teamId)
+          && !isSuspended(resource.data.teamId)
           // A child the FA found not eligible can't be edited (2.14c)
           && resource.data.get('notEligible', false) != true
           && !('notEligible' in request.resource.data)

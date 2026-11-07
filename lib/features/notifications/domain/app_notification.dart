@@ -17,6 +17,8 @@ enum NotificationKind {
   teamCorrected, // the FA corrected a mistake itself (2.11a)
   correctionAsked, // the FA asks the team to correct something (2.11b)
   correctionDone, // the FA checked the team's correction
+  teamSuspended, // by the chairman (2.11c)
+  suspensionLifted,
   // For the FA (written by teams, clubs, invited people)
   teamRequest,
   playersSubmitted,
@@ -128,6 +130,8 @@ class AppNotification {
         NotificationKind.correctionDone => 'The FA marked your correction done',
         NotificationKind.correctionSentBack =>
           '$teamName sent their correction back',
+        NotificationKind.teamSuspended => '$teamName is suspended',
+        NotificationKind.suspensionLifted => 'Suspension lifted',
       };
 
   String get body => switch (kind) {
@@ -186,6 +190,10 @@ class AppNotification {
           '${names.lastOrNull ?? 'Your correction'}: all good.',
         NotificationKind.correctionSentBack =>
           '${names.lastOrNull ?? ''}. Check it in Teams › Changes.',
+        NotificationKind.teamSuspended =>
+          '"${names.lastOrNull ?? ''}" Contact the FA.',
+        NotificationKind.suspensionLifted =>
+          '${names.lastOrNull ?? ''}. You can add and edit players again.',
       };
 
   static AppNotification? fromMap(String id, Map<String, dynamic> data) {

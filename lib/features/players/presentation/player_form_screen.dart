@@ -199,6 +199,11 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
 
   Future<void> _save(Team team, List<Player> squad) async {
     FocusScope.of(context).unfocus();
+    // Suspended by the chairman (2.11c): the rules refuse it too
+    if (team.isSuspended) {
+      AppToast.warning(context, suspendedMessage);
+      return;
+    }
     setState(() => _showErrors = true);
     final formOk = _formKey.currentState!.validate();
     final juvenileOk = !_isJuvenile ||
