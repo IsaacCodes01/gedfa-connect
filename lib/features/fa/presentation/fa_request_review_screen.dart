@@ -16,12 +16,16 @@ import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/core/widgets/status_badge.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
+import 'package:gedfa_connect/features/fa/presentation/widgets/correction_widgets.dart';
 import 'package:gedfa_connect/features/fa/presentation/widgets/review_widgets.dart';
 import 'package:gedfa_connect/features/payments/data/payment_repository.dart';
 import 'package:gedfa_connect/features/payments/presentation/widgets/fa_payment_card.dart';
 import 'package:gedfa_connect/features/settings/presentation/widgets/settings_widgets.dart';
 import 'package:gedfa_connect/core/utils/team_name_key.dart';
 import 'package:gedfa_connect/features/teams/data/team_change_repository.dart';
+import 'package:gedfa_connect/features/teams/data/team_correction_repository.dart';
+import 'package:gedfa_connect/features/teams/data/team_profile_repository.dart';
+import 'package:gedfa_connect/features/teams/domain/team_correction.dart';
 import 'package:gedfa_connect/features/teams/data/team_request_repository.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/previous_name_pill.dart';
 import 'package:gedfa_connect/features/teams/domain/club_status.dart';
@@ -80,6 +84,10 @@ class _ReviewBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // An approved team: the team as it is now, with corrections (2.11a)
+    if (request.status == ApprovalStatus.approved) {
+      return _ApprovedBody(request: request);
+    }
     final directions = request.homeGroundDirections;
     final email = request.email;
 
@@ -147,15 +155,182 @@ class _ReviewBody extends StatelessWidget {
   }
 }
 
+// ── An approved team (2.11a, mockup A1) ──────────────────────────────────
+
+/// The team as it is NOW (its own edits since 2.10a included), not what
+/// it registered with. The FA corrects misspellings and obvious mistakes
+/// here: the club name (✎ Correct name) and the club details (Edit).
+/// Below: the season fee and the registration (club status, letter,
+/// licence).
+class _ApprovedBody extends ConsumerStatefulWidget {
+  const _ApprovedBody({required this.request});
+
+  final TeamRequest request;
+
+  @override
+  ConsumerState<_ApprovedBody> createState() => _ApprovedBodyState();
+}
+
+class _ApprovedBodyState extends ConsumerState<_ApprovedBody> {
+  bool _busy = false;
+
+  /// The team ID is the key of the name it registered with (2.2)
+  String get _teamId => teamNameKey(widget.request.teamName);
+
+  Future<void> _correctName(TeamDetails team) async {
+    final result = await showNameCorrectionSheet(
+      context,
+      teamId: _teamId,
+      name: team.teamName,
+    );
+    if (result == null || !mounted) return;
+    final user = ref.read(authRepositoryProvider).currentUser;
+    if (user == null) return;
+
+    setState(() => _busy = true);
+    try {
+      await ref.read(teamCorrectionRepositoryProvider).correct(
+            teamId: _teamId,
+            teamName: team.teamName,
+            section: CorrectionSection.name,
+            changes: {'name': result.name},
+            lines: [correctionLine('Club name', team.teamName, result.name)],
+            reason: result.reason,
+            faUid: user.uid,
+            faName: user.displayName,
+          );
+      if (mounted) {
+        AppToast.success(context, 'Corrected. ${result.name} has been told.');
+      }
+    } catch (error) {
+      if (mounted) AppToast.error(context, appErrorMessage(error));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final request = widget.request;
+    // The registration until the team has loaded
+    final team = ref.watch(teamDetailsProvider(_teamId)).value ?? request;
+    final corrections =
+        ref.watch(teamCorrectionsProvider(_teamId)).value ?? const [];
+    final fixed = {for (final c in corrections) ...c.fields};
+    final directions = team.homeGroundDirections;
+    final email = team.email;
+
+    DetailRow row(String label, String? value, String field) => DetailRow(
+          label,
+          value == null || value.isEmpty ? null : value,
+          badge: fixed.contains(field) ? const FaFixedPill() : null,
+        );
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      children: [
+        ResponsiveCenter(
+          maxWidth: 560,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _Header(
+                request: request,
+                onCorrectName: _busy ? null : () => _correctName(team),
+              ),
+              const SizedBox(height: 22),
+
+              _EditTitle(
+                'Club details',
+                onEdit: _busy
+                    ? null
+                    : () => context.push(Routes.adminCorrectDetails(_teamId)),
+              ),
+              TileGroup(
+                children: [
+                  row('Town', team.town, 'town'),
+                  row('Home ground', team.homeGround, 'homeGround'),
+                  row('Directions', directions, 'homeGroundDirections'),
+                  row('Year founded', team.yearFounded?.toString(),
+                      'yearFounded'),
+                  row('Club email', email, 'email'),
+                ],
+              ),
+              const SizedBox(height: 22),
+
+              const SectionTitle('Officials'),
+              TileGroup(
+                children: [
+                  for (final official in team.officials)
+                    _OfficialRow(official: official),
+                ],
+              ),
+              const SizedBox(height: 22),
+
+              const SectionTitle('Colours and kits'),
+              _Kits(request: team),
+
+              CorrectionsLog(teamId: _teamId),
+              const SizedBox(height: 22),
+
+              SectionTitle('${Season.label(Season.current)} season fee'),
+              FaPaymentCard(
+                requestUid: request.uid,
+                teamName: team.teamName,
+                requestPending: false,
+              ),
+              const SizedBox(height: 22),
+
+              const SectionTitle('Registration'),
+              _ClubStatus(request: request),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// "CLUB DETAILS                ✎ Edit"
+class _EditTitle extends StatelessWidget {
+  const _EditTitle(this.text, {required this.onEdit});
+
+  final String text;
+  final VoidCallback? onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(child: SectionTitle(text)),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: TextButton.icon(
+            onPressed: onEdit,
+            style: TextButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+            ),
+            icon: const Icon(Icons.edit_outlined, size: 16),
+            label: const Text('Edit'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 // ── Header: logo, name, competitions, status, when sent ─────────────────
 
 /// The club at the top. An approved team shows its name, logo, short name
 /// and competitions as they are NOW, with "Previously …" if renamed
-/// (2.10c); the rest of the screen is what it registered with.
+/// (2.10c), and "✎ Correct name" for the FA (2.11a).
 class _Header extends ConsumerWidget {
-  const _Header({required this.request});
+  const _Header({required this.request, this.onCorrectName});
 
   final TeamRequest request;
+
+  /// Approved teams only; null greys it out while saving
+  final VoidCallback? onCorrectName;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -212,6 +387,12 @@ class _Header extends ConsumerWidget {
               ),
               const SizedBox(height: 10),
               StatusBadge(status: request.status),
+              if (request.status == ApprovalStatus.approved)
+                TextButton.icon(
+                  onPressed: onCorrectName,
+                  icon: const Icon(Icons.edit_outlined, size: 16),
+                  label: const Text('Correct name'),
+                ),
               if (sent != null) ...[
                 const SizedBox(height: 8),
                 Text(

@@ -63,10 +63,13 @@ class CheckLine extends StatelessWidget {
 
 /// "Label    Value" inside a TileGroup. A null value shows "Not given".
 class DetailRow extends StatelessWidget {
-  const DetailRow(this.label, this.value, {super.key});
+  const DetailRow(this.label, this.value, {super.key, this.badge});
 
   final String label;
   final String? value;
+
+  /// Shown after the value, e.g. "FA fixed" (2.11a)
+  final Widget? badge;
 
   @override
   Widget build(BuildContext context) {
@@ -98,6 +101,10 @@ class DetailRow extends StatelessWidget {
                   : textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
             ),
           ),
+          if (badge case final badge?) ...[
+            const SizedBox(width: 8),
+            Padding(padding: const EdgeInsets.only(top: 2), child: badge),
+          ],
         ],
       ),
     );

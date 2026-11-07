@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.12.1, matches the rules after step 2.10c (7 Nov 2026)
+**Status:** v2.13, matches the rules after step 2.11a (7 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -233,6 +233,7 @@ Created by an FA admin when approving a request.
 | `officials`            | array of maps    | Same shape as on the request                               |
 | `adminUids`            | array of strings | Users who manage this team (one or more)                   |
 | `requestUid`           | string           | The`teamRequests` document it came from                  |
+| `lastCorrectionId`     | string?          | The FA's latest correction (`corrections/{id}`, 2.11a)     |
 | `createdAt`            | timestamp        | Approval time                                              |
 | `updatedAt`            | timestamp        |                                                            |
 
@@ -241,6 +242,7 @@ Created by an FA admin when approving a request.
 - **Change requests (2.10b):** name, short name, logo and competitions change only when the FA approves a `teamChanges` request (Section 2.3a). The FA's batch may change only that kind's fields, to exactly what the team asked: `name` + `nameLower`; `shortName`; `logoUrl`; or `categories` (+ `juvenileKits`). Until then the old details are used everywhere. The team ID never changes.
 - **Adding a competition:** a Division club adding Juvenile gets `categories: [division, juvenile]` and no juvenile kits yet (it adds them in Kits › Edit). A Juvenile club adding Division keeps its `kits` as its `juvenileKits` (copied in the approval) and as its Division kits until it edits them.
 - **Open question for GEDFA (6 Nov 2026):** does adding a second competition mid-season change the season fee? For now: no, GH₵ 1,000 per club.
+- **FA corrections (2.11a):** the FA may correct **misspellings and obvious mistakes** itself: `name` + `nameLower`, `town`, `homeGround`, `homeGroundDirections`, `yearFounded`, `email`. Each correction sets `lastCorrectionId` and writes its log line (Section 2.3b) in the same batch; the rules check the log lists exactly the changed fields. A new spelling of the name is reserved in `teamNames` for the club (refused if another club holds it) and copied to every player's `teamName`. **Officials (sensitive data), kits and colours are never corrected by the FA**: it asks the team (2.11b). Short name, logo and competitions stay change requests (2.10b).
 - `logoUrl` reuses the request's logo download link (it keeps working). Copying the file to `teams/{teamId}/logo.jpg` needs a server function and is deferred.
 - FA admins can `get` and `list` teams; a team admin can `get` only their own.
 - Teams created by hand during Phase 1 testing may lack some fields.
@@ -270,6 +272,23 @@ A team asks the FA to change its name, short name or logo, or to add the competi
 - **Approve all (2.10c):** the app approves a team's waiting changes one after another (oldest first), each in its own batch as above, because the rules allow only one kind of change per team update. A name another club holds is skipped.
 - The FA sees the requests grouped by team (Teams › Changes, one card per team).
 - Read: the team's admins (query by `teamId`) and FA admins.
+
+### 2.3b `teams/{teamId}/corrections/{id}` — the FA's corrections log (2.11a)
+
+One line per correction the FA makes itself. Written in the same batch as the correction (the team's `lastCorrectionId` points at it); **never edited or deleted**.
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `section` | string | `name` or `details` |
+| `fields` | array of strings | The team fields that changed (1–12), e.g. `homeGround`; `nameLower` is not listed |
+| `lines` | array of strings | What the team reads (1–20), e.g. `Home ground: Apam Prk → Apam Park` |
+| `reason` | string | "What was wrong?", 5–300 characters; the team sees it |
+| `nameKey` | string? | `name` only: the key of the new spelling |
+| `byUid`, `byName` | string | The FA official |
+| `createdAt` | timestamp | |
+
+- Same batch: the team's bell `teamCorrected` ("The FA corrected your team profile", one per team and day).
+- Read: FA admins and the team's admins.
 
 #### Subcollection `teams/{teamId}/jerseys/{category}-{number}` — jersey reservations
 
@@ -451,7 +470,7 @@ Readable and writable only by FA admins. Created with `next: 2` by the very firs
 | Field | Notes |
 | ----- | ----- |
 | `audience` | `fa` or `team:<teamId>` |
-| `kind` | `playersApproved`, `playersRejected`, `teamApproved`, `paymentConfirmed`, `paymentNotFound`, `feeReminder`, `changeApproved`, `changeRefused` (for teams, written by the FA); `teamRequest`, `playersSubmitted`, `playersResubmitted`, `juvenileSubmitted`, `inviteAccepted`, `paymentSent`, `teamUpdated`, `changeRequested` (for the FA) |
+| `kind` | `playersApproved`, `playersRejected`, `teamApproved`, `paymentConfirmed`, `paymentNotFound`, `feeReminder`, `changeApproved`, `changeRefused`, `teamCorrected` (for teams, written by the FA); `teamRequest`, `playersSubmitted`, `playersResubmitted`, `juvenileSubmitted`, `inviteAccepted`, `paymentSent`, `teamUpdated`, `changeRequested` (for the FA) |
 | `teamId`, `teamName` | The team concerned (`teamRequest`: the club's uid) |
 | `names` | e.g. `Kojo Arthur (GE26-0011)`, `Yaw Boateng: Jersey number #10 → #14` |
 | `count`, `day`, `updatedAt` | |
@@ -630,6 +649,8 @@ Feed rules: never include dates of birth; player photos only if agreed with GEDF
 
 **Answered by GEDFA (27 Oct 2026):** squad up to 30 (fewer is fine); matchday squad up to 16 (fewer is fine); 5 substitutes; normal jersey rules; registration window not open yet; tie-breakers as the English Premier League; officials up to 7 (team manager and head coach required); logo required; licence and owners optional; third kit and second goalkeeper kit optional; new clubs send a letter and their last league; season fee GH₵ 1,000 every season, paid in parts, the FA confirms each payment (no payment is rejected unless it can't be found or is false), reminders every 3 days until paid; juvenile kits are separate; juvenile age group = season **start** year − birth year; younger players may play up (as the GFA); overage players are not allowed.
 
+**Decided by Isaac (7 Nov 2026), for 2.11:** the FA corrects only misspellings and obvious mistakes itself (club name, town, ground, directions, year founded, email); officials (sensitive data), kits, colours and players it asks the team to correct. Only the **chairman** suspends a team and lifts a suspension. A suspension stops adding or editing players, profile edits and change requests (later: team sheets); the team still sees everything and pays its fee. It ends on a date (set by the offence) or lasts until the FA board has met the club; the chairman may lift it early, e.g. a fine was paid or a bond was signed.
+
 Still open:
 
 
@@ -659,6 +680,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 7 Nov 2026 | v2.13 (2.11a): FA corrections: new `teams/{teamId}/corrections` log and `teams.lastCorrectionId`; the FA corrects the name, town, ground, directions, year founded and email (never officials, kits or colours), a new spelling reserved in `teamNames` for the club; notification kind `teamCorrected`. Isaac's 2.11 decisions recorded in Section 7. 268 tests. |
 | 7 Nov 2026 | v2.12.1 (2.10c): no field or rule changes. "Approve all" = one batch per change, oldest first; requests grouped by team for the FA. 257 tests. |
 | 7 Nov 2026 | v2.12 (2.10b): new `teamChanges` (name, short name, logo, add a competition; one pending per kind; approve or not approve with a reason); the FA applies an approved change to the team, renames `teamName` on its players and reserves the new name (`teamNames.teamId`); notification kinds `changeRequested`, `changeApproved`, `changeRefused`. Storage: `teams/{teamId}/logo-<millis>.jpg`. 257 tests. |
 | 6 Nov 2026 | v2.11 (2.10a): team admins edit town, ground, colours, kits and officials of their approved team; kind `teamUpdated`. 241 tests. |

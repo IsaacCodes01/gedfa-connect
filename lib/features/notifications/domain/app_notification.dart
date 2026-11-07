@@ -14,6 +14,7 @@ enum NotificationKind {
   feeReminder,
   changeApproved, // name, short name, logo or competition (2.10b)
   changeRefused,
+  teamCorrected, // the FA corrected a mistake itself (2.11a)
   // For the FA (written by teams, clubs, invited people)
   teamRequest,
   playersSubmitted,
@@ -117,6 +118,9 @@ class AppNotification {
           people == 1 ? 'Change approved' : '$people changes approved',
         NotificationKind.changeRefused =>
           people == 1 ? 'Change not approved' : '$people changes not approved',
+        NotificationKind.teamCorrected => people == 1
+            ? 'The FA corrected your team profile'
+            : '$people corrections by the FA',
       };
 
   String get body => switch (kind) {
@@ -166,6 +170,8 @@ class AppNotification {
           '$namesText. It is used everywhere from now on.',
         NotificationKind.changeRefused =>
           "$namesText. Open More › Team profile to read the FA's reason.",
+        NotificationKind.teamCorrected =>
+          '$namesText. See More › Team profile.',
       };
 
   static AppNotification? fromMap(String id, Map<String, dynamic> data) {

@@ -264,6 +264,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       NotificationKind.changeRequested => (_Look.team, Routes.adminChanges),
       NotificationKind.changeApproved => (_Look.ok, Routes.teamClub),
       NotificationKind.changeRefused => (_Look.no, Routes.teamClub),
+      NotificationKind.teamCorrected => (_Look.fa, Routes.teamClub),
     };
     return _Item(
       look: look,

@@ -81,6 +81,12 @@ final teamProfileRepositoryProvider = Provider<TeamProfileRepository>((ref) {
   return TeamProfileRepository(ref.watch(firestoreProvider));
 });
 
+/// FA: any approved team with all its details, as it is now (2.11a).
+final teamDetailsProvider =
+    StreamProvider.family<TeamDetails?, String>((ref, teamId) {
+  return ref.watch(teamProfileRepositoryProvider).watch(teamId);
+});
+
 /// The signed-in team admin's team, with all its details.
 final myTeamDetailsProvider = StreamProvider<TeamDetails?>((ref) async* {
   final appUser = await ref.watch(appUserProvider.future);

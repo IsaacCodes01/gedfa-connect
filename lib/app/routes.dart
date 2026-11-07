@@ -15,6 +15,9 @@ class Routes {
   /// changes to decide (2.10c).
   static const adminChanges = '$admin?view=changes';
   static String adminTeamChanges(String teamId) => '/admin/changes/$teamId';
+
+  /// The FA corrects an approved team's club details (2.11a)
+  static String adminCorrectDetails(String teamId) => '/admin/correct/$teamId';
   static const adminNotifications = '/admin/notifications';
   static const adminAnnouncements = '/admin/more/announcements';
   static const adminNewAnnouncement = '/admin/more/announcements/new';

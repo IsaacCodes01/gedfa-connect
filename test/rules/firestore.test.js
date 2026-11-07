@@ -2433,6 +2433,152 @@ describe('Change requests (2.10b)', () => {
   });
 });
 
+describe('FA corrections (2.11a)', () => {
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      const now = Timestamp.now();
+      await setDoc(doc(db, `${D}/teams/royal`), {
+        name: 'Royal Unique FC', nameLower: 'royal unique fc', nameKey: 'royal',
+        shortName: 'RUFC', town: 'Gomoa Fetteh', homeGround: 'Fetteh Prk',
+        categories: ['division'], kits: KITS, colours: COLOURS, officials: OFFICIALS,
+        logoUrl: 'https://example.com/logo.png', adminUids: ['admin1'],
+        requestUid: 'admin1', updatedAt: now,
+      });
+      await setDoc(doc(db, `${D}/teamNames/royal`), { uid: 'admin1', createdAt: now });
+      await setDoc(doc(db, `${D}/teamNames/gomoa-stars`), { uid: 'admin2', createdAt: now });
+    });
+  });
+
+  /**
+   * The FA's correction as the app sends it: the team (pointing at the
+   * log line) and the log line, in one batch. [more] adds to the batch.
+   */
+  function correct(db, changes, log = {}, { id = 'c1', more } = {}) {
+    const batch = writeBatch(db);
+    batch.update(doc(db, `${D}/teams/royal`),
+      { ...changes, lastCorrectionId: id, updatedAt: serverTimestamp() });
+    batch.set(doc(db, `${D}/teams/royal/corrections/${id}`), {
+      section: 'details',
+      fields: Object.keys(changes).filter((field) => field !== 'nameLower'),
+      lines: ['Home ground: Fetteh Prk → Fetteh Park'],
+      reason: 'Spelling.',
+      byUid: 'fa1',
+      byName: 'Ama Owusu',
+      createdAt: serverTimestamp(),
+      ...log,
+    });
+    more?.(batch);
+    return batch.commit();
+  }
+
+  /** A name correction: team, log, name reservation and players. */
+  function correctName(db, { to = 'Royal Unique F.C.', key = 'royal-unique-f-c', reserve = true, players = true } = {}) {
+    return correct(db, { name: to, nameLower: to.toLowerCase() },
+      { section: 'name', nameKey: key, lines: [`Club name: Royal Unique FC → ${to}`] },
+      {
+        more: (batch) => {
+          if (reserve) {
+            batch.set(doc(db, `${D}/teamNames/${key}`), { uid: 'admin1', teamId: 'royal', createdAt: serverTimestamp() });
+          }
+          if (players) {
+            batch.update(doc(db, `${D}/players/p1`), { teamName: to });
+            batch.update(doc(db, `${D}/players/p3`), { teamName: to });
+          }
+        },
+      });
+  }
+
+  it('the FA corrects the ground, town, directions, year founded and email, with a log line', async () => {
+    const db = dbAs('fa1');
+    await assertSucceeds(correct(db, { homeGround: 'Fetteh Park' }));
+    await assertSucceeds(correct(db, { yearFounded: 1998, email: 'royal@gmail.com', town: 'Gomoa Afransi' }, {}, { id: 'c2' }));
+    await assertSucceeds(correct(db, { homeGroundDirections: 'Behind the Methodist school' }, {}, { id: 'c3' }));
+  });
+
+  it('kits, colours and officials (sensitive): the FA asks the team instead (2.11b)', async () => {
+    const db = dbAs('fa1');
+    await assertFails(correct(db, { kits: { ...KITS, third: { primary: '#000000' } } }));
+    await assertFails(correct(db, { colours: { ...COLOURS, away: { main: '#000000', second: '#FFFFFF' } } }));
+    await assertFails(correct(db, { officials: [OFFICIALS[0], { ...OFFICIALS[1], phone: '+233244000009' }] }));
+    // Other log sections are refused too
+    await assertFails(correct(db, { homeGround: 'Fetteh Park' }, { section: 'officials' }));
+  });
+
+  it('the FA corrects the spelling of the name: the team, its players and the reservation in one batch', async () => {
+    await assertSucceeds(correctName(dbAs('fa1')));
+  });
+
+  it('only the capitals of the name change: the club keeps its reservation', async () => {
+    await assertSucceeds(correctName(dbAs('fa1'), { to: 'ROYAL UNIQUE FC', key: 'royal', reserve: false }));
+  });
+
+  it('a name correction needs the new name reserved for the club; another club\'s name is refused', async () => {
+    const db = dbAs('fa1');
+    await assertFails(correctName(db, { reserve: false }));
+    await assertFails(correctName(db, { to: 'Gomoa Stars', key: 'gomoa-stars' }));
+    await assertFails(correctName(db, { to: 'Gomoa Stars', key: 'gomoa-stars', reserve: false }));
+    // The reservation is only for a name correction in the same batch
+    await assertFails(setDoc(doc(db, `${D}/teamNames/royal-kings-fc`), { uid: 'admin1', teamId: 'royal', createdAt: serverTimestamp() }));
+  });
+
+  it('a correction needs its log line, listing exactly the fields that changed', async () => {
+    const db = dbAs('fa1');
+    // No log line
+    await assertFails(updateDoc(doc(db, `${D}/teams/royal`),
+      { homeGround: 'Fetteh Park', lastCorrectionId: 'c1', updatedAt: serverTimestamp() }));
+    // The log says less, or more, than what changed
+    await assertFails(correct(db, { homeGround: 'Fetteh Park', town: 'Apam' }, { fields: ['homeGround'] }));
+    await assertFails(correct(db, { homeGround: 'Fetteh Park' }, { fields: ['homeGround', 'town'] }));
+    // Nothing corrected
+    await assertFails(correct(db, {}, { fields: ['homeGround'] }));
+    // "What was wrong?" is required (5 to 300 characters)
+    await assertFails(correct(db, { homeGround: 'Fetteh Park' }, { reason: 'Typo' }));
+    await assertFails(correct(db, { homeGround: 'Fetteh Park' }, { byUid: 'fa2' }));
+    // A name without its key
+    await assertFails(correct(db, { name: 'Royal Unique F.C.', nameLower: 'royal unique f.c.' }, { section: 'name' }));
+  });
+
+  it('the FA cannot correct the short name, logo, competitions or team admins this way', async () => {
+    const db = dbAs('fa1');
+    await assertFails(correct(db, { shortName: 'RUF' }));
+    await assertFails(correct(db, { logoUrl: 'https://example.com/new.png' }));
+    await assertFails(correct(db, { categories: ['division', 'juvenile'] }));
+    await assertFails(correct(db, { adminUids: ['admin1', 'admin2'] }));
+  });
+
+  it('corrections must stay valid', async () => {
+    const db = dbAs('fa1');
+    await assertFails(correct(db, { homeGround: 'X' }));
+    await assertFails(correct(db, { officials: [OFFICIALS[0]] }));
+    await assertFails(correct(db, { yearFounded: 1800 }));
+    await assertFails(correct(db, { name: 'R', nameLower: 'r' }, { section: 'name', nameKey: 'r1' }));
+    await assertFails(correct(db, { name: 'Royal Unique F.C.', nameLower: 'royal unique fc' }, { section: 'name', nameKey: 'royal' }));
+  });
+
+  it('a team admin cannot correct its team or write the log; it reads its own log', async () => {
+    await assertFails(correct(dbAs('admin1'), { homeGround: 'Fetteh Park' }, { byUid: 'admin1' }));
+    await correct(dbAs('fa1'), { homeGround: 'Fetteh Park' });
+    await assertSucceeds(getDocs(collection(dbAs('admin1'), `${D}/teams/royal/corrections`)));
+    await assertFails(getDocs(collection(dbAs('admin2'), `${D}/teams/royal/corrections`)));
+    await assertSucceeds(getDocs(collection(dbAs('fa1'), `${D}/teams/royal/corrections`)));
+  });
+
+  it('the log is never edited or deleted', async () => {
+    const db = dbAs('fa1');
+    await correct(db, { homeGround: 'Fetteh Park' });
+    await assertFails(updateDoc(doc(db, `${D}/teams/royal/corrections/c1`), { reason: 'Something else.' }));
+    await assertFails(deleteDoc(doc(db, `${D}/teams/royal/corrections/c1`)));
+  });
+
+  it('the FA tells the team: "The FA corrected your team profile"', async () => {
+    await assertSucceeds(notify(dbAs('fa1'), 'team-royal_teamCorrected_royal',
+      { audience: 'team:royal', kind: 'teamCorrected', teamId: 'royal' }));
+    await assertFails(notify(dbAs('admin1'), 'team-royal_teamCorrected_x',
+      { audience: 'team:royal', kind: 'teamCorrected', teamId: 'royal' }));
+  });
+});
+
 describe('Notifications', () => {
   it('the FA notifies a team, and the counts add up in one notification', async () => {
     const db = dbAs('fa1');

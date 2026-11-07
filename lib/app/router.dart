@@ -14,6 +14,7 @@ import 'package:gedfa_connect/features/notifications/presentation/compose_announ
 import 'package:gedfa_connect/features/notifications/presentation/fa_announcement_screen.dart';
 import 'package:gedfa_connect/features/notifications/presentation/fa_announcements_screen.dart';
 import 'package:gedfa_connect/features/notifications/presentation/notifications_screen.dart';
+import 'package:gedfa_connect/features/fa/presentation/fa_correct_details_screen.dart';
 import 'package:gedfa_connect/features/fa/presentation/fa_team_changes_screen.dart';
 import 'package:gedfa_connect/features/fa/presentation/fa_player_review_screen.dart';
 import 'package:gedfa_connect/features/fa/presentation/fa_player_teams_screen.dart';
@@ -124,6 +125,14 @@ final routerProvider = Provider<GoRouter>((ref) {
                     path: 'changes/:teamId',
                     parentNavigatorKey: rootNavigatorKey,
                     builder: (_, state) => FaTeamChangesScreen(
+                      teamId: state.pathParameters['teamId']!,
+                    ),
+                  ),
+                  // The FA corrects club details (2.11a). Full-screen.
+                  GoRoute(
+                    path: 'correct/:teamId',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (_, state) => FaCorrectDetailsScreen(
                       teamId: state.pathParameters['teamId']!,
                     ),
                   ),
