@@ -87,13 +87,7 @@ class MoreScreen extends ConsumerWidget {
                         icon: Icons.shield_outlined,
                         title: 'Team profile',
                         subtitle: 'Name, logo, kits and officials',
-                        onTap: () => openComingSoon(
-                          context,
-                          title: 'Team profile',
-                          icon: Icons.shield_outlined,
-                          message: 'Soon you will see your team details here '
-                              'and ask the FA to change the name or logo.',
-                        ),
+                        onTap: () => context.go(Routes.teamClub),
                       ),
                     if (isTeamAdmin) const _SeasonFeeTile(),
                     SettingsTile(

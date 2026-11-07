@@ -416,7 +416,8 @@ service cloud.firestore {
                            'teamRequest', 'playersSubmitted', 'playersResubmitted',
                            'juvenileSubmitted', 'inviteAccepted', 'paymentConfirmed', 'paymentNotFound',
                            'feeReminder', 'paymentSent', 'registrationChanged',
-                           'juvenilePassed', 'juvenileNotEligible', 'juvenileToCorrect']
+                           'juvenilePassed', 'juvenileNotEligible', 'juvenileToCorrect',
+                           'teamUpdated']
           && data.teamId is string
           && data.teamName is string
           && data.names is list && data.names.size() <= 60
@@ -430,7 +431,7 @@ service cloud.firestore {
         return hasConfirmedEmail()
           && (isFaAdmin()
               || (data.kind in ['playersSubmitted', 'playersResubmitted',
-                                'juvenileSubmitted', 'paymentSent']
+                                'juvenileSubmitted', 'paymentSent', 'teamUpdated']
                   && isTeamAdminOf(data.teamId))
               || data.kind in ['teamRequest', 'inviteAccepted']);
       }
@@ -889,9 +890,37 @@ service cloud.firestore {
       }
 
             // ---------- teams/{teamId} ----------
+      // 2.10a: what a team admin changes straight away on the team
+      // profile (no FA approval): town, home ground, colours, kits and
+      // officials. Name, short name, logo and competitions are NOT here:
+      // they need an FA request (2.10b). Each part is checked only when
+      // it changes, so teams approved before 2.13b can still edit.
+      function isTeamDirectEdit() {
+        let after = request.resource.data;
+        let changed = after.diff(resource.data).affectedKeys();
+        return changed.hasOnly(['town', 'homeGround', 'homeGroundDirections',
+                                'colours', 'kits', 'juvenileKits', 'officials',
+                                'updatedAt'])
+          && after.updatedAt == request.time
+          && (!changed.hasAny(['town']) || isText(after.town, 2, 60))
+          && (!changed.hasAny(['homeGround']) || isText(after.homeGround, 2, 80))
+          && isOptionalText(after, 'homeGroundDirections', 300)
+          && (!changed.hasAny(['colours']) || isValidTeamColours(after.colours))
+          && (!changed.hasAny(['kits']) || isValidKitSet(after.kits))
+          // Separate juvenile kits only for a club in both competitions
+          && (!changed.hasAny(['juvenileKits'])
+              || (after.categories.size() == 2 && isValidKitSet(after.juvenileKits)))
+          && (!changed.hasAny(['officials'])
+              || (after.officials is list
+                  && after.officials.size() >= 2 && after.officials.size() <= 7));
+      }
+
       match /teams/{teamId} {
         allow get: if isTeamAdminOf(teamId) || isFaAdmin();
         allow list: if isFaAdmin();
+
+        // The team's own profile edits (2.10a)
+        allow update: if isTeamAdminOf(teamId) && isTeamDirectEdit();
 
         // FA approves a request: the team is created from it, in the same
         // batch as the approval. Its ID is the reserved team-name key.

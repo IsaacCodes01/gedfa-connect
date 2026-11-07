@@ -2126,6 +2126,66 @@ describe('Juvenile screening decisions', () => {
   });
 });
 
+// ---------- Team profile: direct edits (2.10a) ----------
+
+const OFFICIALS = [
+  { role: 'teamManager', name: 'Kwame Asante', phone: '+233244000001', licence: null },
+  { role: 'headCoach', name: 'Yaw Boateng', phone: '+233244000002', licence: null },
+];
+describe('Team profile (2.10a)', () => {
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `${D}/teams/royal`), {
+        name: 'Royal Unique FC', shortName: 'RUFC', town: 'Gomoa Fetteh',
+        homeGround: 'Fetteh Park', categories: ['division'], kits: KITS,
+        colours: COLOURS, officials: OFFICIALS, logoUrl: 'https://example.com/logo.png',
+        adminUids: ['admin1'], updatedAt: Timestamp.now(),
+      });
+    });
+  });
+
+  const edit = (db, changes) => updateDoc(doc(db, `${D}/teams/royal`),
+    { ...changes, updatedAt: serverTimestamp() });
+
+  it('the team admin changes the town, ground, colours, kits and officials straight away', async () => {
+    const db = dbAs('admin1');
+    await assertSucceeds(edit(db, { town: 'Gomoa Afransi', homeGround: 'Afransi Park', homeGroundDirections: 'Near the market' }));
+    await assertSucceeds(edit(db, { colours: { ...COLOURS, away: { main: '#000000', second: '#FFFFFF' } } }));
+    await assertSucceeds(edit(db, { kits: KITS }));
+    await assertSucceeds(edit(db, { officials: [...OFFICIALS, { role: 'chairman', name: 'Kofi Mensah', phone: '+233244000003', licence: null }] }));
+  });
+
+  it('name, short name, logo and competitions need the FA (2.10b)', async () => {
+    const db = dbAs('admin1');
+    await assertFails(edit(db, { name: 'Royal Stars FC' }));
+    await assertFails(edit(db, { shortName: 'RSFC' }));
+    await assertFails(edit(db, { logoUrl: 'https://example.com/new.png' }));
+    await assertFails(edit(db, { categories: ['division', 'juvenile'] }));
+    await assertFails(edit(db, { adminUids: ['admin1', 'admin2'] }));
+  });
+
+  it('another team cannot edit it', async () => {
+    await assertFails(edit(dbAs('admin2'), { homeGround: 'Somewhere Park' }));
+  });
+
+  it('edits must stay valid', async () => {
+    const db = dbAs('admin1');
+    await assertFails(edit(db, { homeGround: 'X' }));
+    await assertFails(edit(db, { kits: { home: KITS.home, away: KITS.away } }));
+    await assertFails(edit(db, { officials: [OFFICIALS[0]] }));
+    await assertFails(edit(db, { colours: { home: COLOURS.home } }));
+    // Separate juvenile kits only for a club in both competitions
+    await assertFails(edit(db, { juvenileKits: KITS }));
+  });
+
+  it('the team tells the FA: "Royal Unique FC updated their kits"', async () => {
+    await assertSucceeds(notify(dbAs('admin1'), 'fa_teamUpdated_royal',
+      { audience: 'fa', kind: 'teamUpdated', teamId: 'royal' }));
+    await assertFails(notify(dbAs('admin1'), 'fa_teamUpdated_stars',
+      { audience: 'fa', kind: 'teamUpdated', teamId: 'stars' }));
+  });
+});
+
 describe('Notifications', () => {
   it('the FA notifies a team, and the counts add up in one notification', async () => {
     const db = dbAs('fa1');

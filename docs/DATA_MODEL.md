@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.10, matches the rules after step 2.14d (3 Nov 2026)
+**Status:** v2.11, matches the rules after step 2.10a (6 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -235,6 +235,8 @@ Created by an FA admin when approving a request.
 | `updatedAt`            | timestamp        |                                                            |
 
 - Created **only by the FA's Approve button** (since 2.2), in the same batch as the approval. The **team ID is the reserved name key** (e.g. `gomoa-united-fc`), so it is unique. The rules check: `nameKey == teamId`, `adminUids == [requestUid]`, the reservation belongs to that club, and the request becomes approved in the same batch.
+- **Team profile edits (2.10a):** the team's admin may change `town`, `homeGround`, `homeGroundDirections`, `colours`, `kits`, `juvenileKits` (club in both competitions only) and `officials` (2–7) straight away; each part is validated when it changes. Name, short name, logo and competitions need an FA request (2.10b). Each save writes a `teamUpdated` note to the FA's bell in the same batch.
+- **Open question for GEDFA (6 Nov 2026):** does adding a second competition mid-season change the season fee? For now: no, GH₵ 1,000 per club.
 - `logoUrl` reuses the request's logo download link (it keeps working). Copying the file to `teams/{teamId}/logo.jpg` needs a server function and is deferred.
 - FA admins can `get` and `list` teams; a team admin can `get` only their own.
 - Teams created by hand during Phase 1 testing may lack some fields.
@@ -520,6 +522,7 @@ These changes always happen together in **one batch** (all succeed or none do):
 | Remove player *(later)*               | delete player + delete jersey doc + delete player key                                         |
 | Submit team request                   | create`teamRequests/{uid}` + create `teamNames/{nameKey}`                                 |
 | Rename team while pending or rejected | update request + delete old`teamNames` doc + create new one                                 |
+| Edit the team profile (team admin)    | update `teams/{teamId}` (only the fields of one section + `updatedAt`) + FA notification `teamUpdated` |
 | Approve team request (FA)             | update request (`status: approved`, `teamId`, `reviewedBy`, `reviewedAt`) + create `teams/{teamId}` + create `users/{uid}` (`role: teamAdmin`) |
 | Reject team request (FA)              | update request only (`status: rejected`, `rejectionReason`, review fields)                    |
 | Approve player (FA) — **transaction** | read player (must be pending) + read counter → update player (`approved`, `playerCode`, `approvedBy`, `approvedAt`) + set / update counter (`next + 1`). A player who already has an ID keeps it and the counter is not touched |
@@ -622,6 +625,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 6 Nov 2026 | v2.11 (2.10a): team admins edit town, ground, colours, kits and officials of their approved team; kind `teamUpdated`. 241 tests. |
 | 3 Nov 2026 | v2.10 (2.14d): every screening decision carries `screeningDayId` and is refused before the day starts, a day after it, or for an age group the day doesn't cover; "needs correcting" (back to the team); kind `juvenileToCorrect`. 236 tests. |
 | 3 Nov 2026 | v2.9 (2.14c): juvenile IDs `GJ26-…` from `settings/juvenileCounter`; pass (move up only, jersey moves along) or `notEligible`; the FA may move a child's jersey reservation; notification kinds `juvenilePassed`, `juvenileNotEligible`. 231 tests. |
 | 2 Nov 2026 | v2.8 (2.14b-2): `screeningDays` saved and cancelled with announcements to Juvenile teams. 220 tests. |

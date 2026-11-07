@@ -69,6 +69,12 @@ class Routes {
 
   /// The team's season fee, and adding a payment (2.13c).
   static const teamFee = '/team/more/fee';
+
+  /// Team: More › Team profile, the CLUB's page (2.10a, board P1), and
+  /// one section to edit straight away (details, colours, kits,
+  /// officials). Not [teamProfile], which is the person's My profile.
+  static const teamClub = '/team/more/club';
+  static String teamClubEdit(String section) => '$teamClub/edit/$section';
   static const teamAddPayment = '/team/more/fee/add';
   static const referee = '/referee';
   static const teamPlayer = '/team/player';

@@ -26,7 +26,10 @@ import 'package:gedfa_connect/features/auth/presentation/forgot_password_screen.
 import 'package:gedfa_connect/features/auth/presentation/sign_up_screen.dart';
 import 'package:gedfa_connect/features/teams/presentation/welcome_screen.dart';
 import 'package:gedfa_connect/features/teams/presentation/register_team_screen.dart';
+import 'package:gedfa_connect/features/teams/data/team_profile_repository.dart';
+import 'package:gedfa_connect/features/teams/presentation/team_edit_screen.dart';
 import 'package:gedfa_connect/features/teams/presentation/team_home_screen.dart';
+import 'package:gedfa_connect/features/teams/presentation/team_profile_screen.dart';
 import 'package:gedfa_connect/features/league/presentation/league_settings_screen.dart';
 import 'package:gedfa_connect/features/payments/presentation/add_payment_screen.dart';
 import 'package:gedfa_connect/features/payments/presentation/fa_fees_screen.dart';
@@ -357,6 +360,24 @@ final routerProvider = Provider<GoRouter>((ref) {
                 builder: (_, _) => const MoreScreen(),
                 routes: [
                   ..._moreChildren(),
+                  // Team only: Team profile (2.10a). Editing a section
+                  // opens full-screen.
+                  GoRoute(
+                    path: 'club',
+                    builder: (_, _) => const TeamProfileScreen(),
+                    routes: [
+                      GoRoute(
+                        path: 'edit/:section',
+                        parentNavigatorKey: rootNavigatorKey,
+                        builder: (_, state) => TeamEditScreen(
+                          section: TeamSection.fromString(
+                                state.pathParameters['section'],
+                              ) ??
+                              TeamSection.details,
+                        ),
+                      ),
+                    ],
+                  ),
                   // Team only: Season fee (2.13c). Inside the More tab;
                   // adding a payment opens full-screen.
                   GoRoute(
