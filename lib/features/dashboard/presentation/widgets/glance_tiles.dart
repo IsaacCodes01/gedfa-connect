@@ -70,16 +70,16 @@ class GlanceTiles extends StatelessWidget {
       ),
     ];
 
-    Widget row(List<Widget> items) => IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (var i = 0; i < items.length; i++) ...[
-            if (i > 0) SizedBox(width: wide ? 16 : 10),
-            Expanded(child: items[i]),
-          ],
+    // Every tile has the same fixed parts, so they line up without being
+    // measured (no IntrinsicHeight: on web the font loads late)
+    Widget row(List<Widget> items) => Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < items.length; i++) ...[
+          if (i > 0) SizedBox(width: wide ? 16 : 10),
+          Expanded(child: items[i]),
         ],
-      ),
+      ],
     );
 
     if (wide) return row(tiles);
@@ -182,30 +182,35 @@ class _Tile extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  if (prefix != null) Text('${prefix!} ', style: small),
-                  CountUpText(
-                    value,
-                    format: _thousands,
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.5,
-                      height: 1,
+            // A fixed height: a long number shrinks to fit the width
+            // without making this tile shorter than the others
+            SizedBox(
+              height: MediaQuery.textScalerOf(context).scale(28) * 1.15,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    if (prefix != null) Text('${prefix!} ', style: small),
+                    CountUpText(
+                      value,
+                      format: _thousands,
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.5,
+                        height: 1,
+                      ),
                     ),
-                  ),
-                  if (suffix != null) Text(' ${suffix!}', style: small),
-                ],
+                    if (suffix != null) Text(' ${suffix!}', style: small),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 6),
-            Text(
+            const SizedBox(height: 4),
+            FixedLinesText(
               label,
               style: const TextStyle(
                 fontSize: 12.5,
@@ -213,7 +218,7 @@ class _Tile extends StatelessWidget {
               ),
             ),
             if (progress != null) ...[
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               GrowingBar(
                 fraction: progress!,
                 colors: progressColors,
@@ -221,10 +226,13 @@ class _Tile extends StatelessWidget {
               ),
             ],
             const SizedBox(height: 2),
-            Text(
+            FixedLinesText(
               detail,
+              lines: 2,
               style: TextStyle(fontSize: 11.5, color: scheme.onSurfaceVariant),
             ),
+            // Tiles without a bar keep its room at the bottom
+            if (progress == null) const SizedBox(height: 15),
           ],
         ),
       ),

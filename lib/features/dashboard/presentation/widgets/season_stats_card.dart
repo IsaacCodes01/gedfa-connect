@@ -222,16 +222,18 @@ class ComingLater extends StatelessWidget {
                 child: Icon(icon, size: 20, color: scheme.onSurfaceVariant),
               ),
               const SizedBox(height: 10),
-              Text(
+              FixedLinesText(
                 title,
+                lines: 2,
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: scheme.onSurface.withValues(alpha: 0.7),
                 ),
               ),
-              Text(
+              FixedLinesText(
                 detail,
+                lines: 2,
                 style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
               ),
             ],
@@ -240,16 +242,16 @@ class ComingLater extends StatelessWidget {
       );
     }
 
-    Widget row(List<(IconData, String, String)> items) => IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (var i = 0; i < items.length; i++) ...[
-            if (i > 0) SizedBox(width: wide ? 16 : 10),
-            Expanded(child: box(items[i])),
-          ],
+    // Fixed parts (two lines each), so the boxes line up without being
+    // measured
+    Widget row(List<(IconData, String, String)> items) => Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < items.length; i++) ...[
+          if (i > 0) SizedBox(width: wide ? 16 : 10),
+          Expanded(child: box(items[i])),
         ],
-      ),
+      ],
     );
 
     if (wide) return row(_items);

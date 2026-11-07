@@ -170,6 +170,40 @@ class DashboardSectionTitle extends StatelessWidget {
   }
 }
 
+/// Text that always takes room for [lines] lines (and ends in "…" when it
+/// needs more). Cards side by side then come out the same height without
+/// being measured, so a late web font or a counting number can't make
+/// them overflow. The room follows the phone's text size.
+class FixedLinesText extends StatelessWidget {
+  const FixedLinesText(
+    this.text, {
+    super.key,
+    required this.style,
+    this.lines = 1,
+  });
+
+  final String text;
+  final TextStyle style;
+  final int lines;
+
+  static const _lineHeight = 1.4;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.textScalerOf(context).scale(style.fontSize ?? 14);
+
+    return SizedBox(
+      height: size * _lineHeight * lines + 1,
+      child: Text(
+        text,
+        maxLines: lines,
+        overflow: TextOverflow.ellipsis,
+        style: style.copyWith(height: _lineHeight),
+      ),
+    );
+  }
+}
+
 /// How long the numbers count up and the bars grow when Home opens.
 /// Nothing moves when the phone asks for less motion.
 Duration dashboardMotion(BuildContext context) =>

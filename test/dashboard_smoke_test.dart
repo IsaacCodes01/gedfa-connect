@@ -59,6 +59,7 @@ Future<void> _pump(
   Size size,
   Brightness brightness, {
   FaWaiting waiting = _waiting,
+  double textScale = 1,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -83,10 +84,30 @@ Future<void> _pump(
       ],
       child: MaterialApp(
         theme: ThemeData(useMaterial3: true, brightness: brightness),
+        // Large text on the phone (Settings › Display), when asked
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.linear(textScale)),
+          child: child!,
+        ),
         home: const FaDashboardScreen(),
       ),
     ),
   );
+  // Every frame of the count-up, not only the end: numbers change size
+  // while they count (the overflow Isaac saw on web, 7 Nov 2026)
+  for (var i = 0; i < 12; i++) {
+    await tester.pump(const Duration(milliseconds: 50));
+    final error = tester.takeException();
+    // The whole message (which widget overflowed), not only the summary
+    expect(
+      error,
+      isNull,
+      reason:
+          'frame $i: ${error is FlutterError ? error.toStringDeep() : error}',
+    );
+  }
   await tester.pumpAndSettle();
 }
 
@@ -107,6 +128,16 @@ void main() {
       expect(find.text('Season stats'), findsOneWidget);
     });
   }
+
+  testWidgets('phone 360 with large text (130%)', (tester) async {
+    await _pump(
+      tester,
+      const Size(360, 3200),
+      Brightness.light,
+      textScale: 1.3,
+    );
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('small phone 320, all caught up', (tester) async {
     await _pump(

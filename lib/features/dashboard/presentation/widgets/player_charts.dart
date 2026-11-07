@@ -146,9 +146,13 @@ class _PositionChartState extends State<PositionChart> {
                   ),
                 ],
               ),
-              _Switch(
-                juvenile: _juvenile,
-                onChanged: (v) => setState(() => _juvenile = v),
+              // Shrinks with very large text instead of overflowing
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: _Switch(
+                  juvenile: _juvenile,
+                  onChanged: (v) => setState(() => _juvenile = v),
+                ),
               ),
             ],
           ),
