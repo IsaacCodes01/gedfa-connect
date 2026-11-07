@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.12, matches the rules after step 2.10b (7 Nov 2026)
+**Status:** v2.12.1, matches the rules after step 2.10c (7 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -266,7 +266,9 @@ A team asks the FA to change its name, short name or logo, or to add the competi
 
 - **Ask:** the team's admin only, for its own team, while no request of that kind is pending. Same batch: a `changeRequested` note in the FA's bell. A new logo is uploaded first to `teams/{teamId}/logo-<millis>.jpg`.
 - **Approve (FA):** one batch: the request `approved` + the team's field(s) + the bell note `changeApproved` for the team. A **name** also updates `teamName` on every player of the team (player IDs never change) and reserves the new name in `teamNames`. The rules check that the team really has the new value after the batch.
-- **Not approve (FA):** `rejected` with a reason + `changeRefused` for the team. The team page shows the reason (red) for a week; the team may ask again.
+- **Reject (FA):** `rejected` with a reason + `changeRefused` for the team. The team page shows the reason (red) for a week; the team may ask again.
+- **Approve all (2.10c):** the app approves a team's waiting changes one after another (oldest first), each in its own batch as above, because the rules allow only one kind of change per team update. A name another club holds is skipped.
+- The FA sees the requests grouped by team (Teams › Changes, one card per team).
 - Read: the team's admins (query by `teamId`) and FA admins.
 
 #### Subcollection `teams/{teamId}/jerseys/{category}-{number}` — jersey reservations
@@ -657,6 +659,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 7 Nov 2026 | v2.12.1 (2.10c): no field or rule changes. "Approve all" = one batch per change, oldest first; requests grouped by team for the FA. 257 tests. |
 | 7 Nov 2026 | v2.12 (2.10b): new `teamChanges` (name, short name, logo, add a competition; one pending per kind; approve or not approve with a reason); the FA applies an approved change to the team, renames `teamName` on its players and reserves the new name (`teamNames.teamId`); notification kinds `changeRequested`, `changeApproved`, `changeRefused`. Storage: `teams/{teamId}/logo-<millis>.jpg`. 257 tests. |
 | 6 Nov 2026 | v2.11 (2.10a): team admins edit town, ground, colours, kits and officials of their approved team; kind `teamUpdated`. 241 tests. |
 | 3 Nov 2026 | v2.10 (2.14d): every screening decision carries `screeningDayId` and is refused before the day starts, a day after it, or for an age group the day doesn't cover; "needs correcting" (back to the team); kind `juvenileToCorrect`. 236 tests. |

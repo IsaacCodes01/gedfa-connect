@@ -6,15 +6,19 @@ import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/core/utils/initials.dart';
+import 'package:gedfa_connect/core/utils/team_name_key.dart';
 import 'package:gedfa_connect/core/widgets/count_tabs.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/notification_bell.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/features/fa/presentation/widgets/fa_changes_view.dart';
 import 'package:gedfa_connect/features/teams/data/team_change_repository.dart';
+import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/data/team_request_repository.dart';
+import 'package:gedfa_connect/features/teams/domain/team.dart';
 import 'package:gedfa_connect/features/teams/domain/team_request.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/competition_picker.dart';
+import 'package:gedfa_connect/features/teams/presentation/widgets/previous_name_pill.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/team_logo.dart';
 import 'package:go_router/go_router.dart';
 
@@ -75,9 +79,20 @@ class _FaRequestsScreenState extends ConsumerState<FaRequestsScreen> {
 
     // Filter by tab and search
     final query = _search.trim().toLowerCase();
+    // Approved teams may have a new name or short name (2.10c)
+    final teams = {
+      for (final team in ref.watch(allTeamsProvider).value ?? const <Team>[])
+        team.id: team,
+    };
     final shown = all.where((request) {
       if (request.status != _tab) return false;
       if (query.isEmpty) return true;
+      final team = teams[teamNameKey(request.teamName)];
+      if (team != null &&
+          (team.name.toLowerCase().contains(query) ||
+              team.shortName.toLowerCase().contains(query))) {
+        return true;
+      }
       return request.teamName.toLowerCase().contains(query) ||
           request.town.toLowerCase().contains(query) ||
           request.shortName.toLowerCase().contains(query);
@@ -221,18 +236,31 @@ class _FaRequestsScreenState extends ConsumerState<FaRequestsScreen> {
 
 /// One request in the list: logo, name, short name · town, competitions,
 /// the rejection reason (if any) and when it was sent or changed.
-class _RequestCard extends StatelessWidget {
+///
+/// Approved: the team as it is NOW (after any approved changes), with
+/// "Previously …" when it was renamed (2.10c).
+class _RequestCard extends ConsumerWidget {
   const _RequestCard({required this.request, required this.onTap});
 
   final TeamRequest request;
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final textTheme = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
     final reason = request.rejectionReason;
     final when = request.updatedAt ?? request.createdAt;
+
+    final current = request.status == ApprovalStatus.approved
+        ? ref.watch(currentTeamProvider((
+            teamId: teamNameKey(request.teamName),
+            registeredName: request.teamName,
+          )))
+        : null;
+    final team = current?.team;
+    final name = team?.name ?? request.teamName;
+    final previousName = current?.previousName;
 
     return Material(
       color: scheme.surface,
@@ -248,9 +276,9 @@ class _RequestCard extends StatelessWidget {
           child: Row(
             children: [
               TeamLogo(
-                label: initialsFor(request.teamName),
-                color: request.logoColor,
-                url: request.logoUrl,
+                label: initialsFor(name),
+                color: team?.logoColor ?? request.logoColor,
+                url: team?.logoUrl ?? request.logoUrl,
                 size: 46,
               ),
               const SizedBox(width: 12),
@@ -259,18 +287,19 @@ class _RequestCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      request.teamName,
+                      name,
                       style: textTheme.titleSmall
                           ?.copyWith(fontWeight: FontWeight.w600),
                     ),
                     Text(
-                      '${request.shortName} · ${request.town}',
+                      '${team?.shortName ?? request.shortName} · '
+                      '${team?.town ?? request.town}',
                       style: textTheme.bodySmall
                           ?.copyWith(color: scheme.onSurfaceVariant),
                     ),
                     const SizedBox(height: 6),
                     CompetitionChips(
-                      competitions: request.categories,
+                      competitions: team?.categories ?? request.categories,
                       compact: true,
                     ),
                     if (request.status == ApprovalStatus.rejected &&
@@ -292,6 +321,10 @@ class _RequestCard extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
+                  if (previousName != null) ...[
+                    PreviousNamePill(name: previousName),
+                    const SizedBox(height: 6),
+                  ],
                   if (when != null)
                     Text(
                       _relative(when),

@@ -15,6 +15,7 @@ import 'package:gedfa_connect/features/teams/data/team_profile_repository.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/data/team_request_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
+import 'package:gedfa_connect/features/teams/domain/team.dart';
 import 'package:gedfa_connect/features/teams/domain/team_change.dart';
 
 const _timeout = Duration(seconds: 15);
@@ -223,7 +224,7 @@ class TeamChangeRepository {
     await batch.commit().timeout(_timeout);
   }
 
-  /// FA does not approve: the team sees [reason] on its team page.
+  /// FA rejects: the team sees [reason] on its team page.
   Future<void> refuse(
     TeamChange change, {
     required String reason,
@@ -274,10 +275,39 @@ final teamChangeProvider =
   return ref.watch(teamChangeRepositoryProvider).watch(id);
 });
 
-/// FA: how many changes are waiting.
+/// FA: how many TEAMS have changes waiting (one card each, 2.10c).
 final pendingTeamChangeCountProvider = Provider<int>((ref) {
   final changes = ref.watch(allTeamChangesProvider).value ?? const [];
-  return changes.where((change) => change.isPending).length;
+  return {
+    for (final change in changes)
+      if (change.isPending) change.teamId,
+  }.length;
+});
+
+/// FA: an approved team as it is NOW, and its name before the latest
+/// approved rename (null if it still has its registered name). For the
+/// Approved tiles: "Previously Golden Unity FC" (2.10c).
+typedef CurrentTeam = ({Team team, String? previousName});
+
+/// The key is a record (team ID + the name it registered with), so the
+/// same team reuses the same answer.
+final currentTeamProvider = Provider.family<CurrentTeam?,
+    ({String teamId, String registeredName})>((ref, key) {
+  final teams = ref.watch(allTeamsProvider).value ?? const <Team>[];
+  final team = teams.where((t) => t.id == key.teamId).firstOrNull;
+  if (team == null) return null;
+  if (team.name == key.registeredName) return (team: team, previousName: null);
+
+  // Renamed: the name it had just before (it may have been renamed twice)
+  final changes = ref.watch(allTeamChangesProvider).value ?? const [];
+  final rename = changes
+      .where((c) =>
+          c.teamId == key.teamId &&
+          c.kind == TeamChangeKind.name &&
+          c.status == ApprovalStatus.approved &&
+          c.to == team.name)
+      .firstOrNull;
+  return (team: team, previousName: rename?.from ?? key.registeredName);
 });
 
 /// FA: the gold number on the Teams tab: new teams + changes waiting.

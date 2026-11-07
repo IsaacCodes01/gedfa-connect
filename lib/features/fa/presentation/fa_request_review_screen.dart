@@ -20,7 +20,10 @@ import 'package:gedfa_connect/features/fa/presentation/widgets/review_widgets.da
 import 'package:gedfa_connect/features/payments/data/payment_repository.dart';
 import 'package:gedfa_connect/features/payments/presentation/widgets/fa_payment_card.dart';
 import 'package:gedfa_connect/features/settings/presentation/widgets/settings_widgets.dart';
+import 'package:gedfa_connect/core/utils/team_name_key.dart';
+import 'package:gedfa_connect/features/teams/data/team_change_repository.dart';
 import 'package:gedfa_connect/features/teams/data/team_request_repository.dart';
+import 'package:gedfa_connect/features/teams/presentation/widgets/previous_name_pill.dart';
 import 'package:gedfa_connect/features/teams/domain/club_status.dart';
 import 'package:gedfa_connect/features/teams/domain/kit.dart';
 import 'package:gedfa_connect/features/teams/domain/kit_slot.dart';
@@ -146,18 +149,31 @@ class _ReviewBody extends StatelessWidget {
 
 // ── Header: logo, name, competitions, status, when sent ─────────────────
 
-class _Header extends StatelessWidget {
+/// The club at the top. An approved team shows its name, logo, short name
+/// and competitions as they are NOW, with "Previously …" if renamed
+/// (2.10c); the rest of the screen is what it registered with.
+class _Header extends ConsumerWidget {
   const _Header({required this.request});
 
   final TeamRequest request;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final textTheme = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
     final sent = request.createdAt;
     final changed = request.updatedAt;
     final reason = request.rejectionReason;
+
+    final current = request.status == ApprovalStatus.approved
+        ? ref.watch(currentTeamProvider((
+            teamId: teamNameKey(request.teamName),
+            registeredName: request.teamName,
+          )))
+        : null;
+    final team = current?.team;
+    final name = team?.name ?? request.teamName;
+    final previousName = current?.previousName;
 
     return TileGroup(
       children: [
@@ -166,25 +182,34 @@ class _Header extends StatelessWidget {
           child: Column(
             children: [
               TeamLogo(
-                label: initialsFor(request.teamName),
-                color: request.logoColor,
-                url: request.logoUrl,
+                label: initialsFor(name),
+                color: team?.logoColor ?? request.logoColor,
+                url: team?.logoUrl ?? request.logoUrl,
                 size: 76,
               ),
               const SizedBox(height: 10),
               Text(
-                request.teamName,
+                name,
                 textAlign: TextAlign.center,
                 style: textTheme.titleLarge
                     ?.copyWith(fontWeight: FontWeight.w600),
               ),
+              if (previousName != null) ...[
+                const SizedBox(height: 4),
+                PreviousNamePill(name: previousName, maxWidth: 280),
+                const SizedBox(height: 4),
+              ],
               Text(
-                '${request.shortName} · ${request.town}',
+                '${team?.shortName ?? request.shortName} · '
+                '${team?.town ?? request.town}',
                 style: textTheme.bodySmall
                     ?.copyWith(color: scheme.onSurfaceVariant),
               ),
               const SizedBox(height: 8),
-              CompetitionChips(competitions: request.categories, center: true),
+              CompetitionChips(
+                competitions: team?.categories ?? request.categories,
+                center: true,
+              ),
               const SizedBox(height: 10),
               StatusBadge(status: request.status),
               if (sent != null) ...[

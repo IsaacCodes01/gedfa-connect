@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gedfa_connect/app/routes.dart';
+import 'package:gedfa_connect/app/theme.dart';
 import 'package:gedfa_connect/core/constants/approval_status.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
@@ -17,9 +18,10 @@ import 'package:go_router/go_router.dart';
 /// How many decided changes the FA sees under "Decided".
 const _decidedShown = 10;
 
-/// FA › Teams › Changes (2.10b, board P4): name, short name, logo and
-/// competition requests from approved teams. Waiting ones first (oldest
-/// first, like team requests), then the latest decisions.
+/// FA › Teams › Changes (2.10b, board P4; grouped in 2.10c): name, short
+/// name, logo and competition requests from approved teams. ONE card per
+/// team with everything it asked for (the team that has waited longest
+/// first), then the latest decisions.
 class FaChangesView extends ConsumerWidget {
   const FaChangesView({super.key});
 
@@ -45,13 +47,24 @@ class FaChangesView extends ConsumerWidget {
         final done = all.where((c) => !c.isPending).toList()
           ..sort((a, b) => decided(b).compareTo(decided(a)));
 
-        Team? teamOf(TeamChange c) =>
-            teams.where((t) => t.id == c.teamId).firstOrNull;
+        // One group per team, in the order of its oldest request
+        final byTeam = <String, List<TeamChange>>{};
+        for (final change in waiting) {
+          (byTeam[change.teamId] ??= []).add(change);
+        }
+        Team? teamOf(String teamId) =>
+            teams.where((t) => t.id == teamId).firstOrNull;
+
+        final teamCount = byTeam.length;
+        final changeCount = waiting.length;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _Heading('WAITING FOR YOU · ${waiting.length}'),
+            _Heading(
+              'WAITING FOR YOU · $teamCount ${teamCount == 1 ? 'TEAM' : 'TEAMS'}'
+              ' · $changeCount ${changeCount == 1 ? 'CHANGE' : 'CHANGES'}',
+            ),
             if (waiting.isEmpty)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 24),
@@ -63,11 +76,13 @@ class FaChangesView extends ConsumerWidget {
                 ),
               )
             else
-              for (final change in waiting) ...[
-                _ChangeCard(
-                  change: change,
-                  team: teamOf(change),
-                  onTap: () => context.go(Routes.adminChange(change.id)),
+              for (final MapEntry(key: teamId, value: changes)
+                  in byTeam.entries) ...[
+                _TeamChangesCard(
+                  // Newest first, like the team's screen
+                  changes: changes.reversed.toList(),
+                  team: teamOf(teamId),
+                  onTap: () => context.go(Routes.adminTeamChanges(teamId)),
                 ),
                 const SizedBox(height: 10),
               ],
@@ -111,29 +126,10 @@ class _Heading extends StatelessWidget {
   }
 }
 
-/// One waiting change: logo, team, what it asks for, when and why.
-class _ChangeCard extends StatelessWidget {
-  const _ChangeCard({
-    required this.change,
-    required this.team,
-    required this.onTap,
-  });
-
-  final TeamChange change;
-  final Team? team;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final scheme = Theme.of(context).colorScheme;
-    final team = this.team;
-    final name = team?.name ?? change.teamName;
-    final bold = const TextStyle(fontWeight: FontWeight.w700);
-    final createdAt = change.createdAt;
-
-    // "Name → Golden Unity Stars FC", "Add Juvenile (plays Division)"
-    final asks = switch (change.kind) {
+/// "Name → Golden Unity Stars FC", "Add Juvenile (plays Division)"
+TextSpan asksText(TeamChange change) {
+  const bold = TextStyle(fontWeight: FontWeight.w700);
+  return switch (change.kind) {
       TeamChangeKind.name => TextSpan(children: [
           const TextSpan(text: 'Name → '),
           TextSpan(text: change.to, style: bold),
@@ -151,6 +147,40 @@ class _ChangeCard extends StatelessWidget {
           ),
         ]),
     };
+}
+
+/// One team with changes waiting: logo, team, a line per change, when
+/// (and why, if it is just one), and "3 changes" in gold.
+class _TeamChangesCard extends StatelessWidget {
+  const _TeamChangesCard({
+    required this.changes,
+    required this.team,
+    required this.onTap,
+  });
+
+  /// Newest first
+  final List<TeamChange> changes;
+  final Team? team;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
+    final team = this.team;
+    final name = team?.name ?? changes.first.teamName;
+    final count = changes.length;
+
+    // "3 Nov – 5 Nov", or for one change: "4 Nov · "the reason""
+    final dates = [
+      for (final change in changes.reversed)
+        if (change.createdAt case final at?) formatDayMonth(at),
+    ];
+    final whenText = count == 1
+        ? [...dates, '"${changes.first.reason}"'].join(' · ')
+        : dates.isEmpty || dates.first == dates.last
+            ? dates.firstOrNull ?? ''
+            : '${dates.first} – ${dates.last}';
 
     return Material(
       color: scheme.surface,
@@ -164,6 +194,7 @@ class _ChangeCard extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(14, 14, 10, 14),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TeamLogo(
                 label: initialsFor(name),
@@ -182,13 +213,17 @@ class _ChangeCard extends StatelessWidget {
                           ?.copyWith(fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(height: 2),
-                    Text.rich(asks, style: textTheme.bodyMedium),
+                    for (final change in changes)
+                      Text.rich(
+                        TextSpan(children: [
+                          const TextSpan(text: '•  '),
+                          asksText(change),
+                        ]),
+                        style: textTheme.bodyMedium,
+                      ),
                     const SizedBox(height: 2),
                     Text(
-                      [
-                        if (createdAt != null) formatDayMonth(createdAt),
-                        '"${change.reason}"',
-                      ].join(' · '),
+                      whenText,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: textTheme.bodySmall
@@ -197,7 +232,34 @@ class _ChangeCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded, color: scheme.onSurfaceVariant),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  // "3 changes" in gold: waiting for the FA
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.ghanaGold,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      count == 1 ? '1 change' : '$count changes',
+                      style: const TextStyle(
+                        color: Color(0xFF3A2C00),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -222,7 +284,7 @@ class _DecidedLine extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(0, 4, 0, 6),
       child: Text(
         '${approved ? '✓' : '✕'} ${change.teamName}: ${change.decidedText} · '
-        '${approved ? 'approved' : 'not approved'}$when',
+        '${approved ? 'approved' : 'rejected'}$when',
         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),

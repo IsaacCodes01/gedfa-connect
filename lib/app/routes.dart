@@ -11,10 +11,10 @@ class Routes {
   static const admin = '/admin';
   static String adminRequest(String uid) => '/admin/request/$uid';
 
-  /// FA: Teams with the Changes switch on, and one change to decide
-  /// (2.10b, boards P4 and P5).
+  /// FA: Teams with the Changes switch on (2.10b), and all of one team's
+  /// changes to decide (2.10c).
   static const adminChanges = '$admin?view=changes';
-  static String adminChange(String id) => '/admin/change/$id';
+  static String adminTeamChanges(String teamId) => '/admin/changes/$teamId';
   static const adminNotifications = '/admin/notifications';
   static const adminAnnouncements = '/admin/more/announcements';
   static const adminNewAnnouncement = '/admin/more/announcements/new';

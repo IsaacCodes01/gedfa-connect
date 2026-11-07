@@ -76,10 +76,10 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
 ## Where we left off (7 Nov 2026)
 
 - 2.10a (`9aa5b31`) is pushed and its rules are deployed to dev (Isaac, 7 Nov 2026).
-- **2.10b change requests built and committed** (7 Nov 2026, 257 rules tests): `teamChanges`
-  collection, team "Ask the FA to change" screen, FA Teams › New teams | Changes, change review.
-  **Not yet:** Isaac's test in the app, push, and deploying the 2.10b rules (`firestore:rules` AND
-  `storage`, since `storage.rules` changed) to dev: ask Isaac first.
+- **2.10b change requests** (tested by Isaac) and **2.10c** (changes grouped by team, Reject with a
+  reason, Approve all, "Previously …" on renamed teams) are committed (7 Nov 2026, 257 rules tests).
+  Isaac deploys the 2.10b rules (`firestore:rules` and `storage`) to dev himself.
+- Mockups go in `docs/mockups/` (ignored by git): never commit them.
 - Known and accepted in 2.10b: the old `teamRequests` doc keeps the old name (registration
   history), and old payments / notifications keep the name they had.
 - **Next:** **2.11** FA corrections (edit, ask for a correction, suspend), **2.12** FA dashboard,

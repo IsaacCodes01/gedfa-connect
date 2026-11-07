@@ -14,7 +14,7 @@ import 'package:gedfa_connect/features/notifications/presentation/compose_announ
 import 'package:gedfa_connect/features/notifications/presentation/fa_announcement_screen.dart';
 import 'package:gedfa_connect/features/notifications/presentation/fa_announcements_screen.dart';
 import 'package:gedfa_connect/features/notifications/presentation/notifications_screen.dart';
-import 'package:gedfa_connect/features/fa/presentation/fa_change_review_screen.dart';
+import 'package:gedfa_connect/features/fa/presentation/fa_team_changes_screen.dart';
 import 'package:gedfa_connect/features/fa/presentation/fa_player_review_screen.dart';
 import 'package:gedfa_connect/features/fa/presentation/fa_player_teams_screen.dart';
 import 'package:gedfa_connect/features/fa/presentation/fa_request_review_screen.dart';
@@ -119,12 +119,12 @@ final routerProvider = Provider<GoRouter>((ref) {
                   changes: state.uri.queryParameters['view'] == 'changes',
                 ),
                 routes: [
-                  // One change request to decide. Full-screen (2.10b).
+                  // One team's change requests to decide. Full-screen (2.10c).
                   GoRoute(
-                    path: 'change/:id',
+                    path: 'changes/:teamId',
                     parentNavigatorKey: rootNavigatorKey,
-                    builder: (_, state) => FaChangeReviewScreen(
-                      changeId: state.pathParameters['id']!,
+                    builder: (_, state) => FaTeamChangesScreen(
+                      teamId: state.pathParameters['teamId']!,
                     ),
                   ),
                   // Notifications (bell). Full-screen, above the tabs.
