@@ -49,6 +49,9 @@ class FirestorePaths {
   static const cups = '$district/cups';
   static String cup(String id) => '$district/cups/$id';
 
+  /// A cup's history (3.0c1b): one doc per change, deleted with the cup.
+  static String cupHistory(String id) => '$district/cups/$id/history';
+
   static const players = '$district/players';
   static String player(String playerId) => '$district/players/$playerId';
 

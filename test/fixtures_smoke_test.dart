@@ -8,9 +8,11 @@ import 'package:gedfa_connect/features/fixtures/data/fixture_repository.dart';
 import 'package:gedfa_connect/features/fixtures/data/season_maker.dart';
 import 'package:gedfa_connect/features/fixtures/domain/season_plan.dart';
 import 'package:gedfa_connect/features/fixtures/domain/cup.dart';
+import 'package:gedfa_connect/features/fixtures/domain/cup_changes.dart';
 import 'package:gedfa_connect/features/fixtures/domain/fixture.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/competitions_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/cup_form_screen.dart';
+import 'package:gedfa_connect/features/fixtures/presentation/cup_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/fa_fixtures_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/match_details_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/season_draft_screen.dart';
@@ -219,6 +221,25 @@ Future<void> _pump(
         ),
         seasonTeamsProvider.overrideWith((ref, _) async => _teams),
         seasonCupsProvider.overrideWith((ref) => Stream.value(_cups)),
+        cupProvider.overrideWith(
+          (ref, id) => Stream.value(_cups.firstWhere((c) => c.id == id)),
+        ),
+        cupHistoryProvider.overrideWith(
+          (ref, id) => Stream.value([
+            CupHistoryLine(
+              id: 'h2',
+              text: 'Each round: one match → home and away',
+              byName: 'Kofi Mensah',
+              at: DateTime(2026, 11, 8, 18, 12),
+            ),
+            CupHistoryLine(
+              id: 'h1',
+              text: 'Cup made',
+              byName: 'Kofi Mensah',
+              at: DateTime(2026, 11, 8, 17, 40),
+            ),
+          ]),
+        ),
         savedDraftProvider.overrideWith((ref, _) => Stream.value(null)),
         allTeamsProvider.overrideWith((ref) => Stream.value(const <Team>[])),
         myAudienceProvider.overrideWithValue('team:aps'),
@@ -292,6 +313,58 @@ void main() {
       });
     }
   }
+  for (final brightness in Brightness.values) {
+    for (final width in [360.0, 1280.0]) {
+      testWidgets("A cup's page (C7, C8), $width wide, $brightness", (tester) async {
+        await _pump(tester, const CupScreen(cupId: 'c1'), Size(width, 2400), brightness);
+        expect(find.text('Cup · 18 teams · not drawn yet'), findsOneWidget);
+        expect(find.text('Ready for the first draw'), findsOneWidget);
+        expect(find.text('First round · 2 matches · 14 byes'), findsOneWidget);
+        expect(find.text('Knockout with a first round'), findsOneWidget);
+        expect(find.text('Home and away; the final one match'), findsOneWidget);
+        expect(find.text('Bracket fixed from the quarter-finals · no seeding'), findsOneWidget);
+        expect(find.text('Each round: one match → home and away'), findsOneWidget);
+        expect(find.text('Kofi Mensah · Sun 8 Nov, 5:40 pm'), findsOneWidget);
+        await tester.tap(find.byTooltip('More'));
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(find.text('Delete the cup'), findsOneWidget);
+        expect(find.text('Everything goes: matches and history'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+      testWidgets("A Gala's page (C7), $width wide, $brightness", (tester) async {
+        await _pump(tester, const CupScreen(cupId: 'g1'), Size(width, 2400), brightness);
+        expect(find.text('Ready for the draw'), findsOneWidget);
+        expect(find.text('First round · 4 matches · 4 byes'), findsOneWidget);
+        expect(
+          find.text('Apam Park · Sat 29 Aug – Sun 30 Aug · first kick-off 9:00 am · every 90 min'),
+          findsOneWidget,
+        );
+        expect(find.text('Level at full time'), findsOneWidget);
+      });
+      testWidgets('Change the cup (C8), filled in, $width wide, $brightness', (tester) async {
+        await _pump(tester, const CupFormScreen(cupId: 'c1'), Size(width, 3000), brightness);
+        expect(find.text('Change the cup'), findsOneWidget);
+        expect(find.text('GEDFA Cup 2026/27'), findsWidgets);
+        expect(find.text('18 teams'), findsOneWidget);
+        expect(find.text('Quarter-finals'), findsOneWidget);
+        expect(find.text('Save changes'), findsOneWidget);
+      });
+      testWidgets('Change the Gala (C8), filled in, $width wide, $brightness', (tester) async {
+        await _pump(tester, const CupFormScreen(cupId: 'g1'), Size(width, 3000), brightness);
+        expect(find.text('Change the Gala'), findsOneWidget);
+        expect(find.text('Apam Park'), findsOneWidget);
+        // 12 of the 18 Division teams and 18 U17 sides
+        expect(find.text('12 teams'), findsOneWidget);
+        expect(find.text('24 teams left out'), findsOneWidget);
+        expect(find.text('= 1 h 30 min'), findsOneWidget);
+      });
+    }
+  }
+  testWidgets("A cup's page with large text on a small phone", (tester) async {
+    await _pump(tester, const CupScreen(cupId: 'g1'), const Size(320, 2400), Brightness.light,
+        textScale: 1.3);
+    expect(find.text('Go to the draw'), findsOneWidget);
+  });
   testWidgets('New cup (C2) with large text on a small phone', (tester) async {
     await _pump(tester, const CupFormScreen(), const Size(320, 3600), Brightness.light,
         textScale: 1.3);

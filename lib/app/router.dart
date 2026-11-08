@@ -24,6 +24,7 @@ import 'package:gedfa_connect/features/fa/presentation/fa_request_review_screen.
 import 'package:gedfa_connect/features/fa/presentation/fa_requests_screen.dart';
 import 'package:gedfa_connect/features/fa/presentation/fa_juvenile_child_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/competitions_screen.dart';
+import 'package:gedfa_connect/features/fixtures/presentation/cup_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/cup_form_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/fa_fixtures_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/fixture_form_screen.dart';
@@ -256,6 +257,22 @@ final routerProvider = Provider<GoRouter>((ref) {
                         path: 'new',
                         parentNavigatorKey: rootNavigatorKey,
                         builder: (_, _) => const CupFormScreen(),
+                      ),
+                      // A cup's page (3.0c1b, C7), then "Change"
+                      GoRoute(
+                        path: 'cup/:cupId',
+                        parentNavigatorKey: rootNavigatorKey,
+                        builder: (_, state) =>
+                            CupScreen(cupId: state.pathParameters['cupId']!),
+                        routes: [
+                          GoRoute(
+                            path: 'edit',
+                            parentNavigatorKey: rootNavigatorKey,
+                            builder: (_, state) => CupFormScreen(
+                              cupId: state.pathParameters['cupId'],
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),

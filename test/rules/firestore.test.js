@@ -3260,11 +3260,8 @@ describe('Cups and galas (3.0c1)', () => {
     await assertFails(getDoc(doc(dbAs('newbie'), `${D}/cups/c1`)));
   });
 
-  it('only the FA makes one, and nobody changes or deletes one yet', async () => {
+  it('only the FA makes one', async () => {
     await assertFails(setDoc(doc(dbAs('admin1'), `${D}/cups/c2`), cupData({ createdBy: 'admin1', updatedBy: 'admin1' })));
-    await setDoc(doc(dbAs('fa1'), `${D}/cups/c1`), cupData());
-    await assertFails(updateDoc(doc(dbAs('fa1'), `${D}/cups/c1`), { name: 'GEDFA Cup', updatedAt: serverTimestamp() }));
-    await assertFails(deleteDoc(doc(dbAs('fa1'), `${D}/cups/c1`)));
   });
 
   it('a cup must keep GEDFA\'s rules', async () => {
@@ -3297,5 +3294,83 @@ describe('Cups and galas (3.0c1)', () => {
       gala: { ...galaData().gala, lastDay: Timestamp.fromDate(new Date(Date.UTC(2026, 7, 28))) },
     })));
     await assertFails(setDoc(ref, galaData({ gala: { ...galaData().gala, gapMinutes: 10 } })));
+  });
+});
+
+// ---------- A cup's page: change, delete, history (3.0c1b) ----------
+
+/** A history line, as the app writes it. */
+function cupLine(changes = {}) {
+  return { text: 'Cup made', by: 'fa1', byName: 'Kofi Mensah', at: serverTimestamp(), ...changes };
+}
+
+describe('Cups: change, delete and history (3.0c1b)', () => {
+  beforeEach(async () => {
+    // A cup not drawn yet, and one drawn (made by fa1 yesterday)
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const made = Timestamp.fromDate(new Date(Date.now() - 86400000));
+      const db = context.firestore();
+      await setDoc(doc(db, `${D}/cups/c1`), cupData({ createdAt: made, updatedAt: made }));
+      await setDoc(doc(db, `${D}/cups/c1/history/h1`), cupLine({ at: made }));
+      await setDoc(doc(db, `${D}/cups/d1`), cupData({ stage: 'drawn', createdAt: made, updatedAt: made }));
+    });
+  });
+
+  it('the FA makes a cup with its first history line in one batch', async () => {
+    const db = dbAs('fa1');
+    const batch = writeBatch(db);
+    batch.set(doc(db, `${D}/cups/c9`), cupData());
+    batch.set(doc(db, `${D}/cups/c9/history/h1`), cupLine());
+    await assertSucceeds(batch.commit());
+  });
+
+  it('the FA changes a cup before the draw, with a history line; everyone with a role reads the history', async () => {
+    const db = dbAs('fa1');
+    const batch = writeBatch(db);
+    batch.update(doc(db, `${D}/cups/c1`), { legs: 1, level: 'replay', updatedBy: 'fa1', updatedAt: serverTimestamp() });
+    batch.set(doc(db, `${D}/cups/c1/history/h2`), cupLine({ text: 'Each round: home and away → one match' }));
+    await assertSucceeds(batch.commit());
+    // A cup made a gala: the gala part comes in
+    await assertSucceeds(updateDoc(doc(db, `${D}/cups/c1`), {
+      kind: 'gala', legs: 1, level: 'penalties', bracketFrom: 0, gala: galaData().gala, updatedBy: 'fa1', updatedAt: serverTimestamp(),
+    }));
+    await assertSucceeds(getDocs(collection(dbAs('admin1'), `${D}/cups/c1/history`)));
+    await assertFails(getDocs(collection(dbAs('newbie'), `${D}/cups/c1/history`)));
+  });
+
+  it("nobody else changes a cup, and not after the draw, nor who made it, its season or GEDFA's rules", async () => {
+    const ref = (as, id = 'c1') => doc(dbAs(as), `${D}/cups/${id}`);
+    const stamp = { updatedBy: 'fa1', updatedAt: serverTimestamp() };
+    await assertFails(updateDoc(ref('admin1'), { name: 'Royal Cup', updatedBy: 'admin1', updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(ref('fa1', 'd1'), { name: 'GEDFA Cup', ...stamp }));
+    await assertFails(updateDoc(ref('fa1'), { stage: 'drawn', ...stamp }));
+    await assertFails(updateDoc(ref('fa1'), { createdBy: 'fa2', ...stamp }));
+    await assertFails(updateDoc(ref('fa1'), { createdAt: serverTimestamp(), ...stamp }));
+    await assertFails(updateDoc(ref('fa1'), { season: '2027-28', ...stamp }));
+    await assertFails(updateDoc(ref('fa1'), { level: 'replay', ...stamp }));
+    await assertFails(updateDoc(ref('fa1'), { name: 'GEDFA Cup' }));
+  });
+
+  it('the FA deletes a cup with its history, even after the draw; nobody else does', async () => {
+    await assertFails(deleteDoc(doc(dbAs('admin1'), `${D}/cups/c1`)));
+    await assertFails(deleteDoc(doc(dbAs('admin1'), `${D}/cups/c1/history/h1`)));
+    const db = dbAs('fa1');
+    const batch = writeBatch(db);
+    batch.delete(doc(db, `${D}/cups/c1/history/h1`));
+    batch.delete(doc(db, `${D}/cups/c1`));
+    await assertSucceeds(batch.commit());
+    await assertSucceeds(deleteDoc(doc(db, `${D}/cups/d1`)));
+  });
+
+  it("a history line is the FA's own, now, for a cup that is there, and never changed", async () => {
+    const line = (as, cup = 'c1') => doc(dbAs(as), `${D}/cups/${cup}/history/h9`);
+    await assertSucceeds(setDoc(line('fa1'), cupLine({ text: 'Seeding: off → on' })));
+    await assertFails(setDoc(line('admin1'), cupLine({ by: 'admin1' })));
+    await assertFails(setDoc(line('fa1'), cupLine({ by: 'fa2' })));
+    await assertFails(setDoc(line('fa1'), cupLine({ at: Timestamp.fromDate(new Date(2026, 0, 1)) })));
+    await assertFails(setDoc(line('fa1'), cupLine({ text: 'ok' })));
+    await assertFails(setDoc(line('fa1'), cupLine({ extra: true })));
+    await assertFails(setDoc(line('fa1', 'nope'), cupLine()));
+    await assertFails(updateDoc(doc(dbAs('fa1'), `${D}/cups/c1/history/h1`), { text: 'Cup made twice' }));
   });
 });

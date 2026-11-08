@@ -1311,6 +1311,18 @@ service cloud.firestore {
           && data.updatedAt == request.time;
       }
 
+      // A line in a cup's history (3.0c1b): what changed, who and when. Only
+      // with its cup (made, changed or still there in the same batch).
+      function isValidCupLine(cupId, data) {
+        return data.keys().hasOnly(['text', 'by', 'byName', 'at'])
+          && data.keys().hasAll(['text', 'by', 'byName', 'at'])
+          && isText(data.text, 3, 200)
+          && isText(data.byName, 1, 80)
+          && data.by == request.auth.uid
+          && data.at == request.time
+          && existsAfter(/databases/$(database)/documents/districts/$(districtId)/cups/$(cupId));
+      }
+
       match /cups/{cupId} {
         // Everyone with a role sees the cups (teams see their path, C6)
         allow get, list: if hasRole();
@@ -1322,7 +1334,27 @@ service cloud.firestore {
           && request.resource.data.createdBy == request.auth.uid
           && request.resource.data.createdAt == request.time;
 
-        // Changing and the draw come with 3.0c2; never deleted for now
+        // "Change" (3.0c1b, C8): only before the draw, same season, and who
+        // made it and when stay as they were. The draw (3.0c2) moves it on.
+        allow update: if isFaAdmin()
+          && isValidCup(request.resource.data)
+          && resource.data.stage == 'notDrawn'
+          && request.resource.data.stage == 'notDrawn'
+          && request.resource.data.season == resource.data.season
+          && request.resource.data.createdBy == resource.data.createdBy
+          && request.resource.data.createdAt == resource.data.createdAt;
+
+        // "Delete the cup" (C9): at any time, everything goes (GEDFA, 8 Nov
+        // 2026)
+        allow delete: if isFaAdmin();
+
+        match /history/{lineId} {
+          allow get, list: if hasRole();
+          allow create: if isFaAdmin()
+            && isValidCupLine(cupId, request.resource.data);
+          // Never changed; deleted only with the cup
+          allow delete: if isFaAdmin();
+        }
       }
 
       // ---------- teams/{teamId} ----------

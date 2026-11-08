@@ -90,6 +90,10 @@ class Routes {
   /// cup or gala (C2, C2b).
   static const adminCompetitions = '/admin/fixtures/competitions';
   static const adminNewCup = '/admin/fixtures/competitions/new';
+
+  /// FA: a cup's page (3.0c1b, C7) and "Change" (the C2 form, filled in).
+  static String adminCup(String id) => '$adminCompetitions/cup/$id';
+  static String adminEditCup(String id) => '$adminCompetitions/cup/$id/edit';
   static String adminEditFixture(String id) => '$adminFixtures/edit/$id';
   static String adminFixtureKits(String id) => '$adminFixtures/kits/$id';
 

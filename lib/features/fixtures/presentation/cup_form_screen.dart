@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:gedfa_connect/app/routes.dart';
 import 'package:gedfa_connect/app/theme.dart';
 import 'package:gedfa_connect/core/constants/season.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
@@ -14,6 +15,7 @@ import 'package:gedfa_connect/features/dashboard/presentation/widgets/dashboard_
 import 'package:gedfa_connect/features/fixtures/data/cup_repository.dart';
 import 'package:gedfa_connect/features/fixtures/data/season_maker.dart';
 import 'package:gedfa_connect/features/fixtures/domain/cup.dart';
+import 'package:gedfa_connect/features/fixtures/domain/cup_changes.dart';
 import 'package:gedfa_connect/features/fixtures/domain/cup_format.dart';
 import 'package:gedfa_connect/features/players/domain/age_group.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
@@ -28,8 +30,13 @@ typedef _Side = ({CupEntry entry, String name});
 /// number of teams; the FA sets one match or home and away, what happens
 /// when a tie is level, and the round the bracket is fixed from. A gala
 /// also has a ground, days and a timetable. Saved as "not drawn yet".
+///
+/// With [cupId] it is "Change" (3.0c1b, C8): the same form, filled in from
+/// the saved cup, and each change goes in the cup's history.
 class CupFormScreen extends ConsumerStatefulWidget {
-  const CupFormScreen({super.key});
+  const CupFormScreen({super.key, this.cupId});
+
+  final String? cupId;
 
   @override
   ConsumerState<CupFormScreen> createState() => _CupFormScreenState();
@@ -66,6 +73,42 @@ class _CupFormScreenState extends ConsumerState<CupFormScreen> {
   /// The FA types the minutes between kick-offs (30 to 240).
   final _gapField = TextEditingController(text: '90');
   bool _busy = false;
+
+  /// Change: the cup as saved; the form is filled from it once.
+  Cup? _saved;
+
+  bool get _editing => widget.cupId != null;
+
+  /// Change: fills the form from the saved cup. The teams left out are
+  /// the sides that could play but are not in it.
+  void _fillFrom(Cup cup, List<_Side> division, List<_Side> juvenile) {
+    _saved = cup;
+    _kind = cup.kind;
+    _name.text = cup.name;
+    _nameTyped = true;
+    _who = cup.who;
+    _group = cup.ageGroup ?? AgeGroup.u17;
+    final entered = {for (final e in cup.entries) e.key};
+    _left
+      ..clear()
+      ..addAll([
+        for (final s in _sides(division, juvenile))
+          if (!entered.contains(s.entry.key)) s.entry.key,
+      ]);
+    _format = cup.format;
+    _legs = cup.legs;
+    _level = cup.level;
+    _bracketFrom = cup.bracketFrom;
+    _seeded = cup.seeded;
+    if (cup.gala case final gala?) {
+      _ground.text = gala.ground;
+      _firstDay = gala.firstDay;
+      _lastDay = gala.lastDay;
+      _kickoff = TimeOfDay(hour: gala.kickoffHour, minute: gala.kickoffMinute);
+      _gap = gala.gapMinutes;
+      _gapField.text = '${gala.gapMinutes}';
+    }
+  }
 
   static String _defaultName(CupKind kind) => kind == CupKind.cup
       ? 'GEDFA Cup ${Season.label(Season.current)}'
@@ -135,7 +178,9 @@ class _CupFormScreenState extends ConsumerState<CupFormScreen> {
     final picked = await showDatePicker(
       context: context,
       initialDate: first ? _firstDay : _lastDay,
-      firstDate: first ? DateTime(now.year, now.month, now.day) : _firstDay,
+      firstDate: first
+          ? _earliest(DateTime(now.year, now.month, now.day))
+          : _firstDay,
       lastDate: now.add(const Duration(days: 400)),
       helpText: first ? 'First day' : 'Last day',
     );
@@ -150,6 +195,10 @@ class _CupFormScreenState extends ConsumerState<CupFormScreen> {
     });
   }
 
+  /// Change: a Gala already set in the past can keep its day.
+  DateTime _earliest(DateTime today) =>
+      _firstDay.isBefore(today) ? _firstDay : today;
+
   Future<void> _pickKickoff() async {
     final picked = await showTimePicker(
       context: context,
@@ -159,7 +208,11 @@ class _CupFormScreenState extends ConsumerState<CupFormScreen> {
     if (picked != null && mounted) setState(() => _kickoff = picked);
   }
 
-  Future<void> _save(List<_Side> chosen, int bracketFrom) async {
+  Future<void> _save(
+    List<_Side> chosen,
+    int bracketFrom,
+    String Function(CupEntry entry) nameOf,
+  ) async {
     final name = _name.text.trim();
     if (name.length < 3 || name.length > 60) {
       AppToast.warning(context, 'Give it a name (3 to 60 letters).');
@@ -184,41 +237,59 @@ class _CupFormScreenState extends ConsumerState<CupFormScreen> {
     }
     final me = ref.read(authRepositoryProvider).currentUser;
     if (me == null) return;
+    final saved = _saved;
+    if (_editing && saved == null) return;
     setState(() => _busy = true);
     try {
-      await ref
-          .read(cupRepositoryProvider)
-          .create(
-            Cup(
-              id: '',
-              season: Season.current,
-              kind: _kind,
-              name: name,
-              who: _who,
-              ageGroup: _who == CupWho.division ? null : _group,
-              entries: [for (final s in chosen) s.entry],
-              format: _format,
-              legs: _legs,
-              level: _level,
-              bracketFrom: _format == CupFormat.groups ? 0 : bracketFrom,
-              seeded: _seeded,
-              stage: CupStage.notDrawn,
-              gala: gala
-                  ? GalaSettings(
-                      ground: _ground.text,
-                      firstDay: _firstDay,
-                      lastDay: _lastDay,
-                      kickoffHour: _kickoff.hour,
-                      kickoffMinute: _kickoff.minute,
-                      gapMinutes: _gap,
-                    )
-                  : null,
-            ),
-            by: me,
-          );
+      final cup = Cup(
+        id: saved?.id ?? '',
+        season: saved?.season ?? Season.current,
+        kind: _kind,
+        name: name,
+        who: _who,
+        ageGroup: _who == CupWho.division ? null : _group,
+        entries: [for (final s in chosen) s.entry],
+        format: _format,
+        legs: _legs,
+        level: _level,
+        bracketFrom: _format == CupFormat.groups ? 0 : bracketFrom,
+        seeded: _seeded,
+        stage: CupStage.notDrawn,
+        gala: gala
+            ? GalaSettings(
+                ground: _ground.text,
+                firstDay: _firstDay,
+                lastDay: _lastDay,
+                kickoffHour: _kickoff.hour,
+                kickoffMinute: _kickoff.minute,
+                gapMinutes: _gap,
+              )
+            : null,
+        createdAt: saved?.createdAt,
+      );
+      final repository = ref.read(cupRepositoryProvider);
+      if (saved != null) {
+        final lines = cupChanges(saved, cup, nameOf: nameOf);
+        if (lines.isEmpty) {
+          if (mounted) AppToast.info(context, 'Nothing changed.');
+          return;
+        }
+        await repository.update(cup, lines, by: me);
+        if (!mounted) return;
+        AppToast.success(
+          context,
+          lines.length == 1
+              ? 'Saved: ${lines.single}'
+              : '${lines.length} changes saved.',
+        );
+        context.pop();
+        return;
+      }
+      final id = await repository.create(cup, by: me);
       if (!mounted) return;
       AppToast.success(context, '$name saved. The live draw comes next.');
-      context.pop();
+      // To the cup's page (C7), where the draw starts
+      context.pushReplacement(Routes.adminCup(id));
     } catch (error) {
       if (mounted) AppToast.error(context, appErrorMessage(error));
     } finally {
@@ -234,14 +305,30 @@ class _CupFormScreenState extends ConsumerState<CupFormScreen> {
       for (final t in ref.watch(allTeamsProvider).value ?? const [])
         if (t.isSuspended) t.id,
     };
-    final gala = _kind == CupKind.gala;
+    final savedAsync = _editing ? ref.watch(cupProvider(widget.cupId!)) : null;
 
     Widget body;
-    final error = divisionAsync.error ?? juvenileAsync.error;
+    final error =
+        divisionAsync.error ?? juvenileAsync.error ?? savedAsync?.error;
     if (error != null) {
       body = ErrorView(message: appErrorMessage(error));
-    } else if (!divisionAsync.hasValue || !juvenileAsync.hasValue) {
+    } else if (!divisionAsync.hasValue ||
+        !juvenileAsync.hasValue ||
+        (savedAsync != null && !savedAsync.hasValue)) {
       body = const LoadingView();
+    } else if (savedAsync != null && savedAsync.value == null) {
+      body = const EmptyView(
+        icon: Icons.emoji_events_outlined,
+        title: 'Not here',
+        message: 'This cup was deleted.',
+      );
+    } else if (savedAsync?.value?.stage case final stage?
+        when stage != CupStage.notDrawn) {
+      body = const EmptyView(
+        icon: Icons.lock_outline,
+        title: 'Already drawn',
+        message: 'It is drawn, so it can no longer be changed.',
+      );
     } else {
       final division = [
         for (final t in divisionAsync.requireValue)
@@ -257,7 +344,19 @@ class _CupFormScreenState extends ConsumerState<CupFormScreen> {
             name: t.side.name,
           ),
       ];
+      if (savedAsync?.value case final cup? when _saved == null) {
+        _fillFrom(cup, division, juvenile);
+      }
+      final gala = _kind == CupKind.gala;
       final sides = _sides(division, juvenile);
+      final names = {
+        for (final s in division) s.entry.key: s.name,
+        for (final s in juvenile)
+          s.entry.key: _who == CupWho.open
+              ? '${s.name} · ${_group.label}'
+              : s.name,
+      };
+      String nameOf(CupEntry e) => names[e.key] ?? 'A team';
       final chosen = [
         for (final s in sides)
           if (!_left.contains(s.entry.key)) s,
@@ -535,7 +634,9 @@ class _CupFormScreenState extends ConsumerState<CupFormScreen> {
             ],
             const SizedBox(height: 20),
             FilledButton(
-              onPressed: _busy ? null : () => _save(chosen, bracketFrom),
+              onPressed: _busy
+                  ? null
+                  : () => _save(chosen, bracketFrom, nameOf),
               child: _busy
                   ? const SizedBox(
                       width: 20,
@@ -543,7 +644,9 @@ class _CupFormScreenState extends ConsumerState<CupFormScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : Text(
-                      gala
+                      _editing
+                          ? 'Save changes'
+                          : gala
                           ? 'Save and go to the draw'
                           : 'Save and go to the first draw',
                     ),
@@ -553,10 +656,13 @@ class _CupFormScreenState extends ConsumerState<CupFormScreen> {
       );
     }
 
+    final gala = _kind == CupKind.gala;
     return Scaffold(
       appBar: GedfaAppBar(
-        title: gala ? 'New Gala' : 'New cup',
-        subtitle: 'Competitions',
+        title: _editing
+            ? (gala ? 'Change the Gala' : 'Change the cup')
+            : (gala ? 'New Gala' : 'New cup'),
+        subtitle: _editing ? _saved?.name ?? 'Competitions' : 'Competitions',
         leading: const CloseButton(),
       ),
       body: body,

@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.20.1, matches the rules after step 3.0c1 (8 Nov 2026)
+**Status:** v2.21, matches the rules after step 3.0c1b (8 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -622,9 +622,9 @@ A draft the FA saved for later. **FA only** (read, write, delete). ID: `<season>
 - **The calendar** (`season_plan.dart`): one matchday a weekend from the first date, skipping weeks off; with Sunday too, half on Saturday and half on Sunday; a team sharing a ground with another that day moves to the other day (a warning says so). Matchdays continue after any already in the league.
 - **Publishing** writes the matches 3 at a time (the rules may look up about 20 documents per save), with fixed IDs `<draftId>_md<round>_<home>_v_<away>`, so publishing again after a lost connection skips the ones already saved. Then ONE `fixtureAdded` note per team ("Division League: 34 matches, the first v … on Sat 14 Nov") and the saved draft is removed. Kits are picked for each match by the kit rule.
 
-### 2.15b `cups/{cupId}` — cups and galas (3.0c1)
+### 2.15b `cups/{cupId}` — cups and galas (3.0c1, 3.0c1b)
 
-A cup or a gala of one season. Made by the FA (C2, C2b); read by everyone with a role. Its matches will be ordinary `fixtures` with the cup's ID as `competitionId` (the draw, 3.0c2). Random ID. Not changed or deleted yet (3.0c2 adds the draw).
+A cup or a gala of one season. Made by the FA (C2, C2b); read by everyone with a role. Its matches will be ordinary `fixtures` with the cup's ID as `competitionId` (the draw, 3.0c2). Random ID. The FA **changes** it only before the draw (the same form, filled in; same season, `createdBy` / `createdAt` kept) and **deletes** it at any time: everything goes, the cup, its history and (after the draw) its matches; nothing is kept (GEDFA, 8 Nov 2026).
 
 | Field | Type | Notes |
 | ----- | ---- | ----- |
@@ -644,6 +644,7 @@ A cup or a gala of one season. Made by the FA (C2, C2b); read by everyone with a
 | `createdBy`, `createdAt`, `updatedBy`, `updatedAt` | | Who and when (server time) |
 
 - **The format** (`cup_format.dart`): straight knockout, for 18 clubs: 2 first-round ties (4 clubs), 14 byes, then a round of 16. Groups: as few groups (2, 4, 8, 16) as possible; 18 clubs → 5, 5, 4, 4, the top 2 to the quarter-finals. The app suggests knockout; groups are offered from 6 clubs.
+- **`cups/{cupId}/history/{lineId}`** (3.0c1b): one line per change, `{ text (3–200), by, byName (1–80), at }`, written in the same batch as the cup ("Cup made", "Each round: one match → home and away", "Teams: Ojobi Stars left out"). Read by everyone with a role; created only by the FA, with the cup there after the batch; never changed; deleted with the cup. The lines come from `cupChanges` (`cup_changes.dart`).
 - **A gala's timetable** (`GalaPlan`): kick-offs every `gapMinutes` from the first kick-off, no later than 4:30 pm (before dark). A round starts 2 slots after the last kick-off of the round before, so every club has a free slot to rest. The form warns when the matches don't fit in the days.
 
 ## 3. Who can do what (summary)
@@ -777,11 +778,10 @@ Feed rules: never include dates of birth; player photos only if agreed with GEDF
 
 **GFA colts guidelines 2023/24 (found online, 7 Nov 2026):** U13 players may play for U15 and U15 players for U17; in a U17 match at most 1 U13 player and 5 U15 players. Match length U17 2 × 45, U15 2 × 40, U13 2 × 25 minutes. Not stated: how many U13 players in a U15 match (asked GEDFA).
 
+**Answered by GEDFA via Isaac (8 Nov 2026), cups (4):** the FA can **delete** a cup at any time (even after the draw) and everything goes, nothing is kept. The FA can **postpone** a cup or Gala to a new date, and even the **start of a league** (every matchday not played yet moves by the same number of days); the clubs are told, with the reason. In a seeded cup the **Pot 1 clubs get the byes first** in a first round. **Juvenile side names:** "**B**" is added when a club keeps the same name; the juvenile side gets its own short name only when it gets a new name; a club already in both competitions asks the FA (like a name change), and the name shows everywhere after approval. **Gala team sheets: 20 minutes before kick-off.** Only "Cup" takes a plural ("Cups and Gala").
+
 Still open:
 
-
-- Juvenile side name: "II" or "B" when a club keeps the same name? Its own short name? (asked 8 Nov 2026)
-- Gala team sheets: how long before kick-off (less than 1 hour)?
 
 - Juvenile: coach per age group? Welfare or child-safety officer required?
 - Juvenile: age cut-off date per age group, per season
@@ -809,6 +809,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 8 Nov 2026 | v2.21 (3.0c1b): the FA changes a cup before the draw and deletes one at any time; new `cups/{id}/history`. GEDFA's cup answers (4) in Section 7 (delete, postpone, Pot 1 byes, juvenile "B", Gala sheets 20 minutes before). 310 rules tests. |
 | 8 Nov 2026 | v2.20.1: `cups.finalOneMatch` removed (the final is always one match, GEDFA). GEDFA's cup answers (3) in Section 7. 305 rules tests. |
 | 8 Nov 2026 | v2.20 (3.0c1): new `cups/{id}` (cups and galas: who plays, format, one or two legs, level rule, bracket fixed from, seeding, the gala's ground and days). Read by everyone with a role, made by the FA, not changed yet. GEDFA's cup answers (2) in Section 7. 305 rules tests. |
 | 8 Nov 2026 | v2.19.1: no data change. Match details reads `fixtures/{id}/history` newest first (teams can read it). |

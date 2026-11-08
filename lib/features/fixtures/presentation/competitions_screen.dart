@@ -5,7 +5,6 @@ import 'package:gedfa_connect/app/theme.dart';
 import 'package:gedfa_connect/core/constants/season.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
-import 'package:gedfa_connect/core/widgets/app_toast.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/features/dashboard/presentation/widgets/dashboard_card.dart';
@@ -134,8 +133,8 @@ class CompetitionsScreen extends ConsumerWidget {
       title: cup.name,
       subtitle: parts.join(' · '),
       tag: 'Draw',
-      // The live draw is the next step (3.0c2)
-      onTap: () => AppToast.info(context, 'The live draw comes next.'),
+      // The cup's page (3.0c1b, C7)
+      onTap: () => context.push(Routes.adminCup(cup.id)),
     );
   }
 

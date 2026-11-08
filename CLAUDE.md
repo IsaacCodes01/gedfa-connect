@@ -19,7 +19,7 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
    - test steps he can do himself in the app
 5. **Before every commit**, run (and show the result):
    - `flutter analyze` → must be **0 issues**
-   - `cd test/rules && npm test` → **all** rules tests pass (305 after 3.0c1)
+   - `cd test/rules && npm test` → **all** rules tests pass (310 after 3.0c1b)
    - `flutter test` → all Dart tests pass (layout smoke tests and the kit check)
 6. **Commit after each step** with a clear message, e.g.
    `feat(teams): change requests for name, short name, logo and competitions; 250 rules tests; docs v2.12`
@@ -103,6 +103,10 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
   🏆 on the Fixtures tab), New cup / New gala (C2, C2b). Mockup `3.0c-competitions.html`. Still asked of GEDFA:
   pots before results, which juvenile sides in an open cup, final one match, gala match length. Next: **3.0c2**
   the live draw (C3, C3b). Rules changed (`cups`): Isaac deploys to dev.
+- **3.0c1b** done (8 Nov 2026, 310 rules tests): a cup's page `cup_screen.dart` (C7) with ⋯ Change / History /
+  Delete; `cups/{id}/history` lines from `cupChanges` (`cup_changes.dart`); the C2 form doubles as Change
+  (`CupFormScreen(cupId:)`). Agreed order next: **3.0c1c** postpone (C10, C11), **the back arrow** on every tab
+  opened from another tab, **juvenile side names** ("B"), then **3.0c2**. Rules changed: Isaac deploys to dev.
 - **Then:** **3.0c** competitions and cups (mockups C1–C4 in `3.0-fixtures-and-sheet.html`:
   the FA picks draw rules, one or two legs; random draw; knockout with byes or groups then knockout;
   live draw; bracket; a juvenile cup per age group). Then the rest of 3.0d (next matchday card, D1, J1)
