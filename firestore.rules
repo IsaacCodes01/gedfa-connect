@@ -1231,6 +1231,29 @@ service cloud.firestore {
         }
       }
 
+      // ---------- fixtureDrafts/{draftId} (3.0b) ----------
+      // "Make the season": a draft the FA saved for later. FA only; nobody
+      // else sees it. Each match is checked when it is published.
+      match /fixtureDrafts/{draftId} {
+        allow get, list, delete: if isFaAdmin();
+        allow create, update: if isFaAdmin()
+          && request.resource.data.keys().hasOnly([
+               'season', 'competitionId', 'category', 'ageGroup', 'settings',
+               'teamIds', 'matches', 'updatedBy', 'updatedAt'
+             ])
+          && isSeason(request.resource.data.season)
+          && request.resource.data.category in ['division', 'juvenile']
+          && request.resource.data.competitionId
+               == request.resource.data.season + '_' + request.resource.data.category + '-league'
+          && request.resource.data.settings is map
+          && request.resource.data.teamIds is list
+          && request.resource.data.teamIds.size() <= 40
+          && request.resource.data.matches is list
+          && request.resource.data.matches.size() <= 1600
+          && request.resource.data.updatedBy == request.auth.uid
+          && request.resource.data.updatedAt == request.time;
+      }
+
       // ---------- teams/{teamId} ----------
 
       // Each part of a team edit is checked only when it changes, so teams

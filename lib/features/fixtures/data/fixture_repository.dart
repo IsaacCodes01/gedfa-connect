@@ -8,6 +8,7 @@ import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/features/fixtures/domain/fixture.dart';
 import 'package:gedfa_connect/features/fixtures/domain/kit_clash.dart';
+import 'package:gedfa_connect/features/fixtures/domain/season_plan.dart';
 import 'package:gedfa_connect/features/notifications/data/notification_writer.dart';
 import 'package:gedfa_connect/features/notifications/domain/app_notification.dart';
 import 'package:gedfa_connect/features/players/domain/age_group.dart';
@@ -162,16 +163,7 @@ class FixtureRepository {
   /// in both teams' bells.
   Future<void> add(FixtureDraft d, {required User by}) {
     final ref = _fixtures.doc();
-    final batch = _db.batch()
-      ..set(ref, {
-        ..._fields(d, status: FixtureStatus.scheduled, note: null, by: by),
-        'season': Season.current,
-        'competitionId': Fixture.leagueId(Season.current, d.category),
-        'category': d.category.name,
-        'ageGroup': ?d.ageGroup?.label,
-        'createdBy': by.uid,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+    final batch = _db.batch()..set(ref, _newFixture(d, by));
     _history(batch, ref.id, 'Match added', null, by);
     for (final team in [d.home.side, d.away.side]) {
       _notify(batch, NotificationKind.fixtureAdded, team,
@@ -179,6 +171,141 @@ class FixtureRepository {
     }
     return batch.commit().timeout(_timeout);
   }
+
+  /// "Publish and tell all teams" (3.0b): a whole season of matches.
+  ///
+  /// The rules may look up only about 20 documents per save, so the
+  /// matches go up 3 at a time. Each match has a fixed ID (draft, matchday
+  /// and teams), so publishing again after a lost connection skips the
+  /// ones already saved and carries on. Each team then gets ONE note
+  /// ("34 matches, the first …"), and the saved draft is removed.
+  Future<void> publishSeason({
+    required String draftId,
+    required String leagueName,
+    required List<FixtureDraft> matches,
+    required User by,
+    void Function(int done, int total)? onProgress,
+  }) async {
+    if (matches.isEmpty) return;
+    final competitionId =
+        Fixture.leagueId(Season.current, matches.first.category);
+    final existing = {
+      for (final doc in (await _fixtures
+              .where('competitionId', isEqualTo: competitionId)
+              .get()
+              .timeout(_timeout))
+          .docs)
+        doc.id,
+    };
+    String idOf(FixtureDraft d) =>
+        '${draftId}_md${d.round}_${d.home.side.id}_v_${d.away.side.id}';
+
+    final todo = [
+      for (final d in matches)
+        if (!existing.contains(idOf(d))) d,
+    ];
+    var done = matches.length - todo.length;
+    onProgress?.call(done, matches.length);
+    for (var i = 0; i < todo.length; i += 3) {
+      final batch = _db.batch();
+      for (final d in todo.skip(i).take(3)) {
+        batch.set(_fixtures.doc(idOf(d)), _newFixture(d, by));
+      }
+      await batch.commit().timeout(_timeout);
+      done += todo.skip(i).take(3).length;
+      onProgress?.call(done, matches.length);
+    }
+
+    // One note per team: how many matches, and the first one
+    final byTeam = <String, List<FixtureDraft>>{};
+    final sides = <String, FixtureSide>{};
+    for (final d in matches) {
+      for (final side in [d.home.side, d.away.side]) {
+        byTeam.putIfAbsent(side.id, () => []).add(d);
+        sides[side.id] = side;
+      }
+    }
+    final teamIds = byTeam.keys.toList();
+    for (var i = 0; i < teamIds.length; i += 9) {
+      final batch = _db.batch();
+      for (final id in teamIds.skip(i).take(9)) {
+        final list = byTeam[id]!
+          ..sort((a, b) => a.kickoffAt.compareTo(b.kickoffAt));
+        final first = list.first;
+        final other = first.home.side.id == id ? first.away.side : first.home.side;
+        _notify(batch, NotificationKind.fixtureAdded, sides[id]!,
+            '$leagueName: ${list.length} matches, the first v ${other.name} '
+            'on ${formatShortDate(first.kickoffAt)}');
+      }
+      if (i + 9 >= teamIds.length) {
+        batch.delete(_db.doc(FirestorePaths.fixtureDraft(draftId)));
+      }
+      await batch.commit().timeout(_timeout);
+    }
+  }
+
+  // ---------- "Make the season" drafts (3.0b) ----------
+
+  /// FA: every approved team in [category], read fresh, A to Z.
+  Future<List<MatchTeam>> loadTeams(Competition category) async {
+    final snap = await _db
+        .collection(FirestorePaths.teams)
+        .get()
+        .timeout(_timeout);
+    final teams = [
+      for (final doc in snap.docs)
+        if (Competition.fromList(doc.data()['categories'] as List<dynamic>?)
+            .contains(category))
+          MatchTeam.fromTeamDoc(doc.id, doc.data(), category),
+    ]..sort((a, b) => a.side.name.toLowerCase().compareTo(
+          b.side.name.toLowerCase(),
+        ));
+    return teams;
+  }
+
+  Stream<Map<String, dynamic>?> watchDraft(String draftId) => _db
+      .doc(FirestorePaths.fixtureDraft(draftId))
+      .snapshots()
+      .map((doc) => doc.data());
+
+  /// "Save the draft for later" (FA only).
+  Future<void> saveDraft({
+    required String draftId,
+    required Competition category,
+    required AgeGroup? ageGroup,
+    required SeasonSettings settings,
+    required List<String> teamIds,
+    required List<DraftMatch> matches,
+    required User by,
+  }) {
+    return _db.doc(FirestorePaths.fixtureDraft(draftId)).set({
+      'season': Season.current,
+      'competitionId': Fixture.leagueId(Season.current, category),
+      'category': category.name,
+      'ageGroup': ?ageGroup?.label,
+      'settings': settings.toMap(),
+      'teamIds': teamIds,
+      'matches': [for (final m in matches) m.toMap()],
+      'updatedBy': by.uid,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }).timeout(_timeout);
+  }
+
+  Future<void> deleteDraft(String draftId) => _db
+      .doc(FirestorePaths.fixtureDraft(draftId))
+      .delete()
+      .timeout(_timeout);
+
+  /// A new match, as [add] and [publishSeason] write it.
+  Map<String, dynamic> _newFixture(FixtureDraft d, User by) => {
+        ..._fields(d, status: FixtureStatus.scheduled, note: null, by: by),
+        'season': Season.current,
+        'competitionId': Fixture.leagueId(Season.current, d.category),
+        'category': d.category.name,
+        'ageGroup': ?d.ageGroup?.label,
+        'createdBy': by.uid,
+        'createdAt': FieldValue.serverTimestamp(),
+      };
 
   /// "Change a match": anything but the competition. Teams that leave the
   /// match are told too.

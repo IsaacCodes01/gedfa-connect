@@ -3159,3 +3159,43 @@ describe('Fixtures: a team changes its kit after the match is made (3.0a)', () =
     }));
   });
 });
+
+// ---------- Season drafts (3.0b) ----------
+
+function draftData(changes = {}) {
+  return {
+    season: '2026-27',
+    competitionId: '2026-27_division-league',
+    category: 'division',
+    settings: { homeAndAway: true, sundayToo: true, firstDay: Timestamp.now() },
+    teamIds: ['royal', 'stars'],
+    matches: [{ round: 1, homeId: 'royal', awayId: 'stars', kickoffAt: Timestamp.now(), venue: 'Apam Park' }],
+    updatedBy: 'fa1',
+    updatedAt: serverTimestamp(),
+    ...changes,
+  };
+}
+
+describe('Season drafts (3.0b)', () => {
+  it('the FA saves, reads and deletes a draft', async () => {
+    const ref = doc(dbAs('fa1'), `${D}/fixtureDrafts/2026-27_division-league`);
+    await assertSucceeds(setDoc(ref, draftData()));
+    await assertSucceeds(getDoc(ref));
+    await assertSucceeds(setDoc(ref, draftData({ teamIds: ['royal', 'stars', 'colts'] })));
+    await assertSucceeds(deleteDoc(ref));
+  });
+
+  it('teams cannot see or write a draft', async () => {
+    await setDoc(doc(dbAs('fa1'), `${D}/fixtureDrafts/d1`), draftData());
+    await assertFails(getDoc(doc(dbAs('admin1'), `${D}/fixtureDrafts/d1`)));
+    await assertFails(setDoc(doc(dbAs('admin1'), `${D}/fixtureDrafts/d2`), draftData({ updatedBy: 'admin1' })));
+    await assertFails(deleteDoc(doc(dbAs('admin1'), `${D}/fixtureDrafts/d1`)));
+  });
+
+  it('a draft must name its league and keep to the size limit', async () => {
+    const ref = doc(dbAs('fa1'), `${D}/fixtureDrafts/d1`);
+    await assertFails(setDoc(ref, draftData({ competitionId: '2026-27_juvenile-league' })));
+    await assertFails(setDoc(ref, draftData({ extra: true })));
+    await assertFails(setDoc(ref, draftData({ teamIds: Array.from({ length: 41 }, (_, i) => `t${i}`) })));
+  });
+});

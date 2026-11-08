@@ -4,8 +4,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/features/auth/domain/app_user.dart';
 import 'package:gedfa_connect/features/fixtures/data/fixture_repository.dart';
+import 'package:gedfa_connect/features/fixtures/data/season_maker.dart';
+import 'package:gedfa_connect/features/fixtures/domain/season_plan.dart';
 import 'package:gedfa_connect/features/fixtures/domain/fixture.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/fa_fixtures_screen.dart';
+import 'package:gedfa_connect/features/fixtures/presentation/season_draft_screen.dart';
+import 'package:gedfa_connect/features/fixtures/presentation/season_setup_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/team_fixtures_screen.dart';
 import 'package:gedfa_connect/features/notifications/data/notifications_repository.dart';
 import 'package:gedfa_connect/features/players/domain/age_group.dart';
@@ -59,6 +63,52 @@ Fixture _match(
       note: note,
     );
 
+/// 18 Division teams for the season screens, two of them sharing a ground.
+final _teams = [
+  for (var i = 0; i < 18; i++)
+    MatchTeam(
+      side: _side('t$i', 'Team number $i Football Club', 'T$i', const Color(0xFF1259A8)),
+      rawKits: const {},
+      kits: {
+        KitSlot.home: Kit(primary: i.isEven ? Colors.red : Colors.blue, shorts: Colors.white, socks: Colors.white),
+        KitSlot.away: const Kit(primary: Colors.white, shorts: Colors.black, socks: Colors.white),
+        KitSlot.goalkeeper: const Kit(primary: Color(0xFFFFD100), shorts: Colors.black, socks: Colors.black),
+      },
+      homeGround: i < 2 ? 'Apam Park' : 'Ground $i',
+    ),
+];
+
+/// A real draft of those 18 teams (home and away: 34 matchdays).
+class _FakeMaker extends SeasonMaker {
+  @override
+  SeasonSession? build() => SeasonSession(
+        category: Competition.division,
+        group: null,
+        teams: _teams,
+        firstRound: 1,
+        settings: SeasonSettings(
+          firstDay: DateTime(2026, 11, 14),
+          homeAndAway: true,
+          sundayToo: true,
+          kickoffHour: 15,
+          kickoffMinute: 0,
+        ),
+        draft: planSeason(
+          teams: [
+            for (final t in _teams)
+              PlanTeam(id: t.side.id, name: t.side.name, ground: t.homeGround),
+          ],
+          settings: SeasonSettings(
+            firstDay: DateTime(2026, 11, 14),
+            homeAndAway: true,
+            sundayToo: true,
+            kickoffHour: 15,
+            kickoffMinute: 0,
+          ),
+        ),
+      );
+}
+
 final _fixtures = [
   _match('m1'),
   _match('m2', from: const Duration(days: 9)),
@@ -101,6 +151,10 @@ Future<void> _pump(
           ),
         ),
         unreadCountProvider.overrideWithValue(2),
+        seasonMakerProvider.overrideWith(_FakeMaker.new),
+        seasonTeamsProvider.overrideWith((ref, _) async => _teams),
+        savedDraftProvider.overrideWith((ref, _) => Stream.value(null)),
+        allTeamsProvider.overrideWith((ref) => Stream.value(const <Team>[])),
         myAudienceProvider.overrideWithValue('team:aps'),
       ],
       child: MaterialApp(
@@ -137,6 +191,21 @@ void main() {
         expect(find.textContaining('Team sheet due'), findsOneWidget);
       });
     }
+  }
+
+  for (final width in [360.0, 1280.0]) {
+    testWidgets('Make the season (G1), $width wide', (tester) async {
+      await _pump(tester, const SeasonSetupScreen(), Size(width, 2400), Brightness.light);
+      expect(find.text('Make the draft'), findsOneWidget);
+      expect(find.text('All 18 Division teams'), findsOneWidget);
+    });
+
+    testWidgets('Draft season (G2), 18 teams, $width wide', (tester) async {
+      await _pump(tester, const SeasonDraftScreen(), Size(width, 2400), Brightness.dark);
+      expect(find.text('34'), findsOneWidget); // matchdays
+      expect(find.text('306'), findsOneWidget); // matches
+      expect(find.text('Publish and tell all teams'), findsOneWidget);
+    });
   }
 
   testWidgets('both tabs with large text (130%) on a small phone', (tester) async {

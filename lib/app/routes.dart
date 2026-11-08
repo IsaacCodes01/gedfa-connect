@@ -82,6 +82,10 @@ class Routes {
   /// the kits of a match.
   static const adminFixtures = '/admin/fixtures';
   static const adminNewFixture = '/admin/fixtures/new';
+
+  /// FA: "Make the season" (3.0b, G1) and its draft (G2).
+  static const adminSeason = '/admin/fixtures/season';
+  static const adminSeasonDraft = '/admin/fixtures/season/draft';
   static String adminEditFixture(String id) => '$adminFixtures/edit/$id';
   static String adminFixtureKits(String id) => '$adminFixtures/kits/$id';
 

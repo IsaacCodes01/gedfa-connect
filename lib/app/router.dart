@@ -26,6 +26,8 @@ import 'package:gedfa_connect/features/fa/presentation/fa_juvenile_child_screen.
 import 'package:gedfa_connect/features/fixtures/presentation/fa_fixtures_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/fixture_form_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/fixture_kits_screen.dart';
+import 'package:gedfa_connect/features/fixtures/presentation/season_draft_screen.dart';
+import 'package:gedfa_connect/features/fixtures/presentation/season_setup_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/team_fixtures_screen.dart';
 import 'package:gedfa_connect/features/players/domain/age_group.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
@@ -241,6 +243,24 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: Routes.adminFixtures,
                 builder: (_, _) => const FaFixturesScreen(),
                 routes: [
+                  // Make the season (3.0b): G1, then the draft (G2)
+                  GoRoute(
+                    path: 'season',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (_, state) => SeasonSetupScreen(
+                      category: Competition.fromString(
+                            state.uri.queryParameters['category'],
+                          ) ??
+                          Competition.division,
+                    ),
+                    routes: [
+                      GoRoute(
+                        path: 'draft',
+                        parentNavigatorKey: rootNavigatorKey,
+                        builder: (_, _) => const SeasonDraftScreen(),
+                      ),
+                    ],
+                  ),
                   // Add one match (?category=juvenile&group=U15). Full screen.
                   GoRoute(
                     path: 'new',

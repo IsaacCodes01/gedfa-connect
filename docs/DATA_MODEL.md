@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.18, matches the rules after step 3.0a (8 Nov 2026)
+**Status:** v2.19, matches the rules after step 3.0b (8 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -606,6 +606,22 @@ One match. Made by the FA (one at a time in 3.0a; "Make the season" and cups fol
 - **Team sheets** are due `kickoffAt` − 1 hour (GEDFA); nothing is stored for that yet (3.1).
 - `fixtures/{id}/history/{entryId}`: `{ what, reason?, by, byName, at }`, written by the FA with each change (the match must exist after the batch). Read by everyone with a role.
 
+### 2.15a `fixtureDrafts/{draftId}` — "Make the season" drafts (3.0b)
+
+A draft the FA saved for later. **FA only** (read, write, delete). ID: `<season>_<category>-league`, plus `_U13` / `_U15` / `_U17` for a juvenile age group.
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `season`, `competitionId`, `category`, `ageGroup?` | | As on a match |
+| `settings` | map | `{ firstDay, homeAndAway, sundayToo, kickoffHour, kickoffMinute, weeksOff: [{ start, end }] }` |
+| `teamIds` | array | Up to 40, in the order of the draw |
+| `matches` | array | Up to 1,600 `{ round, homeId, awayId, kickoffAt, venue }`. Not checked one by one: each match is checked when it is published |
+| `updatedBy`, `updatedAt` | | |
+
+- **The draw** (`round_robin.dart`): the circle method. Everyone meets everyone once (or once at each ground); nobody plays twice on a matchday; with an odd number one team rests. Measured for 3 to 20 teams: home games differ by at most 2 between teams, nobody is home or away more than 3 matchdays in a row, and two teams never meet again within 2 matchdays (the second half starts one round later).
+- **The calendar** (`season_plan.dart`): one matchday a weekend from the first date, skipping weeks off; with Sunday too, half on Saturday and half on Sunday; a team sharing a ground with another that day moves to the other day (a warning says so). Matchdays continue after any already in the league.
+- **Publishing** writes the matches 3 at a time (the rules may look up about 20 documents per save), with fixed IDs `<draftId>_md<round>_<home>_v_<away>`, so publishing again after a lost connection skips the ones already saved. Then ONE `fixtureAdded` note per team ("Division League: 34 matches, the first v … on Sat 14 Nov") and the saved draft is removed. Kits are picked for each match by the kit rule.
+
 ## 3. Who can do what (summary)
 
 The security rules enforce this table. Screens hiding a button is **not** security.
@@ -762,6 +778,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 8 Nov 2026 | v2.19 (3.0b): new `fixtureDrafts/{id}` (FA only); "Make the season" publishes matches with fixed IDs, 3 per save. 301 rules tests. |
 | 8 Nov 2026 | v2.18.1 (3.0a fix): kit clashes measured (CIEDE2000 < 20.5) instead of a hand-made table; goalkeepers by Law 4 (not against each other or the referee). The FA team page reads the team ID saved at approval. |
 | 8 Nov 2026 | v2.18 (3.0a): new `fixtures/{id}` with a copy of both teams and their kits for the match, and `fixtures/{id}/history`; four match notification kinds. Kit rule (home keeps its home kit) and clash table. 298 rules tests. |
 | 7 Nov 2026 | v2.17 (2.12b): no new collections or rules. The dashboard's totals are worked out in the app from `teams`, `players` and `fees` (already streamed for the FA), not count queries. Squads ready = Division teams with at least `settings/league.matchdaySquad` approved Division players. |

@@ -44,15 +44,55 @@ class _FaFixturesScreenState extends ConsumerState<FaFixturesScreen> {
         subtitle: 'Gomoa East District FA',
         actions: [NotificationBell()],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push(
-          Uri(path: Routes.adminNewFixture, queryParameters: {
-            'category': _category.name,
-            'group': ?_group?.label,
-          }).toString(),
+      // Mockup F1: "Make the season" on the left, "Add a match" on the right
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        // Each button shrinks a little on a narrow phone so both fit
+        child: Row(
+          children: [
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: FloatingActionButton.extended(
+                  heroTag: 'season',
+                  backgroundColor: Theme.of(context).colorScheme.surface,
+                  foregroundColor: Theme.of(context).colorScheme.primary,
+                  onPressed: () => context.push(
+                    Uri(
+                      path: Routes.adminSeason,
+                      queryParameters: {'category': _category.name},
+                    ).toString(),
+                  ),
+                  icon: const Icon(Icons.auto_awesome),
+                  label: const Text('Make the season'),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: FloatingActionButton.extended(
+                  heroTag: 'add',
+                  onPressed: () => context.push(
+                    Uri(
+                      path: Routes.adminNewFixture,
+                      queryParameters: {
+                        'category': _category.name,
+                        'group': ?_group?.label,
+                      },
+                    ).toString(),
+                  ),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add a match'),
+                ),
+              ),
+            ),
+          ],
         ),
-        icon: const Icon(Icons.add),
-        label: const Text('Add a match'),
       ),
       body: fixturesAsync.when(
         loading: () => const LoadingView(),
@@ -124,16 +164,18 @@ class _FaFixturesScreenState extends ConsumerState<FaFixturesScreen> {
         EmptyView(
           icon: Icons.calendar_month_outlined,
           title: 'No matches yet',
-          message: 'Tap "Add a match" to add the first one.',
+          message:
+              'Tap "Make the season" to draw the whole league, or '
+              '"Add a match" for one match.',
         ),
       ];
     }
 
     Widget row(Fixture f) => FixtureRow(
-          fixture: f,
-          showJuvenileRules: juvenile,
-          onTap: () => showFixtureActions(context, ref, f),
-        );
+      fixture: f,
+      showJuvenileRules: juvenile,
+      onTap: () => showFixtureActions(context, ref, f),
+    );
 
     // Scheduled matches by matchday, each in kick-off order
     final byRound = <int, List<Fixture>>{};
@@ -152,8 +194,9 @@ class _FaFixturesScreenState extends ConsumerState<FaFixturesScreen> {
         ),
         FixtureListCard(
           children: [
-            for (final f in byRound[round]!
-              ..sort((a, b) => a.kickoffAt!.compareTo(b.kickoffAt!)))
+            for (final f
+                in byRound[round]!
+                  ..sort((a, b) => a.kickoffAt!.compareTo(b.kickoffAt!)))
               row(f),
           ],
         ),
