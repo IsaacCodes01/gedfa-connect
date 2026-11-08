@@ -188,7 +188,10 @@ class _ApprovedBodyState extends ConsumerState<_ApprovedBody> {
   bool _busy = false;
 
   /// The team ID is the key of the name it registered with (2.2)
-  String get _teamId => teamNameKey(widget.request.teamName);
+  /// The team saved on the registration at approval; the name's key for
+  /// older registrations (the same value when nothing changed).
+  String get _teamId =>
+      widget.request.teamId ?? teamNameKey(widget.request.teamName);
 
   Future<void> _correctName(TeamDetails team) async {
     final result = await showNameCorrectionSheet(

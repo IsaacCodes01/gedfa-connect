@@ -179,13 +179,14 @@ class _EditKitsState extends ConsumerState<_EditKits> {
           l != null && against != null && l.shirtClashes(against)
               ? 'Clashes'
               : null;
-      String? gkClash(KitLook? l, List<KitLook?> against) {
-        if (l == null) return null;
-        if (l.mainClashes(refereeColour)) return 'Like the referee';
-        return against.any((o) => o != null && l.shirtClashes(o))
-            ? 'Clashes'
-            : null;
-      }
+      // A goalkeeper must look different from both outfield kits (Law 4).
+      // The two goalkeepers may match; the referee is not known yet.
+      String? gkClash(KitLook? l) =>
+          l != null &&
+                  [homeLook, awayLook]
+                      .any((o) => o != null && l.shirtClashes(o))
+              ? 'Like an outfield kit'
+              : null;
 
       const outfield = [KitSlot.home, KitSlot.away, KitSlot.third];
       const keepers = [KitSlot.goalkeeper, KitSlot.goalkeeper2];
@@ -232,8 +233,7 @@ class _EditKitsState extends ConsumerState<_EditKits> {
               team: home,
               slots: keepers,
               selected: s.homeGk,
-              clash: (slot) =>
-                  gkClash(look(home, slot), [homeLook, awayLook]),
+              clash: (slot) => gkClash(look(home, slot)),
               onPick: (slot) => setState(() => _picked = (
                     home: s.home,
                     away: s.away,
@@ -246,8 +246,7 @@ class _EditKitsState extends ConsumerState<_EditKits> {
               team: away,
               slots: keepers,
               selected: s.awayGk,
-              clash: (slot) => gkClash(look(away, slot),
-                  [homeLook, awayLook, look(home, s.homeGk)]),
+              clash: (slot) => gkClash(look(away, slot)),
               onPick: (slot) => setState(() => _picked = (
                     home: s.home,
                     away: s.away,

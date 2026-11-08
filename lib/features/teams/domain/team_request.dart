@@ -37,6 +37,7 @@ class TeamRequest {
     this.rejectionReason,
     this.createdAt,
     this.updatedAt,
+    this.teamId,
   });
 
   // Section 1: club details
@@ -102,6 +103,10 @@ class TeamRequest {
   final String? rejectionReason;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+
+  /// The approved team's ID, saved on the registration by the FA's
+  /// approval. Null before approval (and on older registrations).
+  final String? teamId;
 
   bool get canEdit =>
       status == ApprovalStatus.pending || status == ApprovalStatus.rejected;
@@ -207,6 +212,7 @@ class TeamRequest {
       rejectionReason: data['rejectionReason'] as String?,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
+      teamId: data['teamId'] as String?,
     );
   }
 }

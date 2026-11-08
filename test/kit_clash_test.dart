@@ -16,6 +16,9 @@ const green = Color(0xFF009A44);
 const blue = Color(0xFF1E5BC6);
 const navy = Color(0xFF14213D);
 const skyBlue = Color(0xFF6CB4EE);
+const gold = Color(0xFFC9A227);
+const purple = Color(0xFF5B2A86);
+const darkGreen = Color(0xFF00573F);
 
 Kit kit(Color shirt, {Color? shorts, Color? socks, Color? second, KitPattern pattern = KitPattern.plain}) =>
     Kit(
@@ -47,33 +50,36 @@ TeamKits team({
       colours: colours,
     );
 
-/// The away side's goalkeeper is sky blue unless a test gives one, so the
-/// two goalkeepers don't clash by accident.
 KitPlan plan(TeamKits home, TeamKits away) => planKits(
       home: home,
-      away: away.kits[KitSlot.goalkeeper]?.primary == green
-          ? TeamKits(
-              kits: {...away.kits, KitSlot.goalkeeper: kit(skyBlue)},
-              colours: away.colours,
-            )
-          : away,
+      away: away,
       homeName: 'Apam Stars',
       awayName: 'Gomoa Royals',
     );
 
 void main() {
   group('colours', () {
-    test('a colour clashes with itself, and the table works both ways', () {
+    test('a colour clashes with itself, and close colours clash both ways', () {
       expect(coloursClash(red, red), isTrue);
       expect(coloursClash(red, maroon), isTrue);
       expect(coloursClash(maroon, red), isTrue);
       expect(coloursClash(navy, black), isTrue);
+      expect(coloursClash(yellow, gold), isTrue);
     });
 
     test('colours that are easy to tell apart do not clash', () {
       expect(coloursClash(red, white), isFalse);
       expect(coloursClash(blue, yellow), isFalse);
       expect(coloursClash(skyBlue, blue), isFalse);
+      // Too strict before (8 Nov 2026): purple goalkeeper v blue shirts
+      expect(coloursClash(purple, blue), isFalse);
+      expect(coloursClash(black, darkGreen), isFalse);
+    });
+
+    test('the difference matches the standard values', () {
+      expect(colourDifference(white, white), closeTo(0, 0.01));
+      expect(colourDifference(yellow, gold), closeTo(13.3, 0.2));
+      expect(colourDifference(red, maroon), closeTo(20.3, 0.2));
     });
   });
 
@@ -121,7 +127,7 @@ void main() {
         team(home: const Kit.fromPhotos(photos), away: const Kit.fromPhotos(photos)),
       );
       expect(p.isClear, isTrue);
-      expect(p.notes.single, contains('check the colours by eye'));
+      expect(p.notes.single, contains('check them by eye'));
     });
 
     test('photo kits are read from the team colours when there are some', () {
@@ -141,21 +147,41 @@ void main() {
     });
   });
 
-  group('goalkeepers', () {
-    test('a black goalkeeper kit clashes with the referee: the second one is used', () {
+  group('goalkeepers (Law 4)', () {
+    test('a black goalkeeper kit is fine: the referee is not checked yet', () {
       final p = plan(
-        team(home: kit(red), away: kit(white), gk: kit(black), gk2: kit(yellow)),
+        team(home: kit(red), away: kit(white), gk: kit(black)),
         team(home: kit(blue), away: kit(white)),
+      );
+      expect(p.homeGk, KitSlot.goalkeeper);
+      expect(p.notes, isEmpty);
+    });
+
+    test('both goalkeepers may wear the same colour', () {
+      final p = plan(
+        team(home: kit(red), away: kit(white), gk: kit(yellow)),
+        team(home: kit(blue), away: kit(white), gk: kit(yellow)),
+      );
+      expect(p.homeGk, KitSlot.goalkeeper);
+      expect(p.awayGk, KitSlot.goalkeeper);
+      expect(p.isClear, isTrue);
+    });
+
+    test('a goalkeeper like the other team shirts wears the second kit', () {
+      final p = plan(
+        team(home: kit(red), away: kit(white), gk: kit(navy), gk2: kit(yellow)),
+        team(home: kit(black), away: kit(white)),
       );
       expect(p.homeGk, KitSlot.goalkeeper2);
     });
 
-    test('the away goalkeeper must differ from the home goalkeeper', () {
+    test('with no other kit, it is a warning, not a problem', () {
       final p = plan(
-        team(home: kit(red), away: kit(white), gk: kit(yellow)),
-        team(home: kit(blue), away: kit(white), gk: kit(yellow), gk2: kit(green)),
+        team(home: kit(red), away: kit(white), gk: kit(navy)),
+        team(home: kit(black), away: kit(white)),
       );
-      expect(p.awayGk, KitSlot.goalkeeper2);
+      expect(p.isClear, isTrue);
+      expect(p.notes.single, contains('another shirt'));
     });
   });
 }
