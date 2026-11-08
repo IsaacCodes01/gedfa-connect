@@ -288,6 +288,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       // Suspensions (2.11c): the red banner on the Squad tab
       NotificationKind.teamSuspended => (_Look.no, Routes.team),
       NotificationKind.suspensionLifted => (_Look.ok, Routes.team),
+      NotificationKind.fixtureAdded => (_Look.fa, Routes.teamFixtures),
+      NotificationKind.fixtureChanged => (_Look.fa, Routes.teamFixtures),
+      NotificationKind.fixturePostponed => (_Look.no, Routes.teamFixtures),
+      NotificationKind.fixtureCancelled => (_Look.no, Routes.teamFixtures),
     };
     return _Item(
       look: look,

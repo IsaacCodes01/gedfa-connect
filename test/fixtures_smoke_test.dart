@@ -1,0 +1,148 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
+import 'package:gedfa_connect/features/auth/domain/app_user.dart';
+import 'package:gedfa_connect/features/fixtures/data/fixture_repository.dart';
+import 'package:gedfa_connect/features/fixtures/domain/fixture.dart';
+import 'package:gedfa_connect/features/fixtures/presentation/fa_fixtures_screen.dart';
+import 'package:gedfa_connect/features/fixtures/presentation/team_fixtures_screen.dart';
+import 'package:gedfa_connect/features/notifications/data/notifications_repository.dart';
+import 'package:gedfa_connect/features/players/domain/age_group.dart';
+import 'package:gedfa_connect/features/teams/data/team_repository.dart';
+import 'package:gedfa_connect/features/teams/domain/competition.dart';
+import 'package:gedfa_connect/features/teams/domain/kit.dart';
+import 'package:gedfa_connect/features/teams/domain/kit_slot.dart';
+import 'package:gedfa_connect/features/teams/domain/team.dart';
+
+KitChoice _kit(KitSlot slot, Color c) => KitChoice(
+      slot: slot,
+      kit: Kit(primary: c, shorts: Colors.white, socks: c),
+      raw: const {},
+    );
+
+FixtureSide _side(String id, String name, String short, Color c) =>
+    FixtureSide(id: id, name: name, shortName: short, colour: c);
+
+final _aps = _side('aps', 'Apam Stars Football Club', 'APS', const Color(0xFF7A1F2B));
+final _gry = _side('gry', 'Gomoa Royals', 'GRY', const Color(0xFF1259A8));
+
+Fixture _match(
+  String id, {
+  int round = 4,
+  Duration from = const Duration(days: 2, hours: 3),
+  FixtureStatus status = FixtureStatus.scheduled,
+  Competition category = Competition.division,
+  AgeGroup? group,
+  String? note,
+}) =>
+    Fixture(
+      id: id,
+      season: '2026-27',
+      competitionId: '2026-27_${category.name}-league',
+      category: category,
+      ageGroup: group,
+      round: round,
+      home: _aps,
+      away: _gry,
+      kits: MatchKits(
+        home: _kit(KitSlot.home, const Color(0xFF7A1F2B)),
+        away: _kit(KitSlot.away, Colors.white),
+        homeGk: _kit(KitSlot.goalkeeper, const Color(0xFFFFD100)),
+        awayGk: _kit(KitSlot.goalkeeper, const Color(0xFF009A44)),
+      ),
+      kickoffAt: status == FixtureStatus.postponed && note != null
+          ? null
+          : DateTime.now().add(from),
+      venue: 'Apam Park, Apam Junction',
+      status: status,
+      note: note,
+    );
+
+final _fixtures = [
+  _match('m1'),
+  _match('m2', from: const Duration(days: 9)),
+  _match('m3', round: 3, from: const Duration(days: -7)),
+  _match('m4', status: FixtureStatus.postponed, note: 'Pitch waterlogged'),
+  _match('m5', status: FixtureStatus.cancelled, note: 'Club withdrew'),
+  _match('j1', category: Competition.juvenile, group: AgeGroup.u17),
+];
+
+Future<void> _pump(
+  WidgetTester tester,
+  Widget screen,
+  Size size,
+  Brightness brightness, {
+  double textScale = 1,
+}) async {
+  tester.view.physicalSize = size;
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        seasonFixturesProvider.overrideWith((ref) => Stream.value(_fixtures)),
+        myFixturesProvider.overrideWith((ref) => Stream.value(_fixtures)),
+        appUserProvider.overrideWith(
+          (ref) => Stream.value(
+            const AppUser(uid: 'u', role: null, teamId: 'aps'),
+          ),
+        ),
+        myTeamProvider.overrideWith(
+          (ref) => Stream.value(
+            const Team(
+              id: 'aps',
+              name: 'Apam Stars Football Club',
+              shortName: 'APS',
+              town: 'Apam',
+              categories: {Competition.division, Competition.juvenile},
+              adminUids: ['u'],
+            ),
+          ),
+        ),
+        unreadCountProvider.overrideWithValue(2),
+        myAudienceProvider.overrideWithValue('team:aps'),
+      ],
+      child: MaterialApp(
+        theme: ThemeData(useMaterial3: true, brightness: brightness),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(textScale)),
+          child: child!,
+        ),
+        home: screen,
+      ),
+    ),
+  );
+  for (var i = 0; i < 6; i++) {
+    await tester.pump(const Duration(milliseconds: 100));
+    final error = tester.takeException();
+    expect(error, isNull,
+        reason: 'frame $i: ${error is FlutterError ? error.toStringDeep() : error}');
+  }
+}
+
+void main() {
+  for (final brightness in Brightness.values) {
+    for (final width in [360.0, 1280.0]) {
+      testWidgets('FA Fixtures tab, $width wide, $brightness', (tester) async {
+        await _pump(tester, const FaFixturesScreen(), Size(width, 2400), brightness);
+        expect(find.text('Matchday 4'), findsOneWidget);
+        expect(find.text('Postponed'), findsWidgets);
+      });
+
+      testWidgets('team Fixtures tab, $width wide, $brightness', (tester) async {
+        await _pump(tester, const TeamFixturesScreen(), Size(width, 2400), brightness);
+        expect(find.text('Next match'), findsOneWidget);
+        expect(find.textContaining('Team sheet due'), findsOneWidget);
+      });
+    }
+  }
+
+  testWidgets('both tabs with large text (130%) on a small phone', (tester) async {
+    await _pump(tester, const TeamFixturesScreen(), const Size(320, 3000),
+        Brightness.light, textScale: 1.3);
+    await _pump(tester, const FaFixturesScreen(), const Size(320, 3000),
+        Brightness.light, textScale: 1.3);
+  });
+}

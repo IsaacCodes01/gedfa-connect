@@ -19,6 +19,10 @@ enum NotificationKind {
   correctionDone, // the FA checked the team's correction
   teamSuspended, // by the chairman (2.11c)
   suspensionLifted,
+  fixtureAdded, // matches (3.0a)
+  fixtureChanged,
+  fixturePostponed,
+  fixtureCancelled,
   // For the FA (written by teams, clubs, invited people)
   teamRequest,
   playersSubmitted,
@@ -132,6 +136,14 @@ class AppNotification {
           '$teamName sent their correction back',
         NotificationKind.teamSuspended => '$teamName is suspended',
         NotificationKind.suspensionLifted => 'Suspension lifted',
+        NotificationKind.fixtureAdded =>
+          people == 1 ? 'New match' : '$people new matches',
+        NotificationKind.fixtureChanged =>
+          people == 1 ? 'Match changed' : '$people matches changed',
+        NotificationKind.fixturePostponed =>
+          people == 1 ? 'Match postponed' : '$people matches postponed',
+        NotificationKind.fixtureCancelled =>
+          people == 1 ? 'Match cancelled' : '$people matches cancelled',
       };
 
   String get body => switch (kind) {
@@ -194,6 +206,10 @@ class AppNotification {
           '"${names.lastOrNull ?? ''}" Contact the FA.',
         NotificationKind.suspensionLifted =>
           '${names.lastOrNull ?? ''}. You can add and edit players again.',
+        NotificationKind.fixtureAdded => '$namesText. See Fixtures.',
+        NotificationKind.fixtureChanged => '$namesText. See Fixtures.',
+        NotificationKind.fixturePostponed => '$namesText. See Fixtures.',
+        NotificationKind.fixtureCancelled => '$namesText. See Fixtures.',
       };
 
   static AppNotification? fromMap(String id, Map<String, dynamic> data) {

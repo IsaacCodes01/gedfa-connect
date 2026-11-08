@@ -25,13 +25,18 @@ class ShellDestination {
   final Provider<int>? badge;
 }
 
-/// The team admin's tabs. Add Fixtures and Feed here (and a branch for each
-/// in the router) when those screens exist.
+/// The team admin's tabs. Add Feed here (and a branch in the router) when
+/// that screen exists.
 final teamDestinations = [
   const ShellDestination(
     icon: Icons.groups_outlined,
     selectedIcon: Icons.groups_rounded,
     label: 'Squad',
+  ),
+  const ShellDestination(
+    icon: Icons.calendar_month_outlined,
+    selectedIcon: Icons.calendar_month_rounded,
+    label: 'Fixtures',
   ),
   const ShellDestination(
     icon: Icons.assignment_ind_outlined,
@@ -66,6 +71,11 @@ final adminDestinations = [
     selectedIcon: Icons.groups_rounded,
     label: 'Players',
     badge: pendingPlayerCountProvider,
+  ),
+  const ShellDestination(
+    icon: Icons.calendar_month_outlined,
+    selectedIcon: Icons.calendar_month_rounded,
+    label: 'Fixtures',
   ),
   const ShellDestination(
     icon: Icons.more_horiz_rounded,

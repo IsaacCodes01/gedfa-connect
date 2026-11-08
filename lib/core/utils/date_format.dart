@@ -21,6 +21,21 @@ const _monthNames = [
   'August', 'September', 'October', 'November', 'December',
 ];
 
+/// "Sat 14 Nov" (matches and fixtures)
+String formatShortDate(DateTime date) {
+  final local = date.toLocal();
+  return '${_weekdayNames[local.weekday - 1].substring(0, 3)} '
+      '${local.day} ${_months[local.month - 1]}';
+}
+
+/// "3:00 pm"
+String formatTime(DateTime date) {
+  final local = date.toLocal();
+  final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
+  final minute = local.minute.toString().padLeft(2, '0');
+  return '$hour:$minute ${local.hour < 12 ? 'am' : 'pm'}';
+}
+
 /// "Saturday, 7 November 2026" (the FA dashboard header)
 String formatLongDate(DateTime date) {
   final local = date.toLocal();

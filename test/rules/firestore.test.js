@@ -2902,3 +2902,260 @@ describe('Read marks', () => {
     await assertFails(setDoc(doc(dbAs('admin2'), `${D}/readMarks/admin1`), { notificationsSeenAt: serverTimestamp() }));
   });
 });
+
+// ---------- Fixtures (3.0a) ----------
+
+/** Kits on the seeded teams for the fixture tests. */
+const ROYAL_KITS = {
+  home: { primary: '#7A1F2B' },
+  away: { primary: '#FFFFFF' },
+  goalkeeper: { primary: '#FFD100' },
+};
+const STARS_KITS = {
+  home: { primary: '#D71920' },
+  away: { primary: '#FFFFFF' },
+  third: { primary: '#14213D' },
+  goalkeeper: { primary: '#009A44' },
+};
+const COLTS_JUVENILE_KITS = {
+  home: { primary: '#1E5BC6' },
+  away: { primary: '#FFD100' },
+  goalkeeper: { primary: '#111111' },
+};
+
+/** A Division league match, Royal (home) v Stars, in 3 days. */
+function fixtureData(changes = {}) {
+  return {
+    season: '2026-27',
+    competitionId: '2026-27_division-league',
+    category: 'division',
+    round: 4,
+    teamIds: ['royal', 'stars'],
+    home: { id: 'royal', name: 'Royal Unique FC', shortName: 'RUF', logoUrl: null, colour: '#7A1F2B' },
+    away: { id: 'stars', name: 'Gomoa Stars', shortName: 'GST', logoUrl: null, colour: '#D71920' },
+    kits: {
+      home: { slot: 'home', kit: ROYAL_KITS.home },
+      away: { slot: 'away', kit: STARS_KITS.away },
+      homeGk: { slot: 'goalkeeper', kit: ROYAL_KITS.goalkeeper },
+      awayGk: { slot: 'goalkeeper', kit: STARS_KITS.goalkeeper },
+    },
+    kickoffAt: Timestamp.fromMillis(Date.now() + 3 * 86400000),
+    venue: 'Apam Park',
+    status: 'scheduled',
+    createdBy: 'fa1',
+    createdAt: serverTimestamp(),
+    updatedBy: 'fa1',
+    updatedAt: serverTimestamp(),
+    ...changes,
+  };
+}
+
+/**
+ * Adds a match the way the app does: the match, its first history line
+ * and a note in each team's bell, in one batch.
+ */
+function addFixture(db, id, data = fixtureData(), { by = 'fa1' } = {}) {
+  const batch = writeBatch(db);
+  batch.set(doc(db, `${D}/fixtures/${id}`), data);
+  batch.set(doc(db, `${D}/fixtures/${id}/history/h1`), {
+    what: 'Match added', by, byName: 'Ama Boateng', at: serverTimestamp(),
+  });
+  for (const team of data.teamIds) {
+    batch.set(doc(db, `${D}/notifications/team-${team}_fixtureAdded_${team}_2026-11-08`), {
+      audience: `team:${team}`, kind: 'fixtureAdded', teamId: team, teamName: 'x',
+      names: arrayUnion('v Someone, Sat 14 Nov, 3:00 pm'), count: increment(1),
+      day: '2026-11-08', updatedAt: serverTimestamp(),
+    }, { merge: true });
+  }
+  return batch.commit();
+}
+
+/** The FA's change to a match: the new fields plus who and when. */
+function changeFixture(db, id, changes) {
+  return updateDoc(doc(db, `${D}/fixtures/${id}`), {
+    ...changes, updatedBy: 'fa1', updatedAt: serverTimestamp(),
+  });
+}
+
+describe('Fixtures (3.0a)', () => {
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await updateDoc(doc(db, `${D}/teams/royal`), { shortName: 'RUF', logoUrl: null, kits: ROYAL_KITS });
+      await updateDoc(doc(db, `${D}/teams/stars`), { shortName: 'GST', logoUrl: null, kits: STARS_KITS });
+      // A club in both competitions, with separate juvenile kits
+      await setDoc(doc(db, `${D}/teams/colts`), {
+        name: 'Apam Colts', shortName: 'APC', logoUrl: null, categories: ['division', 'juvenile'],
+        kits: STARS_KITS, juvenileKits: COLTS_JUVENILE_KITS,
+      });
+      await setDoc(doc(db, `${D}/teams/youth`), {
+        name: 'Afransi Youth', shortName: 'AFY', logoUrl: null, categories: ['juvenile'], kits: ROYAL_KITS,
+      });
+    });
+  });
+
+  it('the FA adds a match with its history and both teams notes in one batch', async () => {
+    await assertSucceeds(addFixture(dbAs('fa1'), 'm1'));
+  });
+
+  it('a juvenile match needs an age group and uses the juvenile kits', async () => {
+    const juvenile = fixtureData({
+      competitionId: '2026-27_juvenile-league', category: 'juvenile', ageGroup: 'U15',
+      teamIds: ['colts', 'youth'],
+      home: { id: 'colts', name: 'Apam Colts', shortName: 'APC', logoUrl: null, colour: '#1E5BC6' },
+      away: { id: 'youth', name: 'Afransi Youth', shortName: 'AFY', logoUrl: null, colour: '#7A1F2B' },
+      kits: {
+        home: { slot: 'home', kit: COLTS_JUVENILE_KITS.home },
+        away: { slot: 'away', kit: ROYAL_KITS.away },
+        homeGk: { slot: 'goalkeeper', kit: COLTS_JUVENILE_KITS.goalkeeper },
+        awayGk: { slot: 'goalkeeper', kit: ROYAL_KITS.goalkeeper },
+      },
+    });
+    await assertSucceeds(addFixture(dbAs('fa1'), 'j1', juvenile));
+    await assertFails(addFixture(dbAs('fa1'), 'j2', without(juvenile, 'ageGroup')));
+    // The Colts' Division kit in a juvenile match is not their juvenile kit
+    await assertFails(addFixture(dbAs('fa1'), 'j3', {
+      ...juvenile, kits: { ...juvenile.kits, home: { slot: 'home', kit: STARS_KITS.home } },
+    }));
+  });
+
+  it('a match is refused when the teams or their details are wrong', async () => {
+    const db = dbAs('fa1');
+    // The same team twice
+    await assertFails(addFixture(db, 'x1', fixtureData({
+      teamIds: ['royal', 'royal'],
+      away: { id: 'royal', name: 'Royal Unique FC', shortName: 'RUF', logoUrl: null, colour: '#7A1F2B' },
+    })));
+    // A team that doesn't play Division (Afransi Youth is Juvenile only)
+    await assertFails(addFixture(db, 'x2', fixtureData({
+      teamIds: ['royal', 'youth'],
+      away: { id: 'youth', name: 'Afransi Youth', shortName: 'AFY', logoUrl: null, colour: '#7A1F2B' },
+    })));
+    // A name that isn't the team's real name
+    await assertFails(addFixture(db, 'x3', fixtureData({
+      away: { id: 'stars', name: 'Stars FC', shortName: 'GST', logoUrl: null, colour: '#D71920' },
+    })));
+    // A kit the team doesn't have
+    await assertFails(addFixture(db, 'x4', fixtureData({
+      kits: { ...fixtureData().kits, away: { slot: 'away', kit: { primary: '#000000' } } },
+    })));
+    // teamIds that don't match the two sides
+    await assertFails(addFixture(db, 'x5', fixtureData({ teamIds: ['stars', 'royal'] })));
+  });
+
+  it('a new match must be scheduled, in the future, in its own league', async () => {
+    const db = dbAs('fa1');
+    await assertFails(addFixture(db, 'x1', fixtureData({ kickoffAt: Timestamp.fromMillis(Date.now() - 3600000) })));
+    await assertFails(addFixture(db, 'x2', fixtureData({ status: 'postponed', note: 'Rain' })));
+    await assertFails(addFixture(db, 'x3', fixtureData({ competitionId: '2026-27_juvenile-league' })));
+    await assertFails(addFixture(db, 'x4', fixtureData({ ageGroup: 'U13' })));
+    await assertFails(addFixture(db, 'x5', fixtureData({ round: 0 })));
+    await assertFails(addFixture(db, 'x6', fixtureData({ venue: '' })));
+  });
+
+  it('a team admin cannot add a match; teams and referees can read the schedule', async () => {
+    await assertFails(addFixture(dbAs('admin1'), 'm1',
+      fixtureData({ createdBy: 'admin1', updatedBy: 'admin1' }), { by: 'admin1' }));
+    await addFixture(dbAs('fa1'), 'm1');
+    await assertSucceeds(getDoc(doc(dbAs('admin2'), `${D}/fixtures/m1`)));
+    await assertSucceeds(getDocs(query(collection(dbAs('admin1'), `${D}/fixtures`),
+      where('teamIds', 'array-contains', 'royal'))));
+    await assertSucceeds(getDoc(doc(dbAs('ref1'), `${D}/fixtures/m1`)));
+    await assertFails(getDoc(doc(dbAs('newbie'), `${D}/fixtures/m1`)));
+  });
+
+  it('the FA changes a match: teams swapped, new date and venue', async () => {
+    await addFixture(dbAs('fa1'), 'm1');
+    const f = fixtureData();
+    await assertSucceeds(changeFixture(dbAs('fa1'), 'm1', {
+      teamIds: ['stars', 'royal'], home: f.away, away: f.home,
+      kits: {
+        home: { slot: 'home', kit: STARS_KITS.home }, away: { slot: 'away', kit: ROYAL_KITS.away },
+        homeGk: f.kits.awayGk, awayGk: f.kits.homeGk,
+      },
+      kickoffAt: Timestamp.fromMillis(Date.now() + 5 * 86400000),
+      venue: 'Gomoa Park', note: 'The ground is booked',
+    }));
+  });
+
+  it('a change cannot move a match into the past or another season', async () => {
+    await addFixture(dbAs('fa1'), 'm1');
+    const db = dbAs('fa1');
+    await assertFails(changeFixture(db, 'm1', { kickoffAt: Timestamp.fromMillis(Date.now() - 3600000) }));
+    await assertFails(changeFixture(db, 'm1', { season: '2027-28', competitionId: '2027-28_division-league' }));
+    await assertFails(changeFixture(db, 'm1', { createdBy: 'fa2' }));
+    await assertFails(changeFixture(dbAs('admin1'), 'm1', { venue: 'Royal Park' }));
+  });
+
+  it('postponing needs a reason; the new date can come now or later', async () => {
+    await addFixture(dbAs('fa1'), 'm1');
+    const db = dbAs('fa1');
+    await assertFails(changeFixture(db, 'm1', { status: 'postponed', kickoffAt: null }));
+    await assertSucceeds(changeFixture(db, 'm1', { status: 'postponed', kickoffAt: null, note: 'Pitch waterlogged' }));
+    // A scheduled match must have a date
+    await assertFails(changeFixture(db, 'm1', { status: 'scheduled', kickoffAt: null, note: null }));
+    await assertSucceeds(changeFixture(db, 'm1', {
+      status: 'scheduled', kickoffAt: Timestamp.fromMillis(Date.now() + 7 * 86400000), note: null,
+    }));
+  });
+
+  it('a cancelled match keeps its date and can never be changed again', async () => {
+    await addFixture(dbAs('fa1'), 'm1');
+    const db = dbAs('fa1');
+    await assertFails(changeFixture(db, 'm1', { status: 'cancelled' }));
+    await assertFails(changeFixture(db, 'm1', {
+      status: 'cancelled', note: 'Club withdrew', kickoffAt: Timestamp.fromMillis(Date.now() + 9 * 86400000),
+    }));
+    await assertSucceeds(changeFixture(db, 'm1', { status: 'cancelled', note: 'Club withdrew' }));
+    await assertFails(changeFixture(db, 'm1', { status: 'scheduled', note: null }));
+  });
+
+  it('nobody deletes a match', async () => {
+    await addFixture(dbAs('fa1'), 'm1');
+    await assertFails(deleteDoc(doc(dbAs('fa1'), `${D}/fixtures/m1`)));
+  });
+
+  it('a history line is written by the FA, for a match that exists', async () => {
+    await addFixture(dbAs('fa1'), 'm1');
+    const line = { what: 'Kick-off moved to 4:00 pm', by: 'fa1', byName: 'Ama Boateng', at: serverTimestamp() };
+    await assertSucceeds(setDoc(doc(dbAs('fa1'), `${D}/fixtures/m1/history/h2`), line));
+    await assertFails(setDoc(doc(dbAs('fa1'), `${D}/fixtures/nope/history/h1`), line));
+    await assertFails(setDoc(doc(dbAs('admin1'), `${D}/fixtures/m1/history/h3`),
+      { ...line, by: 'admin1' }));
+    await assertSucceeds(getDocs(collection(dbAs('admin1'), `${D}/fixtures/m1/history`)));
+  });
+
+  it('only the FA writes match notes for a team bell', async () => {
+    await assertSucceeds(notify(dbAs('fa1'), 'team-royal_fixturePostponed_royal_2026-11-08',
+      { audience: 'team:royal', kind: 'fixturePostponed', teamId: 'royal' }));
+    await assertFails(notify(dbAs('admin1'), 'team-stars_fixtureAdded_stars_2026-11-08',
+      { audience: 'team:stars', kind: 'fixtureAdded', teamId: 'stars' }));
+    await assertFails(notify(dbAs('admin1'), 'fa_fixtureChanged_royal_2026-11-08',
+      { audience: 'fa', kind: 'fixtureChanged', teamId: 'royal' }));
+  });
+});
+
+describe('Fixtures: a team changes its kit after the match is made (3.0a)', () => {
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await updateDoc(doc(db, `${D}/teams/royal`), { shortName: 'RUF', logoUrl: null, kits: ROYAL_KITS });
+      await updateDoc(doc(db, `${D}/teams/stars`), { shortName: 'GST', logoUrl: null, kits: STARS_KITS });
+    });
+  });
+
+  it('the old copy is refused; the app sends a fresh copy with the change', async () => {
+    await addFixture(dbAs('fa1'), 'm1');
+    const newHome = { primary: '#1E5BC6' };
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), `${D}/teams/royal`),
+        { kits: { ...ROYAL_KITS, home: newHome } });
+    });
+    const db = dbAs('fa1');
+    await assertFails(changeFixture(db, 'm1', { status: 'postponed', kickoffAt: null, note: 'Rain' }));
+    await assertSucceeds(changeFixture(db, 'm1', {
+      status: 'postponed', kickoffAt: null, note: 'Rain',
+      kits: { ...fixtureData().kits, home: { slot: 'home', kit: newHome } },
+    }));
+  });
+});

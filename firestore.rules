@@ -467,7 +467,9 @@ service cloud.firestore {
                            'teamUpdated', 'changeRequested', 'changeApproved',
                            'changeRefused', 'teamCorrected', 'correctionAsked',
                            'correctionSentBack', 'correctionDone',
-                           'teamSuspended', 'suspensionLifted']
+                           'teamSuspended', 'suspensionLifted',
+                           'fixtureAdded', 'fixtureChanged', 'fixturePostponed',
+                           'fixtureCancelled']
           && data.teamId is string
           && data.teamName is string
           && data.names is list && data.names.size() <= 60
@@ -1105,6 +1107,128 @@ service cloud.firestore {
           && !('teamId' in resource.data)
           && (!existsAfter(teamRequestDoc(request.auth.uid))
               || getAfter(teamRequestDoc(request.auth.uid)).data.nameKey != nameKey);
+      }
+
+      // ---------- fixtures/{fixtureId} (3.0a) ----------
+
+      function fixtureDoc(fixtureId) {
+        return /databases/$(database)/documents/districts/$(districtId)/fixtures/$(fixtureId);
+      }
+
+      // The kits a team wears in a competition: a club in both keeps
+      // separate juvenile kits (2.13b)
+      function kitsOf(team, category) {
+        return category == 'juvenile' && team.get('juvenileKits', {}).size() > 0
+          ? team.juvenileKits
+          : team.get('kits', {});
+      }
+
+      // { slot, kit }: one of the team's own kits, copied exactly
+      function isKitChoice(choice, team, category, slots) {
+        return choice is map
+          && choice.keys().hasOnly(['slot', 'kit'])
+          && choice.get('slot', '') in slots
+          && kitsOf(team, category).get(choice.slot, null) != null
+          && choice.get('kit', null) == kitsOf(team, category)[choice.slot];
+      }
+
+      // One side of a match: { id, name, shortName, logoUrl, colour }.
+      // Teams can't read other teams, so the match carries a copy; it must
+      // match the team as it is now. The team must play this competition.
+      function isFixtureSide(side, category, outfield, goalkeeper) {
+        let team = get(teamDoc(side.id)).data;
+        return side.keys().hasOnly(['id', 'name', 'shortName', 'logoUrl', 'colour'])
+          && team.get('categories', []).hasAny([category])
+          && side.get('name', '') == team.name
+          && side.get('shortName', '') == team.get('shortName', '')
+          && side.get('logoUrl', null) == team.get('logoUrl', null)
+          && isHexColour(side.get('colour', null))
+          && isKitChoice(outfield, team, category, ['home', 'away', 'third'])
+          && isKitChoice(goalkeeper, team, category, ['goalkeeper', 'goalkeeper2']);
+      }
+
+      // A match. A league match's competition is '<season>_<category>-league'
+      // (cups come in 3.0c). Kick-off is empty only while postponed with no
+      // new date. Postponed and cancelled need a reason the teams can read.
+      function isValidFixture(data) {
+        return data.keys().hasOnly([
+            'season', 'competitionId', 'category', 'ageGroup', 'round',
+            'teamIds', 'home', 'away', 'kits', 'kickoffAt', 'venue', 'status',
+            'note', 'createdBy', 'createdAt', 'updatedBy', 'updatedAt'
+          ])
+          && data.keys().hasAll([
+            'season', 'competitionId', 'category', 'round', 'teamIds', 'home',
+            'away', 'kits', 'kickoffAt', 'venue', 'status', 'createdBy',
+            'createdAt', 'updatedBy', 'updatedAt'
+          ])
+          && isSeason(data.season)
+          && data.category in ['division', 'juvenile']
+          && (data.category == 'juvenile'
+              ? data.get('ageGroup', '') in ['U13', 'U15', 'U17']
+              : !('ageGroup' in data))
+          && data.competitionId == data.season + '_' + data.category + '-league'
+          && data.round is int && data.round >= 1 && data.round <= 99
+          && data.home is map && data.away is map && data.kits is map
+          && data.home.get('id', '') is string && data.away.get('id', '') is string
+          && data.home.id != data.away.id
+          && data.teamIds == [data.home.id, data.away.id]
+          && data.kits.keys().hasOnly(['home', 'away', 'homeGk', 'awayGk'])
+          && data.kits.keys().hasAll(['home', 'away', 'homeGk', 'awayGk'])
+          && isFixtureSide(data.home, data.category, data.kits.home, data.kits.homeGk)
+          && isFixtureSide(data.away, data.category, data.kits.away, data.kits.awayGk)
+          && isText(data.venue, 2, 80)
+          && data.status in ['scheduled', 'postponed', 'cancelled']
+          && (data.kickoffAt is timestamp
+              || (data.kickoffAt == null && data.status == 'postponed'))
+          && isOptionalText(data, 'note', 200)
+          && (data.status == 'scheduled' || isText(data.get('note', ''), 3, 200))
+          && data.updatedBy == request.auth.uid
+          && data.updatedAt == request.time;
+      }
+
+      match /fixtures/{fixtureId} {
+        // The schedule is for everyone with a role (teams, referees, FA)
+        allow get, list: if hasRole();
+
+        // The FA adds a match: always scheduled, kick-off in the future
+        allow create: if isFaAdmin()
+          && isValidFixture(request.resource.data)
+          && request.resource.data.status == 'scheduled'
+          && request.resource.data.kickoffAt > request.time
+          && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.createdAt == request.time;
+
+        // The FA changes, postpones or cancels it. A cancelled match is
+        // final, and cancelling keeps its date. A new date is in the future.
+        allow update: if isFaAdmin()
+          && resource.data.status != 'cancelled'
+          && isValidFixture(request.resource.data)
+          && request.resource.data.season == resource.data.season
+          && request.resource.data.competitionId == resource.data.competitionId
+          && request.resource.data.category == resource.data.category
+          && request.resource.data.get('ageGroup', null) == resource.data.get('ageGroup', null)
+          && request.resource.data.createdBy == resource.data.createdBy
+          && request.resource.data.createdAt == resource.data.createdAt
+          && (request.resource.data.status != 'cancelled'
+              || request.resource.data.kickoffAt == resource.data.kickoffAt)
+          && (request.resource.data.kickoffAt == resource.data.kickoffAt
+              || request.resource.data.kickoffAt == null
+              || request.resource.data.kickoffAt > request.time);
+
+        // Never deleted: cancel it instead, so the teams keep the record
+
+        // fixtures/{id}/history/{entryId}: every change, written with it
+        match /history/{entryId} {
+          allow get, list: if hasRole();
+          allow create: if isFaAdmin()
+            && request.resource.data.keys().hasOnly(['what', 'reason', 'by', 'byName', 'at'])
+            && isText(request.resource.data.what, 3, 400)
+            && isOptionalText(request.resource.data, 'reason', 200)
+            && request.resource.data.by == request.auth.uid
+            && isText(request.resource.data.byName, 1, 80)
+            && request.resource.data.at == request.time
+            && existsAfter(fixtureDoc(fixtureId));
+        }
       }
 
       // ---------- teams/{teamId} ----------

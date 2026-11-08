@@ -23,6 +23,12 @@ import 'package:gedfa_connect/features/fa/presentation/fa_player_teams_screen.da
 import 'package:gedfa_connect/features/fa/presentation/fa_request_review_screen.dart';
 import 'package:gedfa_connect/features/fa/presentation/fa_requests_screen.dart';
 import 'package:gedfa_connect/features/fa/presentation/fa_juvenile_child_screen.dart';
+import 'package:gedfa_connect/features/fixtures/presentation/fa_fixtures_screen.dart';
+import 'package:gedfa_connect/features/fixtures/presentation/fixture_form_screen.dart';
+import 'package:gedfa_connect/features/fixtures/presentation/fixture_kits_screen.dart';
+import 'package:gedfa_connect/features/fixtures/presentation/team_fixtures_screen.dart';
+import 'package:gedfa_connect/features/players/domain/age_group.dart';
+import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/fa/presentation/fa_team_juvenile_screen.dart';
 import 'package:gedfa_connect/features/fa/presentation/fa_team_players_screen.dart';
 import 'package:gedfa_connect/features/auth/presentation/verify_email_screen.dart';
@@ -106,7 +112,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
-      // FA admin area: a shell with tabs (Home, Teams, Players, More).
+      // FA admin area: a shell with tabs (Home, Teams, Players, Fixtures,
+      // More).
       StatefulShellRoute.indexedStack(
         builder: (_, state, navigationShell) => AppShell(
           navigationShell: navigationShell,
@@ -227,7 +234,47 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
-          // Tab 3: More
+          // Tab 3: Fixtures (3.0a)
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: Routes.adminFixtures,
+                builder: (_, _) => const FaFixturesScreen(),
+                routes: [
+                  // Add one match (?category=juvenile&group=U15). Full screen.
+                  GoRoute(
+                    path: 'new',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (_, state) => FixtureFormScreen(
+                      category: Competition.fromString(
+                            state.uri.queryParameters['category'],
+                          ) ??
+                          Competition.division,
+                      group: AgeGroup.fromString(
+                        state.uri.queryParameters['group'],
+                      ),
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'edit/:id',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (_, state) => FixtureFormScreen(
+                      fixtureId: state.pathParameters['id'],
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'kits/:id',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (_, state) => FixtureKitsScreen(
+                      fixtureId: state.pathParameters['id']!,
+                      canEdit: true,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          // Tab 4: More
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -378,7 +425,25 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
-          // Tab 1: Positions (who can play where)
+          // Tab 1: Fixtures (3.0a)
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: Routes.teamFixtures,
+                builder: (_, _) => const TeamFixturesScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'kits/:id',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (_, state) => FixtureKitsScreen(
+                      fixtureId: state.pathParameters['id']!,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          // Tab 2: Positions (who can play where)
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -406,7 +471,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
-          // Tab 2: More (Settings)
+          // Tab 3: More (Settings)
           StatefulShellBranch(
             routes: [
               GoRoute(

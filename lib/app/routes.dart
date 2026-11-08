@@ -78,7 +78,18 @@ class Routes {
   static String adminInviteReady(String email) =>
       '$adminPeople/invited/${Uri.encodeComponent(email)}';
   static String adminMember(String uid) => '$adminPeople/member/$uid';
+  /// FA: the Fixtures tab (3.0a), adding one match, changing one, and
+  /// the kits of a match.
+  static const adminFixtures = '/admin/fixtures';
+  static const adminNewFixture = '/admin/fixtures/new';
+  static String adminEditFixture(String id) => '$adminFixtures/edit/$id';
+  static String adminFixtureKits(String id) => '$adminFixtures/kits/$id';
+
   static const team = '/team';
+
+  /// Team: the Fixtures tab (3.0a) and the kits of one match.
+  static const teamFixtures = '/team/fixtures';
+  static String teamFixtureKits(String id) => '$teamFixtures/kits/$id';
   static const teamNotifications = '/team/notifications';
   static String teamAnnouncement(String id) =>
       '/team/notifications/announcement/$id';

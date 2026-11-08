@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.17, matches the rules after step 2.12b (7 Nov 2026)
+**Status:** v2.18, matches the rules after step 3.0a (8 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -514,7 +514,7 @@ Readable and writable only by FA admins. Created with `next: 2` by the very firs
 | Field | Notes |
 | ----- | ----- |
 | `audience` | `fa` or `team:<teamId>` |
-| `kind` | `playersApproved`, `playersRejected`, `teamApproved`, `paymentConfirmed`, `paymentNotFound`, `feeReminder`, `changeApproved`, `changeRefused`, `teamCorrected`, `correctionAsked`, `correctionDone`, `teamSuspended`, `suspensionLifted` (for teams, written by the FA); `teamRequest`, `playersSubmitted`, `playersResubmitted`, `juvenileSubmitted`, `inviteAccepted`, `paymentSent`, `teamUpdated`, `changeRequested`, `correctionSentBack` (for the FA) |
+| `kind` | `playersApproved`, `playersRejected`, `teamApproved`, `paymentConfirmed`, `paymentNotFound`, `feeReminder`, `changeApproved`, `changeRefused`, `teamCorrected`, `correctionAsked`, `correctionDone`, `teamSuspended`, `suspensionLifted`, `fixtureAdded`, `fixtureChanged`, `fixturePostponed`, `fixtureCancelled` (for teams, written by the FA); `teamRequest`, `playersSubmitted`, `playersResubmitted`, `juvenileSubmitted`, `inviteAccepted`, `paymentSent`, `teamUpdated`, `changeRequested`, `correctionSentBack` (for the FA) |
 | `teamId`, `teamName` | The team concerned (`teamRequest`: the club's uid) |
 | `names` | e.g. `Kojo Arthur (GE26-0011)`, `Yaw Boateng: Jersey number #10 → #14` |
 | `count`, `day`, `updatedAt` | |
@@ -579,6 +579,32 @@ The affiliation fee is **GH₵ 1,000 every season**, paid to GEDFA's MoMo (numbe
 
 - Read by anyone with a role; created and deleted (cancelled) by FA admins; never edited (cancel and add again).
 - The team's blue "Juvenile screening" card shows each day until midnight after it.
+
+### 2.15 `fixtures/{fixtureId}` — matches (3.0a)
+
+One match. Made by the FA (one at a time in 3.0a; "Make the season" and cups follow in 3.0b and 3.0c). Read by everyone with a role. **Never deleted**: a called-off match is cancelled.
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `season` | string | `2026-27`; never changes |
+| `competitionId` | string | League matches: `<season>_division-league` or `<season>_juvenile-league` (cups in 3.0c); never changes |
+| `category` | string | `division` / `juvenile`; never changes |
+| `ageGroup` | string? | **Juvenile only**: `U13`, `U15`, `U17`; never changes. Absent for Division |
+| `round` | number | The matchday, 1 to 99 |
+| `teamIds` | array | `[home.id, away.id]`, exactly (teams query their matches with `array-contains`) |
+| `home`, `away` | map | `{ id, name, shortName, logoUrl, colour }`: a **copy** of the team (teams can't read other teams). The rules check it matches the team document as it is now, and that the team plays this competition |
+| `kits` | map | `{ home, away, homeGk, awayGk }`, each `{ slot, kit }`: which of the team's kits it wears and that kit **exactly as on the team** (juvenile kits for a club in both competitions). Outfield slots `home`/`away`/`third`, goalkeeper slots `goalkeeper`/`goalkeeper2` |
+| `kickoffAt` | timestamp? | Empty only while **postponed** with no new date |
+| `venue` | string | 2–80; the home team's ground unless the FA changes it |
+| `status` | string | `scheduled` → `postponed` → `scheduled` again, or `cancelled` (final) |
+| `note` | string? | Up to 200. The reason; **required** (3–200) when postponed or cancelled |
+| `createdBy`, `createdAt`, `updatedBy`, `updatedAt` | | Who and when (server time) |
+
+- **Create (FA):** always `scheduled`, kick-off in the future. Same batch: a history line and `fixtureAdded` in both teams' bells.
+- **Update (FA):** season, competition, category, age group and creator never change; a new kick-off is in the future; cancelling keeps the date; a cancelled match is never changed again. Every save re-copies both teams (they may have changed their name, logo or kits since). Same batch: a history line and a note in the bells of every team involved (`fixtureChanged`, `fixturePostponed`, `fixtureCancelled`).
+- **Kits (GEDFA, 8 Nov 2026):** the home team keeps its home kit; the away team wears the first of home, away, third whose shirt doesn't clash (then shorts and socks). Goalkeepers differ from both teams, each other and the referee (black). The clash table of the 16 kit colours is in `kit_clash.dart` (draft for GEDFA to check). The FA can change any choice.
+- **Team sheets** are due `kickoffAt` − 1 hour (GEDFA); nothing is stored for that yet (3.1).
+- `fixtures/{id}/history/{entryId}`: `{ what, reason?, by, byName, at }`, written by the FA with each change (the match must exist after the batch). Read by everyone with a role.
 
 ## 3. Who can do what (summary)
 
@@ -703,6 +729,8 @@ Feed rules: never include dates of birth; player photos only if agreed with GEDF
 
 **Decided by Isaac (8 Nov 2026), fixtures:** competitions (leagues and cups) are made by the app: a league by round robin, a cup by an automatic draw (straight knockout with byes, or groups then knockout, by the number of teams). "Add one match" stays for special cases (friendlies, replays). The FA can change any match the app made (teams, home and away, date, time, venue, round). Postponing asks for the new date and time at once, or later.
 
+**Answered by GEDFA via Isaac (8 Nov 2026), cups:** when the FA creates a cup it chooses the rules: a draw after 90 minutes goes to penalties, extra time then penalties, or a replay; one leg or two legs per round. Who goes through follows normal qualification for the format (group places, then knockout winners). The draw is fully random (no seeding). There is a juvenile cup for each age group (U13, U15, U17).
+
 **GFA colts guidelines 2023/24 (found online, 7 Nov 2026):** U13 players may play for U15 and U15 players for U17; in a U17 match at most 1 U13 player and 5 U15 players. Match length U17 2 × 45, U15 2 × 40, U13 2 × 25 minutes. Not stated: how many U13 players in a U15 match (asked GEDFA).
 
 Still open:
@@ -734,6 +762,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 8 Nov 2026 | v2.18 (3.0a): new `fixtures/{id}` with a copy of both teams and their kits for the match, and `fixtures/{id}/history`; four match notification kinds. Kit rule (home keeps its home kit) and clash table. 298 rules tests. |
 | 7 Nov 2026 | v2.17 (2.12b): no new collections or rules. The dashboard's totals are worked out in the app from `teams`, `players` and `fees` (already streamed for the FA), not count queries. Squads ready = Division teams with at least `settings/league.matchdaySquad` approved Division players. |
 | 7 Nov 2026 | v2.16 (2.12a): no new collections or rules. The FA dashboard reads what is already there (team requests, team changes, players, waiting payments, correction requests, screening days). Section 7: squads ready = matchday squad (16); fourth officials record assists (Phase 4). |
 | 7 Nov 2026 | v2.15 (2.11c): suspensions by the chairman: `teams.suspension` and `teams/{teamId}/suspensions` (ends on a date or when lifted with why: fine paid, bond signed, board decision, other); while in force the team's player, profile and change-request writes are refused; notification kinds `teamSuspended`, `suspensionLifted`. 285 tests. |

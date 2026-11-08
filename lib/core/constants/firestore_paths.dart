@@ -37,6 +37,11 @@ class FirestorePaths {
   static String teamCorrections(String teamId) =>
       '${team(teamId)}/corrections';
 
+  /// Matches (3.0a), and each match's history of changes.
+  static const fixtures = '$district/fixtures';
+  static String fixture(String id) => '$district/fixtures/$id';
+  static String fixtureHistory(String id) => '$district/fixtures/$id/history';
+
   static const players = '$district/players';
   static String player(String playerId) => '$district/players/$playerId';
 

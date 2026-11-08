@@ -19,7 +19,8 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
    - test steps he can do himself in the app
 5. **Before every commit**, run (and show the result):
    - `flutter analyze` → must be **0 issues**
-   - `cd test/rules && npm test` → **all** rules tests pass (285 after 2.11c)
+   - `cd test/rules && npm test` → **all** rules tests pass (298 after 3.0a)
+   - `flutter test` → all Dart tests pass (layout smoke tests and the kit check)
 6. **Commit after each step** with a clear message, e.g.
    `feat(teams): change requests for name, short name, logo and competitions; 250 rules tests; docs v2.12`
 7. **Deploy rules only after the tests pass**, and only to the dev project:
@@ -90,7 +91,10 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
   links on FA screens use `context.goKeepingHome` / `pushKeepingHome` (`core/widgets/back_to_home.dart`)
   so the note travels. Dashboard numbers are live from the existing streams (no count queries yet).
 - Layout test: `flutter test` runs `test/dashboard_smoke_test.dart` (phone and laptop, light and dark).
-- **Next:** **Phase 3** team sheets (16 / 5 / 7 from settings, GFA play-up limits, kit in the top-left corner),
+- **3.0a fixtures** done (8 Nov 2026): `fixtures/{id}` carries a copy of both teams and their kits; every
+  save re-reads the teams (`FixtureRepository.loadTeam`). Kit clash table in `kit_clash.dart` (draft).
+  Tabs: FA Home · Teams · Players · Fixtures · More; team Squad · Fixtures · Profiles · More.
+- **Next:** **3.0b** Make the season, then 3.0c–e (mockup `3.0-fixtures-and-sheet.html`), then **Phase 3** team sheets (16 / 5 / 7 from settings, GFA play-up limits, kit in the top-left corner),
   then the **UI/UX refresh with motion and animations** and the "before the pilot" list (push
   notifications, 3-day fee reminders, prod setup), then the pilot, a second refresh from feedback, Phase 4.
 - **The refresh (after Phase 3, before the pilot):** our own app icon (`flutter_launcher_icons`), splash
