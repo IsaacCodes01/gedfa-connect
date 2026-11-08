@@ -296,7 +296,7 @@ class _Hero extends StatelessWidget {
                 ),
                 if (f.isScheduled && !played && kickoff != null) ...[
                   const SizedBox(height: 16),
-                  _Countdown(left: kickoff.difference(now)),
+                  _Countdown(kickoff: kickoff),
                 ],
                 const SizedBox(height: 12),
                 Row(
@@ -418,15 +418,41 @@ class _BigTeam extends StatelessWidget {
   }
 }
 
-class _Countdown extends StatelessWidget {
-  const _Countdown({required this.left});
+/// Days, hours, minutes and seconds to kick-off. It ticks every second by
+/// itself, so the rest of the page isn't rebuilt each second.
+class _Countdown extends StatefulWidget {
+  const _Countdown({required this.kickoff});
 
-  final Duration left;
+  final DateTime kickoff;
+
+  @override
+  State<_Countdown> createState() => _CountdownState();
+}
+
+class _CountdownState extends State<_Countdown> {
+  late final Timer _tick;
+
+  @override
+  void initState() {
+    super.initState();
+    _tick = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _tick.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final left = widget.kickoff.difference(DateTime.now());
     final l = left.isNegative ? Duration.zero : left;
-    Widget box(String value, String label) => Container(
+    String two(int n) => n.toString().padLeft(2, '0');
+    Widget box(String value, String label, {Color color = Colors.white}) =>
+        Container(
           constraints: const BoxConstraints(minWidth: 58),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
@@ -437,10 +463,12 @@ class _Countdown extends StatelessWidget {
             children: [
               Text(
                 value,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: color,
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
+                  // Digits keep their width, so the boxes don't jiggle
+                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
               Text(
@@ -455,6 +483,7 @@ class _Countdown extends StatelessWidget {
           ),
         );
     return Semantics(
+      // Read out without the seconds, which change too fast to listen to
       label: 'Kick-off in ${l.inDays} days, ${l.inHours % 24} hours, '
           '${l.inMinutes % 60} minutes',
       excludeSemantics: true,
@@ -463,9 +492,12 @@ class _Countdown extends StatelessWidget {
         children: [
           box('${l.inDays}', 'DAYS'),
           const SizedBox(width: 8),
-          box('${l.inHours % 24}', 'HRS'),
+          box(two(l.inHours % 24), 'HRS'),
           const SizedBox(width: 8),
-          box('${l.inMinutes % 60}', 'MIN'),
+          box(two(l.inMinutes % 60), 'MIN'),
+          const SizedBox(width: 8),
+          // Seconds in gold, as on the matchday card (mockup 3.0)
+          box(two(l.inSeconds % 60), 'SEC', color: const Color(0xFFFCD116)),
         ],
       ),
     );

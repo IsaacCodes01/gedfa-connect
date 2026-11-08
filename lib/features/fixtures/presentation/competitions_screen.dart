@@ -61,7 +61,7 @@ class CompetitionsScreen extends ConsumerWidget {
                 ],
               ),
             ),
-            const DashboardSectionTitle(title: 'Cups and galas'),
+            const DashboardSectionTitle(title: 'Cups and Gala'),
             ...cupsAsync.when(
               loading: () => const [LoadingView()],
               error: (error, _) => [
@@ -74,7 +74,7 @@ class CompetitionsScreen extends ConsumerWidget {
                 if (cups.isEmpty)
                   const DashboardCard(
                     child: Text(
-                      'No cups or galas yet. Make one with the button below.',
+                      'No cups or Gala yet. Make one with the button below.',
                     ),
                   )
                 else
@@ -104,7 +104,7 @@ class CompetitionsScreen extends ConsumerWidget {
             FilledButton.icon(
               onPressed: () => context.push(Routes.adminNewCup),
               icon: const Icon(Icons.add),
-              label: const Text('New cup or gala'),
+              label: const Text('New cup or Gala'),
             ),
           ],
         ),

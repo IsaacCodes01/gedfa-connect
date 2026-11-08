@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gedfa_connect/app/theme.dart';
 import 'package:gedfa_connect/core/constants/season.dart';
@@ -49,7 +50,6 @@ class _CupFormScreenState extends ConsumerState<CupFormScreen> {
   final _left = <String>{};
   CupFormat _format = CupFormat.knockout;
   int _legs = 2;
-  bool _finalOneMatch = true;
   LevelRule _level = LevelRule.penalties;
 
   /// Null = the plan's default (quarter-finals, or the start for a gala).
@@ -62,9 +62,10 @@ class _CupFormScreenState extends ConsumerState<CupFormScreen> {
   late DateTime _lastDay = _firstDay.add(const Duration(days: 1));
   TimeOfDay _kickoff = const TimeOfDay(hour: 9, minute: 0);
   int _gap = 90;
-  bool _busy = false;
 
-  static const _gaps = [60, 75, 90, 105, 120];
+  /// The FA types the minutes between kick-offs (30 to 240).
+  final _gapField = TextEditingController(text: '90');
+  bool _busy = false;
 
   static String _defaultName(CupKind kind) => kind == CupKind.cup
       ? 'GEDFA Cup ${Season.label(Season.current)}'
@@ -75,6 +76,14 @@ class _CupFormScreenState extends ConsumerState<CupFormScreen> {
     final today = DateTime(now.year, now.month, now.day);
     final days = (DateTime.saturday - today.weekday) % 7;
     return today.add(Duration(days: days == 0 ? 7 : days));
+  }
+
+  /// Under the minutes field when they are out of range.
+  String? get _gapError {
+    final minutes = int.tryParse(_gapField.text.trim());
+    return minutes == null || minutes < 30 || minutes > 240
+        ? '30 to 240 minutes'
+        : null;
   }
 
   /// "1 h 30 min"
@@ -88,28 +97,29 @@ class _CupFormScreenState extends ConsumerState<CupFormScreen> {
   void dispose() {
     _name.dispose();
     _ground.dispose();
+    _gapField.dispose();
     super.dispose();
   }
 
   void _setKind(CupKind kind) => setState(() {
-        _kind = kind;
-        if (!_nameTyped) _name.text = _defaultName(kind);
-        _bracketFrom = null;
-        if (kind == CupKind.gala) {
-          // A gala: straight knockout, one match per tie, no seeding
-          _format = CupFormat.knockout;
-          _legs = 1;
-          _seeded = false;
-          if (_level == LevelRule.replay) _level = LevelRule.penalties;
-        }
-      });
+    _kind = kind;
+    if (!_nameTyped) _name.text = _defaultName(kind);
+    _bracketFrom = null;
+    if (kind == CupKind.gala) {
+      // A gala: straight knockout, one match per tie, no seeding
+      _format = CupFormat.knockout;
+      _legs = 1;
+      _seeded = false;
+      if (_level == LevelRule.replay) _level = LevelRule.penalties;
+    }
+  });
 
   void _setWho(CupWho who, [AgeGroup? group]) => setState(() {
-        _who = who;
-        if (group != null) _group = group;
-        _left.clear();
-        _bracketFrom = null;
-      });
+    _who = who;
+    if (group != null) _group = group;
+    _left.clear();
+    _bracketFrom = null;
+  });
 
   /// The sides of the chosen competition, A to Z (Division first in an
   /// open cup).
@@ -160,15 +170,25 @@ class _CupFormScreenState extends ConsumerState<CupFormScreen> {
       return;
     }
     final gala = _kind == CupKind.gala;
+    final typedGap = int.tryParse(_gapField.text.trim());
+    if (gala && (typedGap == null || typedGap < 30 || typedGap > 240)) {
+      AppToast.warning(
+        context,
+        'Type the minutes between kick-offs (30 to 240).',
+      );
+      return;
+    }
     if (gala && _ground.text.trim().length < 2) {
-      AppToast.warning(context, 'Type the ground where the gala is played.');
+      AppToast.warning(context, 'Type the ground where the Gala is played.');
       return;
     }
     final me = ref.read(authRepositoryProvider).currentUser;
     if (me == null) return;
     setState(() => _busy = true);
     try {
-      await ref.read(cupRepositoryProvider).create(
+      await ref
+          .read(cupRepositoryProvider)
+          .create(
             Cup(
               id: '',
               season: Season.current,
@@ -179,7 +199,6 @@ class _CupFormScreenState extends ConsumerState<CupFormScreen> {
               entries: [for (final s in chosen) s.entry],
               format: _format,
               legs: _legs,
-              finalOneMatch: _legs == 1 || _finalOneMatch,
               level: _level,
               bracketFrom: _format == CupFormat.groups ? 0 : bracketFrom,
               seeded: _seeded,
@@ -353,6 +372,7 @@ class _CupFormScreenState extends ConsumerState<CupFormScreen> {
               ),
               const SizedBox(height: 10),
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
                     child: _PickField(
@@ -364,17 +384,27 @@ class _CupFormScreenState extends ConsumerState<CupFormScreen> {
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: DropdownButtonFormField<int>(
-                      initialValue: _gap,
-                      isExpanded: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Between kick-offs',
-                      ),
-                      items: [
-                        for (final g in _gaps)
-                          DropdownMenuItem(value: g, child: Text(_gapText(g))),
+                    child: TextField(
+                      controller: _gapField,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(3),
                       ],
-                      onChanged: (v) => setState(() => _gap = v ?? _gap),
+                      decoration: InputDecoration(
+                        labelText: 'Between kick-offs',
+                        suffixText: 'min',
+                        helperText: '= ${_gapText(_gap)}',
+                        errorText: _gapError,
+                      ),
+                      onChanged: (v) => setState(() {
+                        final minutes = int.tryParse(v);
+                        if (minutes != null &&
+                            minutes >= 30 &&
+                            minutes <= 240) {
+                          _gap = minutes;
+                        }
+                      }),
                     ),
                   ),
                 ],
@@ -427,23 +457,12 @@ class _CupFormScreenState extends ConsumerState<CupFormScreen> {
                   }
                 }),
               ),
-              if (_legs == 2) ...[
-                const SizedBox(height: 8),
-                const _Hint('Two legs: the aggregate score counts; no away goals.'),
-                DashboardCard(
-                  padding: EdgeInsets.zero,
-                  child: SwitchListTile(
-                    secondary: const Icon(Icons.emoji_events_outlined),
-                    title: const Text(
-                      'The final is one match',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    subtitle: const Text('At a ground the FA picks'),
-                    value: _finalOneMatch,
-                    onChanged: (v) => setState(() => _finalOneMatch = v),
-                  ),
-                ),
-              ],
+              const SizedBox(height: 8),
+              _Hint(
+                '${_legs == 2 ? 'Two legs: the aggregate score counts; no '
+                          'away goals. ' : ''}The final is always one match, at a '
+                'ground the FA picks.',
+              ),
             ],
             DashboardSectionTitle(
               title: gala ? 'Level at full time' : 'Level at the end',
@@ -487,11 +506,11 @@ class _CupFormScreenState extends ConsumerState<CupFormScreen> {
                 _Hint(
                   bracketFrom == 0
                       ? 'The whole draw is made at once: every club knows '
-                          'who it meets if it wins.'
+                            'who it meets if it wins.'
                       : 'Until then each round is drawn after the one '
-                          'before it is played. From the '
-                          '${roundName(bracketFrom).toLowerCase()} draw, '
-                          'every club knows who it meets if it wins.',
+                            'before it is played. From the '
+                            '${roundName(bracketFrom).toLowerCase()} draw, '
+                            'every club knows who it meets if it wins.',
                 ),
               ],
             ],
@@ -506,8 +525,8 @@ class _CupFormScreenState extends ConsumerState<CupFormScreen> {
                     style: TextStyle(fontWeight: FontWeight.w600),
                   ),
                   subtitle: const Text(
-                    'Off: fully random. On: the top clubs in the standings '
-                    'go in Pot 1 and never meet each other in that round',
+                    'Off: fully random. On: the FA ticks the Pot 1 clubs at '
+                    'the draw; they never meet each other in that round',
                   ),
                   value: _seeded,
                   onChanged: (v) => setState(() => _seeded = v),
@@ -523,9 +542,11 @@ class _CupFormScreenState extends ConsumerState<CupFormScreen> {
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : Text(gala
-                      ? 'Save and go to the draw'
-                      : 'Save and go to the first draw'),
+                  : Text(
+                      gala
+                          ? 'Save and go to the draw'
+                          : 'Save and go to the first draw',
+                    ),
             ),
           ],
         ),
@@ -534,7 +555,7 @@ class _CupFormScreenState extends ConsumerState<CupFormScreen> {
 
     return Scaffold(
       appBar: GedfaAppBar(
-        title: gala ? 'New gala' : 'New cup',
+        title: gala ? 'New Gala' : 'New cup',
         subtitle: 'Competitions',
         leading: const CloseButton(),
       ),
@@ -584,9 +605,7 @@ class _TeamsCard extends StatelessWidget {
             style: const TextStyle(fontWeight: FontWeight.w700),
           ),
           subtitle: Text(
-            out == 0
-                ? every
-                : '$out ${out == 1 ? 'team' : 'teams'} left out',
+            out == 0 ? every : '$out ${out == 1 ? 'team' : 'teams'} left out',
           ),
           trailing: Text(
             'Change',
@@ -606,8 +625,7 @@ class _TeamsCard extends StatelessWidget {
               CheckboxListTile(
                 value: !left.contains(s.entry.key),
                 title: Text(
-                  who == CupWho.open &&
-                          s.entry.category == Competition.juvenile
+                  who == CupWho.open && s.entry.category == Competition.juvenile
                       ? '${s.name} · ${group.label}'
                       : s.name,
                 ),

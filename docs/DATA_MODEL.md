@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.20, matches the rules after step 3.0c1 (8 Nov 2026)
+**Status:** v2.20.1, matches the rules after step 3.0c1 (8 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -632,16 +632,15 @@ A cup or a gala of one season. Made by the FA (C2, C2b); read by everyone with a
 | `kind` | string | `cup`, or `gala`: a one-off straight knockout, one match per tie, at one ground (GEDFA plays one before the season) |
 | `name` | string | 3–60, e.g. `GEDFA Cup 2026/27` |
 | `category` | string | Who plays: `division`, `juvenile` or `open` (Division and juvenile sides together, like the Ghana FA Cup) |
-| `ageGroup` | string? | `U13` / `U15` / `U17`: **required** for `juvenile` (the age group) and `open` (the juvenile sides' age group, U17 until GEDFA answers); absent for `division` |
+| `ageGroup` | string? | `U13` / `U15` / `U17`: **required** for `juvenile` (the age group) and `open` (`U17`: only U17 sides play in an open cup, GEDFA); absent for `division` |
 | `entries` | array | 2–64 `{ teamId, category }`: every approved team by default, the FA can leave some out. A club in both competitions can have both sides in an open cup. Not checked one by one: each match is checked when the draw saves it |
 | `format` | string | `knockout` (with a first round and byes when the number isn't 4, 8, 16, 32, 64) or `groups` (3–5 clubs a group, 6 only when needed; the top 2 go through). A gala: `knockout` |
-| `legs` | number | `1` (one match) or `2` (home and away; aggregate, **no away goals**). A gala: `1` |
-| `finalOneMatch` | bool | With two legs: the final is still one match (asked GEDFA) |
+| `legs` | number | `1` (one match) or `2` (home and away; aggregate, **no away goals**). A gala: `1`. The **final is always one match**, at a ground the FA picks (GEDFA) |
 | `level` | string | Level at the end: `penalties`, `extraTime` (then penalties) or `replay` (**only with one-match rounds**; never in a gala) |
 | `bracketFrom` | number | The bracket is fixed from the round with this many clubs left: `16`, `8` (quarter-finals), `4` (semi-finals), or `0` = the whole draw at once. Until then each round is drawn after the one before it is played |
-| `seeded` | bool | Pots from the standings (Pot 1 clubs never meet in that round); off = fully random. A gala: `false` |
+| `seeded` | bool | Seeding with pots: the FA ticks the Pot 1 clubs by hand at the draw (the league standings only for a cup made mid-season, once results exist); Pot 1 clubs never meet in that round. Off = fully random; the FA can mix the teams again before the draw. A gala: `false` |
 | `stage` | string | `notDrawn` (3.0c1); the draw moves it on (3.0c2) |
-| `gala` | map? | **Galas only, required**: `{ ground (2–80), firstDay, lastDay (not before firstDay), kickoffHour, kickoffMinute, gapMinutes (30–240) }`. Absent for a cup |
+| `gala` | map? | **Galas only, required**: `{ ground (2–80), firstDay, lastDay (not before firstDay), kickoffHour, kickoffMinute, gapMinutes (30–240, typed by the FA) }`. One pitch. Absent for a cup |
 | `createdBy`, `createdAt`, `updatedBy`, `updatedAt` | | Who and when (server time) |
 
 - **The format** (`cup_format.dart`): straight knockout, for 18 clubs: 2 first-round ties (4 clubs), 14 byes, then a round of 16. Groups: as few groups (2, 4, 8, 16) as possible; 18 clubs → 5, 5, 4, 4, the top 2 to the quarter-finals. The app suggests knockout; groups are offered from 6 clubs.
@@ -774,15 +773,15 @@ Feed rules: never include dates of birth; player photos only if agreed with GEDF
 
 **Answered by GEDFA via Isaac (8 Nov 2026), cups (2):** each round is drawn after the one before it is played, until the round the FA picks; from that draw on the bracket is fixed (every club knows who it meets if it wins). Byes are drawn at random. Seeding only if the FA wants it: the top clubs in the standings go in Pot 1, the rest in Pot 2. **No away goals**: level on aggregate goes to penalties, or extra time then penalties, as set when the competition is made. Groups: 3 points a win, 1 a draw; level on points by goal difference, goals scored, then head-to-head. Every approved team plays by default; a cup may mix Division and juvenile sides (like the Ghana FA Cup). The FA may also make a **gala**: a one-off straight knockout, one match per tie, no home and away (GEDFA plays one before the season starts). Mockup `3.0c-competitions.html`.
 
+**Answered by GEDFA via Isaac (8 Nov 2026), cups (3):** seeding: the FA ticks the pots by hand; the league standings are used only for a cup made mid-season; otherwise everything is random, and in every cup (not only the pre-season Gala) the FA can mix the teams and mix again before making the draw. An open cup has **only U17** juvenile sides, with Division teams. The **final is always one match**, at a ground the FA picks. A Gala has **one pitch**; the FA sets the times when making it. Team sheets for a cup or Gala are sent before kick-off, but not 1 hour before (less time); a club sends **one sheet for the whole Gala**, reused as it goes through. **Juvenile side names:** a club in both competitions keeps one account and gives its juvenile side its own name, or the same name with "II" or "B" added automatically; a club may still choose separate accounts (a later step).
+
 **GFA colts guidelines 2023/24 (found online, 7 Nov 2026):** U13 players may play for U15 and U15 players for U17; in a U17 match at most 1 U13 player and 5 U15 players. Match length U17 2 × 45, U15 2 × 40, U13 2 × 25 minutes. Not stated: how many U13 players in a U15 match (asked GEDFA).
 
 Still open:
 
 
-- Cups: pots from which standings before Phase 4 results (the FA ticks Pot 1 by hand?), and for a pre-season gala?
-- Cups: in an open cup, which juvenile sides may enter, and can a club enter its Division and juvenile sides both?
-- Cups: is the final always one match (at a ground the FA picks), even in a two-leg cup?
-- Gala: match length, time between kick-offs, one pitch or more
+- Juvenile side name: "II" or "B" when a club keeps the same name? Its own short name? (asked 8 Nov 2026)
+- Gala team sheets: how long before kick-off (less than 1 hour)?
 
 - Juvenile: coach per age group? Welfare or child-safety officer required?
 - Juvenile: age cut-off date per age group, per season
@@ -810,6 +809,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 8 Nov 2026 | v2.20.1: `cups.finalOneMatch` removed (the final is always one match, GEDFA). GEDFA's cup answers (3) in Section 7. 305 rules tests. |
 | 8 Nov 2026 | v2.20 (3.0c1): new `cups/{id}` (cups and galas: who plays, format, one or two legs, level rule, bracket fixed from, seeding, the gala's ground and days). Read by everyone with a role, made by the FA, not changed yet. GEDFA's cup answers (2) in Section 7. 305 rules tests. |
 | 8 Nov 2026 | v2.19.1: no data change. Match details reads `fixtures/{id}/history` newest first (teams can read it). |
 | 8 Nov 2026 | v2.19 (3.0b): new `fixtureDrafts/{id}` (FA only); "Make the season" publishes matches with fixed IDs, 3 per save. 301 rules tests. |

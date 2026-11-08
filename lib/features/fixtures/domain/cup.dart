@@ -145,7 +145,6 @@ class Cup {
     required this.entries,
     required this.format,
     required this.legs,
-    required this.finalOneMatch,
     required this.level,
     required this.bracketFrom,
     required this.seeded,
@@ -166,11 +165,10 @@ class Cup {
   final List<CupEntry> entries;
   final CupFormat format;
 
-  /// 1 = one match, 2 = home and away.
+  /// 1 = one match, 2 = home and away. The final is always one match, at
+  /// a ground the FA picks (GEDFA, 8 Nov 2026).
   final int legs;
 
-  /// With two legs: the final is still one match.
-  final bool finalOneMatch;
   final LevelRule level;
 
   /// The bracket is fixed from the round with this many clubs left (8 =
@@ -203,7 +201,6 @@ class Cup {
         'entries': [for (final e in entries) e.toMap()],
         'format': format.name,
         'legs': legs,
-        'finalOneMatch': finalOneMatch,
         'level': level.name,
         'bracketFrom': bracketFrom,
         'seeded': seeded,
@@ -224,7 +221,6 @@ class Cup {
         ],
         format: CupFormat.fromString(data['format'] as String?),
         legs: (data['legs'] as num?)?.toInt() ?? 1,
-        finalOneMatch: data['finalOneMatch'] as bool? ?? true,
         level: LevelRule.fromString(data['level'] as String?),
         bracketFrom: (data['bracketFrom'] as num?)?.toInt() ?? 0,
         seeded: data['seeded'] as bool? ?? false,

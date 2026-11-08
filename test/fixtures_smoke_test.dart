@@ -137,7 +137,6 @@ final _cups = [
     ],
     format: CupFormat.knockout,
     legs: 2,
-    finalOneMatch: true,
     level: LevelRule.penalties,
     bracketFrom: 8,
     seeded: false,
@@ -156,7 +155,6 @@ final _cups = [
     ],
     format: CupFormat.knockout,
     legs: 1,
-    finalOneMatch: true,
     level: LevelRule.penalties,
     bracketFrom: 0,
     seeded: false,
@@ -270,7 +268,8 @@ void main() {
         expect(find.text('2 teams · matchday 4 of 4'), findsOneWidget);
         expect(find.text('GEDFA Cup 2026/27'), findsOneWidget);
         expect(find.textContaining('Open · Division and U17 sides · 12 teams · Apam Park'), findsOneWidget);
-        expect(find.text('New cup or gala'), findsOneWidget);
+        expect(find.text('New cup or Gala'), findsOneWidget);
+        expect(find.text('Cups and Gala'), findsOneWidget);
       });
       testWidgets('New cup (C2), 18 teams, $width wide, $brightness', (tester) async {
         await _pump(tester, const CupFormScreen(), Size(width, 3000), brightness);
@@ -284,7 +283,8 @@ void main() {
         await _pump(tester, const CupFormScreen(), Size(width, 3000), brightness);
         await tester.tap(find.text('Gala'));
         await tester.pump(const Duration(milliseconds: 300));
-        expect(find.text('New gala'), findsOneWidget);
+        expect(find.text('New Gala'), findsOneWidget);
+        expect(find.text('= 1 h 30 min'), findsOneWidget);
         expect(find.text('The plan'), findsOneWidget);
         expect(find.text('First round (4 teams, 14 byes)'), findsOneWidget);
         expect(find.text('Save and go to the draw'), findsOneWidget);

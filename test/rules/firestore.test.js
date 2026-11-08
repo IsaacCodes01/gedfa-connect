@@ -3215,7 +3215,6 @@ function cupData(changes = {}) {
     ],
     format: 'knockout',
     legs: 2,
-    finalOneMatch: true,
     level: 'penalties',
     bracketFrom: 8,
     seeded: false,

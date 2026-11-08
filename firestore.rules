@@ -1278,13 +1278,13 @@ service cloud.firestore {
       function isValidCup(data) {
         return data.keys().hasOnly([
             'season', 'kind', 'name', 'category', 'ageGroup', 'entries',
-            'format', 'legs', 'finalOneMatch', 'level', 'bracketFrom',
+            'format', 'legs', 'level', 'bracketFrom',
             'seeded', 'stage', 'gala', 'createdBy', 'createdAt', 'updatedBy',
             'updatedAt'
           ])
           && data.keys().hasAll([
             'season', 'kind', 'name', 'category', 'entries', 'format', 'legs',
-            'finalOneMatch', 'level', 'bracketFrom', 'seeded', 'stage',
+            'level', 'bracketFrom', 'seeded', 'stage',
             'createdBy', 'createdAt', 'updatedBy', 'updatedAt'
           ])
           && isSeason(data.season)
@@ -1298,7 +1298,6 @@ service cloud.firestore {
           && data.entries.size() >= 2 && data.entries.size() <= 64
           && data.format in ['knockout', 'groups']
           && data.legs in [1, 2]
-          && data.finalOneMatch is bool
           && data.level in ['penalties', 'extraTime', 'replay']
           && (data.level != 'replay' || data.legs == 1)
           && data.bracketFrom in [0, 4, 8, 16, 32]
