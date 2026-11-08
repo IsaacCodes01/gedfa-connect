@@ -21,7 +21,7 @@ import 'package:go_router/go_router.dart';
 
 /// Team: the Fixtures tab (3.0a, mockup F4). The next match in a blue card
 /// with "Team sheet due in …", then what's coming, postponed, played and
-/// cancelled. Tap a match to see the kits.
+/// cancelled. Tap a match for its details (F5, F6).
 class TeamFixturesScreen extends ConsumerStatefulWidget {
   const TeamFixturesScreen({super.key});
 
@@ -97,7 +97,7 @@ class _TeamFixturesScreenState extends ConsumerState<TeamFixturesScreen> {
               dateLabel: k == null
                   ? 'New date to come · ${home ? 'Home' : 'Away'}'
                   : '${formatShortDate(k)} · ${home ? 'Home' : 'Away'}',
-              onTap: () => context.push(Routes.teamFixtureKits(f.id)),
+              onTap: () => context.push(Routes.teamMatch(f.id)),
             );
           }
 
@@ -119,7 +119,7 @@ class _TeamFixturesScreenState extends ConsumerState<TeamFixturesScreen> {
                     fixture: next,
                     teamId: teamId,
                     now: now,
-                    onTap: () => context.push(Routes.teamFixtureKits(next.id)),
+                    onTap: () => context.push(Routes.teamMatch(next.id)),
                   ),
                 ],
                 if (coming.length > 1) ...[

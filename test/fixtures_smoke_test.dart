@@ -8,6 +8,7 @@ import 'package:gedfa_connect/features/fixtures/data/season_maker.dart';
 import 'package:gedfa_connect/features/fixtures/domain/season_plan.dart';
 import 'package:gedfa_connect/features/fixtures/domain/fixture.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/fa_fixtures_screen.dart';
+import 'package:gedfa_connect/features/fixtures/presentation/match_details_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/season_draft_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/season_setup_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/team_fixtures_screen.dart';
@@ -152,6 +153,19 @@ Future<void> _pump(
         ),
         unreadCountProvider.overrideWithValue(2),
         seasonMakerProvider.overrideWith(_FakeMaker.new),
+        fixtureProvider.overrideWith(
+          (ref, id) => Stream.value(_fixtures.firstWhere((f) => f.id == id)),
+        ),
+        fixtureHistoryProvider.overrideWith(
+          (ref, id) => Stream.value([
+            (
+              what: 'Kick-off: Sat 14 Nov, 3:00 pm → Sun 15 Nov, 4:00 pm',
+              reason: 'The home ground is booked for a funeral on Saturday',
+              at: DateTime(2026, 11, 8, 10, 30),
+            ),
+            (what: 'Match added', reason: null, at: DateTime(2026, 11, 1)),
+          ]),
+        ),
         seasonTeamsProvider.overrideWith((ref, _) async => _teams),
         savedDraftProvider.overrideWith((ref, _) => Stream.value(null)),
         allTeamsProvider.overrideWith((ref) => Stream.value(const <Team>[])),
@@ -207,6 +221,28 @@ void main() {
       expect(find.text('Publish and tell all teams'), findsOneWidget);
     });
   }
+
+  for (final (id, what) in [
+    ('m1', 'coming up'),
+    ('m3', 'played'),
+    ('m4', 'postponed'),
+    ('j1', 'juvenile'),
+  ]) {
+    for (final width in [360.0, 1280.0]) {
+      testWidgets('Match details, $what, $width wide', (tester) async {
+        await _pump(tester, MatchDetailsScreen(fixtureId: id, isFa: true),
+            Size(width, 2400), Brightness.light);
+        expect(find.text('Match info'), findsOneWidget);
+        expect(find.text('Directions'), findsOneWidget);
+      });
+    }
+  }
+
+  testWidgets('Match details with large text (130%) on a small phone', (tester) async {
+    await _pump(tester, const MatchDetailsScreen(fixtureId: 'm1'),
+        const Size(320, 3000), Brightness.dark, textScale: 1.3);
+    expect(find.text('What changed'), findsOneWidget);
+  });
 
   testWidgets('both tabs with large text (130%) on a small phone', (tester) async {
     await _pump(tester, const TeamFixturesScreen(), const Size(320, 3000),

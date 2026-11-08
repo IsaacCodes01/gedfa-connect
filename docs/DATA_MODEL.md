@@ -778,6 +778,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 8 Nov 2026 | v2.19.1: no data change. Match details reads `fixtures/{id}/history` newest first (teams can read it). |
 | 8 Nov 2026 | v2.19 (3.0b): new `fixtureDrafts/{id}` (FA only); "Make the season" publishes matches with fixed IDs, 3 per save. 301 rules tests. |
 | 8 Nov 2026 | v2.18.1 (3.0a fix): kit clashes measured (CIEDE2000 < 20.5) instead of a hand-made table; goalkeepers by Law 4 (not against each other or the referee). The FA team page reads the team ID saved at approval. |
 | 8 Nov 2026 | v2.18 (3.0a): new `fixtures/{id}` with a copy of both teams and their kits for the match, and `fixtures/{id}/history`; four match notification kinds. Kit rule (home keeps its home kit) and clash table. 298 rules tests. |

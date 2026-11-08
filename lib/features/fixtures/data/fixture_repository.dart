@@ -553,6 +553,27 @@ final matchTeamProvider = FutureProvider.autoDispose
   return ref.watch(fixtureRepositoryProvider).loadTeam(key.$1, key.$2);
 });
 
+/// One line of a match's history: what changed, why, when.
+typedef FixtureChange = ({String what, String? reason, DateTime? at});
+
+/// A match's history, newest first (Match details: "What changed").
+final fixtureHistoryProvider = StreamProvider.autoDispose
+    .family<List<FixtureChange>, String>((ref, id) {
+  return ref
+      .watch(firestoreProvider)
+      .collection(FirestorePaths.fixtureHistory(id))
+      .orderBy('at', descending: true)
+      .snapshots()
+      .map((snap) => [
+            for (final doc in snap.docs)
+              (
+                what: doc.data()['what'] as String? ?? '',
+                reason: doc.data()['reason'] as String?,
+                at: (doc.data()['at'] as Timestamp?)?.toDate(),
+              ),
+          ]);
+});
+
 /// One match, live (change and kits screens).
 final fixtureProvider =
     StreamProvider.family<Fixture?, String>((ref, id) {

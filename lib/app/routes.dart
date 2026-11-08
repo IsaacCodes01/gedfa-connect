@@ -89,6 +89,10 @@ class Routes {
   static String adminEditFixture(String id) => '$adminFixtures/edit/$id';
   static String adminFixtureKits(String id) => '$adminFixtures/kits/$id';
 
+  /// Match details (F5, F6), for the FA and for teams.
+  static String adminMatch(String id) => '$adminFixtures/match/$id';
+  static String teamMatch(String id) => '$teamFixtures/match/$id';
+
   static const team = '/team';
 
   /// Team: the Fixtures tab (3.0a) and the kits of one match.

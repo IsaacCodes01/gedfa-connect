@@ -96,7 +96,13 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
   Tabs: FA Home · Teams · Players · Fixtures · More; team Squad · Fixtures · Profiles · More.
 - **3.0b Make the season** done (8 Nov 2026): `round_robin.dart`, `season_plan.dart`, drafts in
   `fixtureDrafts` (FA only); publish 3 matches per batch (rules lookup limit), fixed IDs so a retry resumes.
-- **Next:** 3.0c competitions and cups, then 3.0d–e (mockup `3.0-fixtures-and-sheet.html`), then **Phase 3** team sheets (16 / 5 / 7 from settings, GFA play-up limits, kit in the top-left corner),
+- **Match details** (F5, F6) done (8 Nov 2026): `match_details_screen.dart`; tapping any match opens it
+  (`Routes.adminMatch` / `Routes.teamMatch`); the FA manages a match from its ⋯ (`showFixtureActions`).
+- **Next (new conversation):** **3.0c** competitions and cups (mockups C1–C4 in `3.0-fixtures-and-sheet.html`:
+  the FA picks draw rules, one or two legs; random draw; knockout with byes or groups then knockout;
+  live draw; bracket; a juvenile cup per age group). Then the rest of 3.0d (next matchday card, D1, J1)
+  and 3.0e posters (`assets/images/gedfa_logo.png`, transparent, not committed yet). Rules changed in 3.0b
+  (`fixtureDrafts`): Isaac deploys to dev. (mockup `3.0-fixtures-and-sheet.html`), then **Phase 3** team sheets (16 / 5 / 7 from settings, GFA play-up limits, kit in the top-left corner),
   then the **UI/UX refresh with motion and animations** and the "before the pilot" list (push
   notifications, 3-day fee reminders, prod setup), then the pilot, a second refresh from feedback, Phase 4.
 - **The refresh (after Phase 3, before the pilot):** our own app icon (`flutter_launcher_icons`), splash

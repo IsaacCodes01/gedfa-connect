@@ -10,7 +10,6 @@ import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/features/dashboard/presentation/widgets/dashboard_card.dart';
 import 'package:gedfa_connect/features/fixtures/data/fixture_repository.dart';
 import 'package:gedfa_connect/features/fixtures/domain/fixture.dart';
-import 'package:gedfa_connect/features/fixtures/presentation/widgets/fixture_actions.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/widgets/fixture_row.dart';
 import 'package:gedfa_connect/features/players/domain/age_group.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
@@ -174,7 +173,8 @@ class _FaFixturesScreenState extends ConsumerState<FaFixturesScreen> {
     Widget row(Fixture f) => FixtureRow(
       fixture: f,
       showJuvenileRules: juvenile,
-      onTap: () => showFixtureActions(context, ref, f),
+      // Match details (F5, F6); its ⋯ button manages the match
+      onTap: () => context.push(Routes.adminMatch(f.id)),
     );
 
     // Scheduled matches by matchday, each in kick-off order
