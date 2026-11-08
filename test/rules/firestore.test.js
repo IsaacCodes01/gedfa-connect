@@ -3199,3 +3199,104 @@ describe('Season drafts (3.0b)', () => {
     await assertFails(setDoc(ref, draftData({ teamIds: Array.from({ length: 41 }, (_, i) => `t${i}`) })));
   });
 });
+
+// ---------- Cups and galas (3.0c1) ----------
+
+/** A valid cup. Pass changes to make a gala or a broken one. */
+function cupData(changes = {}) {
+  return {
+    season: '2026-27',
+    kind: 'cup',
+    name: 'GEDFA Cup 2026/27',
+    category: 'division',
+    entries: [
+      { teamId: 'royal', category: 'division' },
+      { teamId: 'stars', category: 'division' },
+    ],
+    format: 'knockout',
+    legs: 2,
+    finalOneMatch: true,
+    level: 'penalties',
+    bracketFrom: 8,
+    seeded: false,
+    stage: 'notDrawn',
+    createdBy: 'fa1',
+    createdAt: serverTimestamp(),
+    updatedBy: 'fa1',
+    updatedAt: serverTimestamp(),
+    ...changes,
+  };
+}
+
+function galaData(changes = {}) {
+  return cupData({
+    kind: 'gala',
+    name: 'GEDFA Gala 2026',
+    legs: 1,
+    bracketFrom: 0,
+    gala: {
+      ground: 'Apam Park',
+      firstDay: Timestamp.fromDate(new Date(Date.UTC(2026, 7, 29))),
+      lastDay: Timestamp.fromDate(new Date(Date.UTC(2026, 7, 30))),
+      kickoffHour: 9,
+      kickoffMinute: 0,
+      gapMinutes: 90,
+    },
+    ...changes,
+  });
+}
+
+describe('Cups and galas (3.0c1)', () => {
+  it('the FA makes a cup, a gala, a juvenile cup and an open cup; everyone with a role reads them', async () => {
+    await assertSucceeds(setDoc(doc(dbAs('fa1'), `${D}/cups/c1`), cupData()));
+    await assertSucceeds(setDoc(doc(dbAs('fa1'), `${D}/cups/g1`), galaData()));
+    await assertSucceeds(setDoc(doc(dbAs('fa1'), `${D}/cups/j1`), cupData({ category: 'juvenile', ageGroup: 'U15', legs: 1, level: 'replay' })));
+    await assertSucceeds(setDoc(doc(dbAs('fa1'), `${D}/cups/o1`), cupData({
+      category: 'open',
+      ageGroup: 'U17',
+      entries: [{ teamId: 'royal', category: 'division' }, { teamId: 'royal', category: 'juvenile' }],
+    })));
+    await assertSucceeds(getDoc(doc(dbAs('admin1'), `${D}/cups/c1`)));
+    await assertSucceeds(getDoc(doc(dbAs('ref1'), `${D}/cups/g1`)));
+    await assertFails(getDoc(doc(dbAs('newbie'), `${D}/cups/c1`)));
+  });
+
+  it('only the FA makes one, and nobody changes or deletes one yet', async () => {
+    await assertFails(setDoc(doc(dbAs('admin1'), `${D}/cups/c2`), cupData({ createdBy: 'admin1', updatedBy: 'admin1' })));
+    await setDoc(doc(dbAs('fa1'), `${D}/cups/c1`), cupData());
+    await assertFails(updateDoc(doc(dbAs('fa1'), `${D}/cups/c1`), { name: 'GEDFA Cup', updatedAt: serverTimestamp() }));
+    await assertFails(deleteDoc(doc(dbAs('fa1'), `${D}/cups/c1`)));
+  });
+
+  it('a cup must keep GEDFA\'s rules', async () => {
+    const ref = doc(dbAs('fa1'), `${D}/cups/c1`);
+    // A replay only with one-match rounds
+    await assertFails(setDoc(ref, cupData({ level: 'replay' })));
+    // Juvenile and open need an age group; Division has none
+    await assertFails(setDoc(ref, cupData({ category: 'juvenile' })));
+    await assertFails(setDoc(ref, cupData({ ageGroup: 'U17' })));
+    await assertFails(setDoc(ref, cupData({ category: 'open', ageGroup: 'U19' })));
+    // 2 to 64 sides
+    await assertFails(setDoc(ref, cupData({ entries: [{ teamId: 'royal', category: 'division' }] })));
+    await assertFails(setDoc(ref, cupData({ entries: Array.from({ length: 65 }, (_, i) => ({ teamId: `t${i}`, category: 'division' })) })));
+    // It starts not drawn; a name; nothing extra; a cup has no gala part
+    await assertFails(setDoc(ref, cupData({ stage: 'drawn' })));
+    await assertFails(setDoc(ref, cupData({ name: 'GC' })));
+    await assertFails(setDoc(ref, cupData({ extra: true })));
+    await assertFails(setDoc(ref, cupData({ bracketFrom: 6 })));
+    await assertFails(setDoc(ref, cupData({ gala: galaData().gala })));
+  });
+
+  it('a gala is one match per tie, at one ground, on days in order', async () => {
+    const ref = doc(dbAs('fa1'), `${D}/cups/g1`);
+    await assertFails(setDoc(ref, galaData({ legs: 2 })));
+    await assertFails(setDoc(ref, galaData({ format: 'groups' })));
+    await assertFails(setDoc(ref, galaData({ seeded: true })));
+    await assertFails(setDoc(ref, without(galaData(), 'gala')));
+    await assertFails(setDoc(ref, galaData({ gala: { ...galaData().gala, ground: '' } })));
+    await assertFails(setDoc(ref, galaData({
+      gala: { ...galaData().gala, lastDay: Timestamp.fromDate(new Date(Date.UTC(2026, 7, 28))) },
+    })));
+    await assertFails(setDoc(ref, galaData({ gala: { ...galaData().gala, gapMinutes: 10 } })));
+  });
+});

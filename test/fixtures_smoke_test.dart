@@ -3,10 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/features/auth/domain/app_user.dart';
+import 'package:gedfa_connect/features/fixtures/data/cup_repository.dart';
 import 'package:gedfa_connect/features/fixtures/data/fixture_repository.dart';
 import 'package:gedfa_connect/features/fixtures/data/season_maker.dart';
 import 'package:gedfa_connect/features/fixtures/domain/season_plan.dart';
+import 'package:gedfa_connect/features/fixtures/domain/cup.dart';
 import 'package:gedfa_connect/features/fixtures/domain/fixture.dart';
+import 'package:gedfa_connect/features/fixtures/presentation/competitions_screen.dart';
+import 'package:gedfa_connect/features/fixtures/presentation/cup_form_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/fa_fixtures_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/match_details_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/season_draft_screen.dart';
@@ -119,6 +123,55 @@ final _fixtures = [
   _match('j1', category: Competition.juvenile, group: AgeGroup.u17),
 ];
 
+/// A cup and a gala for Competitions (C1).
+final _cups = [
+  Cup(
+    id: 'c1',
+    season: '2026-27',
+    kind: CupKind.cup,
+    name: 'GEDFA Cup 2026/27',
+    who: CupWho.division,
+    entries: [
+      for (final t in _teams)
+        CupEntry(teamId: t.side.id, category: Competition.division),
+    ],
+    format: CupFormat.knockout,
+    legs: 2,
+    finalOneMatch: true,
+    level: LevelRule.penalties,
+    bracketFrom: 8,
+    seeded: false,
+    stage: CupStage.notDrawn,
+  ),
+  Cup(
+    id: 'g1',
+    season: '2026-27',
+    kind: CupKind.gala,
+    name: 'Pre-season Gala with a very long name',
+    who: CupWho.open,
+    ageGroup: AgeGroup.u17,
+    entries: [
+      for (final t in _teams.take(12))
+        CupEntry(teamId: t.side.id, category: Competition.division),
+    ],
+    format: CupFormat.knockout,
+    legs: 1,
+    finalOneMatch: true,
+    level: LevelRule.penalties,
+    bracketFrom: 0,
+    seeded: false,
+    stage: CupStage.notDrawn,
+    gala: GalaSettings(
+      ground: 'Apam Park',
+      firstDay: DateTime(2026, 8, 29),
+      lastDay: DateTime(2026, 8, 30),
+      kickoffHour: 9,
+      kickoffMinute: 0,
+      gapMinutes: 90,
+    ),
+  ),
+];
+
 Future<void> _pump(
   WidgetTester tester,
   Widget screen,
@@ -167,6 +220,7 @@ Future<void> _pump(
           ]),
         ),
         seasonTeamsProvider.overrideWith((ref, _) async => _teams),
+        seasonCupsProvider.overrideWith((ref) => Stream.value(_cups)),
         savedDraftProvider.overrideWith((ref, _) => Stream.value(null)),
         allTeamsProvider.overrideWith((ref) => Stream.value(const <Team>[])),
         myAudienceProvider.overrideWithValue('team:aps'),
@@ -207,6 +261,42 @@ void main() {
     }
   }
 
+  for (final brightness in Brightness.values) {
+    for (final width in [360.0, 1280.0]) {
+      testWidgets('Competitions (C1), $width wide, $brightness', (tester) async {
+        await _pump(tester, const CompetitionsScreen(), Size(width, 2400), brightness);
+        expect(find.text('Division League'), findsOneWidget);
+        // m3 is played, m1 and m2 come next; m5 is cancelled
+        expect(find.text('2 teams · matchday 4 of 4'), findsOneWidget);
+        expect(find.text('GEDFA Cup 2026/27'), findsOneWidget);
+        expect(find.textContaining('Open · Division and U17 sides · 12 teams · Apam Park'), findsOneWidget);
+        expect(find.text('New cup or gala'), findsOneWidget);
+      });
+      testWidgets('New cup (C2), 18 teams, $width wide, $brightness', (tester) async {
+        await _pump(tester, const CupFormScreen(), Size(width, 3000), brightness);
+        expect(find.text('18 teams'), findsOneWidget);
+        expect(find.text('Knockout with a first round'), findsOneWidget);
+        expect(find.text('Groups, then knockout'), findsOneWidget);
+        expect(find.text('Quarter-finals'), findsOneWidget); // bracket fixed from
+        expect(find.text('Save and go to the first draw'), findsOneWidget);
+      });
+      testWidgets('New gala (C2b), $width wide, $brightness', (tester) async {
+        await _pump(tester, const CupFormScreen(), Size(width, 3000), brightness);
+        await tester.tap(find.text('Gala'));
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(find.text('New gala'), findsOneWidget);
+        expect(find.text('The plan'), findsOneWidget);
+        expect(find.text('First round (4 teams, 14 byes)'), findsOneWidget);
+        expect(find.text('Save and go to the draw'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+  testWidgets('New cup (C2) with large text on a small phone', (tester) async {
+    await _pump(tester, const CupFormScreen(), const Size(320, 3600), Brightness.light,
+        textScale: 1.3);
+    expect(find.text('Save and go to the first draw'), findsOneWidget);
+  });
   for (final width in [360.0, 1280.0]) {
     testWidgets('Make the season (G1), $width wide', (tester) async {
       await _pump(tester, const SeasonSetupScreen(), Size(width, 2400), Brightness.light);

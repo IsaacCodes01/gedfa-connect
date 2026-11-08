@@ -1254,6 +1254,78 @@ service cloud.firestore {
           && request.resource.data.updatedAt == request.time;
       }
 
+      // ---------- cups/{cupId} (3.0c) ----------
+
+      // A gala's ground and days: { ground, firstDay, lastDay, kickoffHour,
+      // kickoffMinute, gapMinutes }
+      function isValidGala(gala) {
+        return gala is map
+          && gala.keys().hasOnly(['ground', 'firstDay', 'lastDay', 'kickoffHour', 'kickoffMinute', 'gapMinutes'])
+          && gala.keys().hasAll(['ground', 'firstDay', 'lastDay', 'kickoffHour', 'kickoffMinute', 'gapMinutes'])
+          && isText(gala.ground, 2, 80)
+          && gala.firstDay is timestamp
+          && gala.lastDay is timestamp
+          && gala.lastDay >= gala.firstDay
+          && gala.kickoffHour is int && gala.kickoffHour >= 0 && gala.kickoffHour <= 23
+          && gala.kickoffMinute is int && gala.kickoffMinute >= 0 && gala.kickoffMinute <= 59
+          && gala.gapMinutes is int && gala.gapMinutes >= 30 && gala.gapMinutes <= 240;
+      }
+
+      // A cup or a gala. The sides in it ({ teamId, category }) are not
+      // checked one by one: each match is checked when the draw saves it.
+      // A replay only with one-match rounds (GEDFA, 8 Nov 2026). A gala is
+      // a straight knockout, one match per tie, at one ground.
+      function isValidCup(data) {
+        return data.keys().hasOnly([
+            'season', 'kind', 'name', 'category', 'ageGroup', 'entries',
+            'format', 'legs', 'finalOneMatch', 'level', 'bracketFrom',
+            'seeded', 'stage', 'gala', 'createdBy', 'createdAt', 'updatedBy',
+            'updatedAt'
+          ])
+          && data.keys().hasAll([
+            'season', 'kind', 'name', 'category', 'entries', 'format', 'legs',
+            'finalOneMatch', 'level', 'bracketFrom', 'seeded', 'stage',
+            'createdBy', 'createdAt', 'updatedBy', 'updatedAt'
+          ])
+          && isSeason(data.season)
+          && data.kind in ['cup', 'gala']
+          && isText(data.name, 3, 60)
+          && data.category in ['division', 'juvenile', 'open']
+          && (data.category == 'division'
+              ? !('ageGroup' in data)
+              : data.get('ageGroup', '') in ['U13', 'U15', 'U17'])
+          && data.entries is list
+          && data.entries.size() >= 2 && data.entries.size() <= 64
+          && data.format in ['knockout', 'groups']
+          && data.legs in [1, 2]
+          && data.finalOneMatch is bool
+          && data.level in ['penalties', 'extraTime', 'replay']
+          && (data.level != 'replay' || data.legs == 1)
+          && data.bracketFrom in [0, 4, 8, 16, 32]
+          && data.seeded is bool
+          && (data.kind == 'gala'
+              ? data.format == 'knockout' && data.legs == 1
+                && data.level != 'replay' && !data.seeded
+                && isValidGala(data.get('gala', null))
+              : !('gala' in data))
+          && data.updatedBy == request.auth.uid
+          && data.updatedAt == request.time;
+      }
+
+      match /cups/{cupId} {
+        // Everyone with a role sees the cups (teams see their path, C6)
+        allow get, list: if hasRole();
+
+        // The FA makes one; it starts not drawn (the draw comes in 3.0c2)
+        allow create: if isFaAdmin()
+          && isValidCup(request.resource.data)
+          && request.resource.data.stage == 'notDrawn'
+          && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.createdAt == request.time;
+
+        // Changing and the draw come with 3.0c2; never deleted for now
+      }
+
       // ---------- teams/{teamId} ----------
 
       // Each part of a team edit is checked only when it changes, so teams

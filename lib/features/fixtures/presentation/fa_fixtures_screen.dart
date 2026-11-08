@@ -38,10 +38,28 @@ class _FaFixturesScreenState extends ConsumerState<FaFixturesScreen> {
     final juvenile = _category == Competition.juvenile;
 
     return Scaffold(
-      appBar: const GedfaAppBar(
+      appBar: GedfaAppBar(
         title: 'Fixtures',
         subtitle: 'Gomoa East District FA',
-        actions: [NotificationBell()],
+        actions: [
+          // Competitions (3.0c1, C1). Tapping a league there comes back
+          // here on that league.
+          IconButton(
+            tooltip: 'Competitions',
+            icon: const Icon(Icons.emoji_events_outlined),
+            onPressed: () async {
+              final league =
+                  await context.push<Competition>(Routes.adminCompetitions);
+              if (league != null && mounted) {
+                setState(() {
+                  _category = league;
+                  _group = null;
+                });
+              }
+            },
+          ),
+          const NotificationBell(),
+        ],
       ),
       // Mockup F1: "Make the season" on the left, "Add a match" on the right
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,

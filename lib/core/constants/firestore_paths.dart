@@ -45,6 +45,10 @@ class FirestorePaths {
   /// "Make the season" drafts the FA saved for later (3.0b), FA only.
   static String fixtureDraft(String id) => '$district/fixtureDrafts/$id';
 
+  /// Cups and galas (3.0c), read by everyone with a role.
+  static const cups = '$district/cups';
+  static String cup(String id) => '$district/cups/$id';
+
   static const players = '$district/players';
   static String player(String playerId) => '$district/players/$playerId';
 

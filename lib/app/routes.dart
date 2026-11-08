@@ -86,6 +86,10 @@ class Routes {
   /// FA: "Make the season" (3.0b, G1) and its draft (G2).
   static const adminSeason = '/admin/fixtures/season';
   static const adminSeasonDraft = '/admin/fixtures/season/draft';
+  /// FA: Competitions (3.0c1, C1): the leagues, cups and galas; and a new
+  /// cup or gala (C2, C2b).
+  static const adminCompetitions = '/admin/fixtures/competitions';
+  static const adminNewCup = '/admin/fixtures/competitions/new';
   static String adminEditFixture(String id) => '$adminFixtures/edit/$id';
   static String adminFixtureKits(String id) => '$adminFixtures/kits/$id';
 

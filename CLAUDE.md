@@ -19,7 +19,7 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
    - test steps he can do himself in the app
 5. **Before every commit**, run (and show the result):
    - `flutter analyze` → must be **0 issues**
-   - `cd test/rules && npm test` → **all** rules tests pass (301 after 3.0b)
+   - `cd test/rules && npm test` → **all** rules tests pass (305 after 3.0c1)
    - `flutter test` → all Dart tests pass (layout smoke tests and the kit check)
 6. **Commit after each step** with a clear message, e.g.
    `feat(teams): change requests for name, short name, logo and competitions; 250 rules tests; docs v2.12`
@@ -98,7 +98,12 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
   `fixtureDrafts` (FA only); publish 3 matches per batch (rules lookup limit), fixed IDs so a retry resumes.
 - **Match details** (F5, F6) done (8 Nov 2026): `match_details_screen.dart`; tapping any match opens it
   (`Routes.adminMatch` / `Routes.teamMatch`); the FA manages a match from its ⋯ (`showFixtureActions`).
-- **Next (new conversation):** **3.0c** competitions and cups (mockups C1–C4 in `3.0-fixtures-and-sheet.html`:
+- **3.0c1** done (8 Nov 2026): `cups/{id}` (class `Cup`, because `Competition` is already the Division /
+  Juvenile enum), `cup_format.dart` (knockout with byes, groups, gala timetable), Competitions (C1, from the
+  🏆 on the Fixtures tab), New cup / New gala (C2, C2b). Mockup `3.0c-competitions.html`. Still asked of GEDFA:
+  pots before results, which juvenile sides in an open cup, final one match, gala match length. Next: **3.0c2**
+  the live draw (C3, C3b). Rules changed (`cups`): Isaac deploys to dev.
+- **Then:** **3.0c** competitions and cups (mockups C1–C4 in `3.0-fixtures-and-sheet.html`:
   the FA picks draw rules, one or two legs; random draw; knockout with byes or groups then knockout;
   live draw; bracket; a juvenile cup per age group). Then the rest of 3.0d (next matchday card, D1, J1)
   and 3.0e posters (`assets/images/gedfa_logo.png`, transparent, not committed yet). Rules changed in 3.0b

@@ -23,6 +23,8 @@ import 'package:gedfa_connect/features/fa/presentation/fa_player_teams_screen.da
 import 'package:gedfa_connect/features/fa/presentation/fa_request_review_screen.dart';
 import 'package:gedfa_connect/features/fa/presentation/fa_requests_screen.dart';
 import 'package:gedfa_connect/features/fa/presentation/fa_juvenile_child_screen.dart';
+import 'package:gedfa_connect/features/fixtures/presentation/competitions_screen.dart';
+import 'package:gedfa_connect/features/fixtures/presentation/cup_form_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/fa_fixtures_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/fixture_form_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/fixture_kits_screen.dart';
@@ -244,6 +246,19 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: Routes.adminFixtures,
                 builder: (_, _) => const FaFixturesScreen(),
                 routes: [
+                  // Competitions (3.0c1, C1), then a new cup or gala (C2)
+                  GoRoute(
+                    path: 'competitions',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (_, _) => const CompetitionsScreen(),
+                    routes: [
+                      GoRoute(
+                        path: 'new',
+                        parentNavigatorKey: rootNavigatorKey,
+                        builder: (_, _) => const CupFormScreen(),
+                      ),
+                    ],
+                  ),
                   // Make the season (3.0b): G1, then the draft (G2)
                   GoRoute(
                     path: 'season',
