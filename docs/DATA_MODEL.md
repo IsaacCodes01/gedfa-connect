@@ -699,6 +699,10 @@ Feed rules: never include dates of birth; player photos only if agreed with GEDF
 
 **Answered by Isaac (7 Nov 2026), for Phase 3:** simple fixtures come first (3.0), because a team sheet belongs to a match. The FA sees every team sheet and gets a copy. A team sheet must be sent **1 hour before kick-off**. Juvenile play-up follows the GFA limits. The paper sheet follows a standard match sheet until GEDFA's own copy arrives.
 
+**Answered by GEDFA via Isaac (8 Nov 2026):** kit clashes: the home team keeps its home kit and the away team changes (away kit, then third), in the Division and the Juvenile league; goalkeepers must differ from both teams and the referee. On juvenile team sheets, children's photos show only to people signed in for that match (the FA, the referee and the two teams), never on the public QR page.
+
+**Decided by Isaac (8 Nov 2026), fixtures:** competitions (leagues and cups) are made by the app: a league by round robin, a cup by an automatic draw (straight knockout with byes, or groups then knockout, by the number of teams). "Add one match" stays for special cases (friendlies, replays). The FA can change any match the app made (teams, home and away, date, time, venue, round). Postponing asks for the new date and time at once, or later.
+
 **GFA colts guidelines 2023/24 (found online, 7 Nov 2026):** U13 players may play for U15 and U15 players for U17; in a U17 match at most 1 U13 player and 5 U15 players. Match length U17 2 × 45, U15 2 × 40, U13 2 × 25 minutes. Not stated: how many U13 players in a U15 match (asked GEDFA).
 
 Still open:
