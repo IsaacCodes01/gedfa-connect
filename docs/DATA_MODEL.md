@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.21.1, matches the rules after step 3.0c1c (9 Nov 2026)
+**Status:** v2.22, matches the rules after step 3.0c1d (9 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -622,6 +622,23 @@ A draft the FA saved for later. **FA only** (read, write, delete). ID: `<season>
 - **The calendar** (`season_plan.dart`): one matchday a weekend from the first date, skipping weeks off; with Sunday too, half on Saturday and half on Sunday; a team sharing a ground with another that day moves to the other day (a warning says so). Matchdays continue after any already in the league.
 - **Publishing** writes the matches 3 at a time (the rules may look up about 20 documents per save), with fixed IDs `<draftId>_md<round>_<home>_v_<away>`, so publishing again after a lost connection skips the ones already saved. Then ONE `fixtureAdded` note per team ("Division League: 34 matches, the first v … on Sat 14 Nov") and the saved draft is removed. Kits are picked for each match by the kit rule.
 
+### 2.15a2 `postponeJobs/{competitionId}` — a league's postpone while it runs (3.0c1d)
+
+Saved **before any match moves**, so a postpone that stopped (no network, the phone died, the FA tapped Later) can be finished later on any phone or laptop, and no match moves twice. **FA only** (read, write, delete). ID: the league, `<season>_<category>-league`, so a league has **one at a time**: a second postpone of it is refused until this one is finished.
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `season`, `competitionId`, `category` | | As on a match; the ID must be the competition |
+| `name` | string | 3–40, "Division League" |
+| `days` | int | 1–365, how many days later |
+| `reason` | string | 3–200, the clubs read it |
+| `moves` | array | 1–1,600 `{ id, from, to }`: each match and its old and new kick-off, first match first. Never changed |
+| `done` | array | The match IDs moved (or skipped: changed by hand since). Starts `[]`, only grows, never longer than `moves` |
+| `byName`, `startedBy`, `startedAt`, `updatedBy`, `updatedAt` | | Who started it and when |
+
+- **Moving:** 3 matches per batch (the rules look up both teams of each), each with its history line, and their IDs added to `done` in the **same batch**. Each move has its new kick-off written down, so running it again only sets the same date again.
+- **Finished:** one `fixturePostponed` note per club (its next match and the reason), and the job is **deleted** with the last notes. The clubs are told only then (Isaac, 9 Nov 2026). A stopped postpone can only be finished, not undone (Isaac, 9 Nov 2026).
+
 ### 2.15b `cups/{cupId}` — cups and galas (3.0c1, 3.0c1b)
 
 A cup or a gala of one season. Made by the FA (C2, C2b); read by everyone with a role. Its matches will be ordinary `fixtures` with the cup's ID as `competitionId` (the draw, 3.0c2). Random ID. The FA **changes** it only before the draw (the same form, filled in; same season, `createdBy` / `createdAt` kept) and **deletes** it at any time: everything goes, the cup, its history and (after the draw) its matches; nothing is kept (GEDFA, 8 Nov 2026).
@@ -644,7 +661,7 @@ A cup or a gala of one season. Made by the FA (C2, C2b); read by everyone with a
 | `createdBy`, `createdAt`, `updatedBy`, `updatedAt` | | Who and when (server time) |
 
 - **The format** (`cup_format.dart`): straight knockout, for 18 clubs: 2 first-round ties (4 clubs), 14 byes, then a round of 16. Groups: as few groups (2, 4, 8, 16) as possible; 18 clubs → 5, 5, 4, 4, the top 2 to the quarter-finals. The app suggests knockout; groups are offered from 6 clubs.
-- **Postpone (3.0c1c):** a Gala's `gala.firstDay` and `gala.lastDay` move by the same number of days, with a history line ("Postponed 4 weeks: … → …. Why.") and a `fixturePostponed` note for every club in it, in one batch. A league: every match not played yet (`scheduled`, kick-off in the future) gets `kickoffAt` the same number of days later at the same time and `note` = the reason, with a line in `fixtures/{id}/history`; then one `fixturePostponed` note per club. A cup (not a Gala) is postponed after the draw (3.0c2).
+- **Postpone (3.0c1c):** a Gala's `gala.firstDay` and `gala.lastDay` move by the same number of days, with a history line ("Postponed 4 weeks: … → …. Why.") and a `fixturePostponed` note for every club in it, in one batch. A league: every match not played yet (`scheduled`, kick-off in the future) gets `kickoffAt` the same number of days later at the same time and `note` = the reason, with a line in `fixtures/{id}/history`; then one `fixturePostponed` note per club. Since 3.0c1d this runs through a saved job (`postponeJobs`, 2.15a2). A cup (not a Gala) is postponed after the draw (3.0c2).
 - **`cups/{cupId}/history/{lineId}`** (3.0c1b): one line per change, `{ text (3–200), by, byName (1–80), at }`, written in the same batch as the cup ("Cup made", "Each round: one match → home and away", "Teams: Ojobi Stars left out"). Read by everyone with a role; created only by the FA, with the cup there after the batch; never changed; deleted with the cup. The lines come from `cupChanges` (`cup_changes.dart`).
 - **A gala's timetable** (`GalaPlan`): kick-offs every `gapMinutes` from the first kick-off, no later than 4:30 pm (before dark). A round starts 2 slots after the last kick-off of the round before, so every club has a free slot to rest. The form warns when the matches don't fit in the days.
 
@@ -812,6 +829,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 9 Nov 2026 | v2.22 (3.0c1d): new `postponeJobs/{competitionId}` (FA only): a league's postpone is saved before any match moves and ticked off in the same batch as each match, so a stopped one is finished later and nothing moves twice; deleted with the last notes. 318 rules tests. |
 | 9 Nov 2026 | v2.21.1 (3.0c1c): no new field or rule. Postpone a league (every match not played yet moves by the same days) or a Gala (its days move); the clubs get a `fixturePostponed` note with the reason. 314 rules tests. |
 | 8 Nov 2026 | v2.21 (3.0c1b): the FA changes a cup before the draw and deletes one at any time; new `cups/{id}/history`. GEDFA's cup answers (4) in Section 7 (delete, postpone, Pot 1 byes, juvenile "B", Gala sheets 20 minutes before). 310 rules tests. |
 | 8 Nov 2026 | v2.20.1: `cups.finalOneMatch` removed (the final is always one match, GEDFA). GEDFA's cup answers (3) in Section 7. 305 rules tests. |

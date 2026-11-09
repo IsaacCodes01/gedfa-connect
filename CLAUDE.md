@@ -19,7 +19,7 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
    - test steps he can do himself in the app
 5. **Before every commit**, run (and show the result):
    - `flutter analyze` → must be **0 issues**
-   - `cd test/rules && npm test` → **all** rules tests pass (314 after 3.0c1c)
+   - `cd test/rules && npm test` → **all** rules tests pass (318 after 3.0c1d)
    - `flutter test` → all Dart tests pass (layout smoke tests and the kit check)
 6. **Commit after each step** with a clear message, e.g.
    `feat(teams): change requests for name, short name, logo and competitions; 250 rules tests; docs v2.12`
@@ -110,7 +110,10 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
 - **3.0c1c** done (9 Nov 2026, 314 rules tests, no rules change): postpone a league (⋯ on its row in Competitions,
   `postpone_plan.dart`, `FixtureRepository.postponeMatches`, 3 per batch, Try again resumes) or a Gala
   (`CupRepository.postponeGala`); dialog `widgets/postpone_dialog.dart`. A cup's Postpone waits for the draw.
-  Next: **3.0c1d** finish a stopped postpone (mockup first), then the back arrow, juvenile side names, 3.0c2.
+- **3.0c1d** done (9 Nov 2026, 318 rules tests): a league's postpone is saved first in `postponeJobs/{competitionId}`
+  (FA only, one per league, `done` ticked in the same batch as each match, deleted with the last notes);
+  `startPostpone` + `finishPostpone`; Competitions shows a stopped one with Finish (C13). Rules changed: Isaac deploys
+  to dev. Next: **the back arrow**, then juvenile side names, then 3.0c2.
 - **Then:** **3.0c** competitions and cups (mockups C1–C4 in `3.0-fixtures-and-sheet.html`:
   the FA picks draw rules, one or two legs; random draw; knockout with byes or groups then knockout;
   live draw; bracket; a juvenile cup per age group). Then the rest of 3.0d (next matchday card, D1, J1)

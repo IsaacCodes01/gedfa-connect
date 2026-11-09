@@ -15,6 +15,7 @@ import 'package:gedfa_connect/features/fixtures/data/cup_repository.dart';
 import 'package:gedfa_connect/features/fixtures/data/fixture_repository.dart';
 import 'package:gedfa_connect/features/fixtures/domain/cup.dart';
 import 'package:gedfa_connect/features/fixtures/domain/fixture.dart';
+import 'package:gedfa_connect/features/fixtures/domain/postpone_job.dart';
 import 'package:gedfa_connect/features/fixtures/domain/postpone_plan.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/widgets/postpone_dialog.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
@@ -31,6 +32,10 @@ class CompetitionsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final fixtures = ref.watch(seasonFixturesProvider).value ?? const [];
     final cupsAsync = ref.watch(seasonCupsProvider);
+    // Postpones that stopped (3.0c1d, C13)
+    final jobs = ref.watch(postponeJobsProvider).value ?? const {};
+    PostponeJob? jobOf(Competition category) =>
+        jobs[Fixture.leagueId(Season.current, category)];
 
     return Scaffold(
       appBar: GedfaAppBar(
@@ -43,7 +48,11 @@ class CompetitionsScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(14, 14, 14, 24),
           children: [
-            const DashboardSectionTitle(title: 'Leagues', top: 2),
+            for (final job in jobs.values) ...[
+              _StoppedCard(job: job),
+              const SizedBox(height: 4),
+            ],
+            DashboardSectionTitle(title: 'Leagues', top: jobs.isEmpty ? 2 : 20),
             DashboardCard(
               padding: EdgeInsets.zero,
               child: Column(
@@ -52,13 +61,18 @@ class CompetitionsScreen extends ConsumerWidget {
                     icon: Icons.format_list_numbered,
                     tone: AccentTone.blue,
                     title: 'Division League',
-                    subtitle: _leagueLine(fixtures, Competition.division),
+                    subtitle: _leagueLine(
+                      fixtures,
+                      Competition.division,
+                      jobOf(Competition.division),
+                    ),
                     onTap: () => context.pop(Competition.division),
                     onMore: () => _leagueMenu(
                       context,
                       ref,
                       fixtures,
                       Competition.division,
+                      jobOf(Competition.division),
                     ),
                   ),
                   const Divider(height: 1),
@@ -66,13 +80,18 @@ class CompetitionsScreen extends ConsumerWidget {
                     icon: Icons.child_care,
                     tone: AccentTone.gold,
                     title: 'Juvenile League',
-                    subtitle: _leagueLine(fixtures, Competition.juvenile),
+                    subtitle: _leagueLine(
+                      fixtures,
+                      Competition.juvenile,
+                      jobOf(Competition.juvenile),
+                    ),
                     onTap: () => context.pop(Competition.juvenile),
                     onMore: () => _leagueMenu(
                       context,
                       ref,
                       fixtures,
                       Competition.juvenile,
+                      jobOf(Competition.juvenile),
                     ),
                   ),
                 ],
@@ -157,8 +176,16 @@ class CompetitionsScreen extends ConsumerWidget {
   }
 
   /// "18 teams · home and away · matchday 4 of 34", or for juvenile
-  /// "U13 · U15 · U17 · 12 clubs".
-  static String _leagueLine(List<Fixture> all, Competition category) {
+  /// "U13 · U15 · U17 · 12 clubs"; while a postpone is unfinished,
+  /// "postponing: 42 of 306 moved" (C13).
+  static String _leagueLine(
+    List<Fixture> all,
+    Competition category,
+    PostponeJob? job,
+  ) {
+    final postponing = job == null
+        ? null
+        : 'postponing: ${job.movedCount} of ${job.moves.length} moved';
     final league = [
       for (final f in all)
         if (f.competitionId == Fixture.leagueId(Season.current, category) &&
@@ -170,8 +197,11 @@ class CompetitionsScreen extends ConsumerWidget {
       for (final f in league) ...[f.home.id, f.away.id],
     };
     if (category == Competition.juvenile) {
-      return '${Competition.juvenileAgeGroups.join(' · ')} · '
-          '${teams.length} clubs';
+      return [
+        ...Competition.juvenileAgeGroups,
+        '${teams.length} clubs',
+        ?postponing,
+      ].join(' · ');
     }
     final pairs = {for (final f in league) '${f.home.id}>${f.away.id}'};
     final twice = league.any(
@@ -191,7 +221,9 @@ class CompetitionsScreen extends ConsumerWidget {
     return [
       '${teams.length} teams',
       if (twice) 'home and away',
-      if (start != null)
+      if (postponing != null)
+        postponing
+      else if (start != null)
         'starts ${formatShortDate(start)}'
       else if (next == null)
         'all $last matchdays played'
@@ -290,18 +322,20 @@ class _Row extends StatelessWidget {
   }
 }
 
-/// The ⋯ on a league (C11): Postpone, while matches are left to play.
+/// The ⋯ on a league (C11): Postpone, while matches are left to play and
+/// no postpone of it is unfinished (C14).
 void _leagueMenu(
   BuildContext context,
   WidgetRef ref,
   List<Fixture> all,
   Competition category,
+  PostponeJob? job,
 ) {
   final league = [
     for (final f in all)
       if (f.competitionId == Fixture.leagueId(Season.current, category)) f,
   ];
-  final plan = PostponePlan.of(league, DateTime.now());
+  final plan = job == null ? PostponePlan.of(league, DateTime.now()) : null;
   showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
@@ -313,7 +347,9 @@ void _leagueMenu(
           style: TextStyle(fontWeight: FontWeight.w600),
         ),
         subtitle: Text(
-          plan == null
+          job != null
+              ? 'Finish the postpone that stopped first'
+              : plan == null
               ? 'No matches left to move'
               : 'Every matchday not played yet moves; the clubs are told',
         ),
@@ -327,9 +363,8 @@ void _leagueMenu(
   );
 }
 
-/// "Postpone the Division League?" (C11), then every match not played
-/// yet moves, with a progress bar. If the connection drops, Try again
-/// carries on with the same plan where it stopped.
+/// "Postpone the Division League?" (C11): the job is saved first (3.0c1d),
+/// then the matches move.
 Future<void> _postponeLeague(
   BuildContext context,
   WidgetRef ref,
@@ -354,11 +389,41 @@ Future<void> _postponeLeague(
   if (choice == null || !context.mounted) return;
   final me = ref.read(authRepositoryProvider).currentUser;
   if (me == null) return;
+  final PostponeJob job;
+  try {
+    job = await ref
+        .read(fixtureRepositoryProvider)
+        .startPostpone(
+          plan.movedTo(choice.newDay),
+          competitionName: name,
+          reason: choice.reason,
+          by: me,
+        );
+  } catch (error) {
+    if (context.mounted) AppToast.error(context, appErrorMessage(error));
+    return;
+  }
+  if (context.mounted) await _runPostpone(context, ref, job, starting: true);
+}
 
-  final moved = plan.movedTo(choice.newDay);
+/// Moves the matches of [job] not moved yet, with a progress bar
+/// ("Postponing…", or "Finishing…" from Finish, C15). If it stops: Try
+/// again now, or Later from Competitions (C12). Nothing moves twice.
+Future<void> _runPostpone(
+  BuildContext context,
+  WidgetRef ref,
+  PostponeJob job, {
+  bool starting = false,
+}) async {
+  final me = ref.read(authRepositoryProvider).currentUser;
+  if (me == null) return;
   final repository = ref.read(fixtureRepositoryProvider);
   final navigator = Navigator.of(context, rootNavigator: true);
-  final progress = ValueNotifier<(int, int)>((0, moved.moving.length));
+  final progress = ValueNotifier<(int, int)>((
+    job.movedCount,
+    job.moves.length,
+  ));
+  var current = job;
   try {
     while (true) {
       if (!context.mounted) return;
@@ -368,7 +433,7 @@ Future<void> _postponeLeague(
         builder: (_) => PopScope(
           canPop: false,
           child: AlertDialog(
-            title: const Text('Postponing…'),
+            title: Text(starting ? 'Postponing…' : 'Finishing…'),
             content: ValueListenableBuilder<(int, int)>(
               valueListenable: progress,
               builder: (_, p, _) => Column(
@@ -387,10 +452,8 @@ Future<void> _postponeLeague(
         ),
       );
       try {
-        await repository.postponeMatches(
-          moved,
-          competitionName: name,
-          reason: choice.reason,
+        await repository.finishPostpone(
+          current,
           by: me,
           onProgress: (done, total) => progress.value = (done, total),
         );
@@ -398,7 +461,8 @@ Future<void> _postponeLeague(
         if (context.mounted) {
           AppToast.success(
             context,
-            '$name postponed ${laterLabel(moved.days)}. Every club was told.',
+            '${job.name} postponed ${laterLabel(job.days)}. Every club was '
+            'told.',
           );
         }
         return;
@@ -411,13 +475,14 @@ Future<void> _postponeLeague(
           builder: (dialog) => AlertDialog(
             title: Text('It stopped at $done of $total'),
             content: Text(
-              '${appErrorMessage(error)} The matches already moved stay '
-              'moved. Try again: it carries on where it stopped.',
+              '${appErrorMessage(error)} The $done matches already moved stay '
+              'moved. Try again now, or finish it later from Competitions '
+              '(on any phone or laptop): nothing moves twice.',
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialog, false),
-                child: const Text('Stop'),
+                child: const Text('Later'),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(dialog, true),
@@ -427,9 +492,92 @@ Future<void> _postponeLeague(
           ),
         );
         if (again != true) return;
+        // The job as saved now: what is already ticked off
+        current =
+            ref.read(postponeJobsProvider).value?[job.competitionId] ?? current;
       }
     }
   } finally {
     progress.dispose();
+  }
+}
+
+/// "Division League: postponing stopped", with Finish (3.0c1d, C13).
+class _StoppedCard extends ConsumerWidget {
+  const _StoppedCard({required this.job});
+
+  final PostponeJob job;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fg = AccentTone.gold.foreground(isDark);
+    final total = job.moves.length;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AccentTone.gold.background(isDark),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE0A800)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.event_repeat, color: fg),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${job.name}: postponing stopped',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${job.movedCount} of $total matches moved '
+                      '${laterLabel(job.days)}. The rest still have their '
+                      "old dates, and the clubs aren't told yet.",
+                      style: TextStyle(fontSize: 12, color: fg),
+                    ),
+                    const SizedBox(height: 10),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(99),
+                      child: LinearProgressIndicator(
+                        value: total == 0 ? 0 : job.movedCount / total,
+                        minHeight: 6,
+                        color: fg,
+                        backgroundColor: fg.withValues(alpha: 0.18),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      [
+                        'Started by ${job.byName}',
+                        if (job.startedAt case final at?)
+                          '${formatShortDate(at)}, ${formatTime(at)}',
+                        '"${job.reason}"',
+                      ].join(' · '),
+                      style: TextStyle(fontSize: 11.5, color: fg),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          FilledButton(
+            onPressed: () => _runPostpone(context, ref, job),
+            child: const Text('Finish'),
+          ),
+        ],
+      ),
+    );
   }
 }

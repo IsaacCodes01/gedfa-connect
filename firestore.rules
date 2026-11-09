@@ -1254,6 +1254,57 @@ service cloud.firestore {
           && request.resource.data.updatedAt == request.time;
       }
 
+      // ---------- postponeJobs/{competitionId} (3.0c1d) ----------
+      // A league's postpone while it runs: every match with its old and new
+      // kick-off, saved before any match moves, and ticked off ('done') in
+      // the same batch as each match. FA only. Its ID is the league, so a
+      // league has one at a time: a second postpone waits until it is
+      // finished. Deleted with the last notes when finished.
+      match /postponeJobs/{competitionId} {
+        allow get, list, delete: if isFaAdmin();
+
+        allow create: if isFaAdmin()
+          && request.resource.data.keys().hasOnly([
+               'season', 'competitionId', 'category', 'name', 'days', 'reason',
+               'moves', 'done', 'byName', 'startedBy', 'startedAt',
+               'updatedBy', 'updatedAt'
+             ])
+          && request.resource.data.keys().hasAll([
+               'season', 'competitionId', 'category', 'name', 'days', 'reason',
+               'moves', 'done', 'byName', 'startedBy', 'startedAt',
+               'updatedBy', 'updatedAt'
+             ])
+          && isSeason(request.resource.data.season)
+          && request.resource.data.category in ['division', 'juvenile']
+          && request.resource.data.competitionId == competitionId
+          && competitionId
+               == request.resource.data.season + '_' + request.resource.data.category + '-league'
+          && isText(request.resource.data.name, 3, 40)
+          && request.resource.data.days is int
+          && request.resource.data.days >= 1 && request.resource.data.days <= 365
+          && isText(request.resource.data.reason, 3, 200)
+          && request.resource.data.moves is list
+          && request.resource.data.moves.size() >= 1
+          && request.resource.data.moves.size() <= 1600
+          && request.resource.data.done == []
+          && isText(request.resource.data.byName, 1, 80)
+          && request.resource.data.startedBy == request.auth.uid
+          && request.resource.data.startedAt == request.time
+          && request.resource.data.updatedBy == request.auth.uid
+          && request.resource.data.updatedAt == request.time;
+
+        // Ticking matches off: only 'done' changes, it only grows, and never
+        // past the number of matches
+        allow update: if isFaAdmin()
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['done', 'updatedBy', 'updatedAt'])
+          && request.resource.data.done is list
+          && request.resource.data.done.hasAll(resource.data.done)
+          && request.resource.data.done.size() <= request.resource.data.moves.size()
+          && request.resource.data.updatedBy == request.auth.uid
+          && request.resource.data.updatedAt == request.time;
+      }
+
       // ---------- cups/{cupId} (3.0c) ----------
 
       // A gala's ground and days: { ground, firstDay, lastDay, kickoffHour,

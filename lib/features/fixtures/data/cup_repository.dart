@@ -98,7 +98,7 @@ class CupRepository {
   /// "Postpone" a Gala (3.0c1c, mockup C10): its days move [days] later,
   /// with a line in its history and a note in every club's bell, in one
   /// batch. [teamNames]: team ID to name, for the bells. (A drawn cup's
-  /// matches move with `FixtureRepository.postponeMatches`.)
+  /// matches move with `FixtureRepository.startPostpone`.)
   Future<void> postponeGala(
     Cup cup,
     int days, {

@@ -10,6 +10,7 @@ import 'package:gedfa_connect/features/fixtures/domain/season_plan.dart';
 import 'package:gedfa_connect/features/fixtures/domain/cup.dart';
 import 'package:gedfa_connect/features/fixtures/domain/cup_changes.dart';
 import 'package:gedfa_connect/features/fixtures/domain/fixture.dart';
+import 'package:gedfa_connect/features/fixtures/domain/postpone_job.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/competitions_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/cup_form_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/cup_screen.dart';
@@ -178,6 +179,7 @@ Future<void> _pump(
   Size size,
   Brightness brightness, {
   double textScale = 1,
+  Map<String, PostponeJob> jobs = const {},
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -241,6 +243,7 @@ Future<void> _pump(
           ]),
         ),
         savedDraftProvider.overrideWith((ref, _) => Stream.value(null)),
+        postponeJobsProvider.overrideWith((ref) => Stream.value(jobs)),
         allTeamsProvider.overrideWith((ref) => Stream.value(const <Team>[])),
         myAudienceProvider.overrideWithValue('team:aps'),
       ],
@@ -302,6 +305,35 @@ void main() {
         expect(find.textContaining('weeks off included. All 2 clubs are told.'), findsOneWidget);
         expect(find.textContaining('Pick the new date', findRichText: true), findsOneWidget);
         expect(find.text('Why (the clubs see it)'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+      testWidgets('Competitions with a stopped postpone (C13, C14), $width wide, $brightness', (tester) async {
+        final job = PostponeJob(
+          competitionId: '2026-27_division-league',
+          season: '2026-27',
+          category: Competition.division,
+          name: 'Division League',
+          days: 14,
+          reason: "The FA's congress",
+          moves: [
+            for (var i = 0; i < 306; i++)
+              PostponeMove(id: 'x$i', from: DateTime(2026, 12, 5, 15), to: DateTime(2026, 12, 19, 15)),
+          ],
+          done: {for (var i = 0; i < 42; i++) 'x$i'},
+          byName: 'Kofi Mensah',
+          startedAt: DateTime(2026, 11, 9, 10, 42),
+        );
+        await _pump(tester, const CompetitionsScreen(), Size(width, 2400), brightness,
+            jobs: {job.competitionId: job});
+        expect(find.text('Division League: postponing stopped'), findsOneWidget);
+        expect(find.textContaining('42 of 306 matches moved 2 weeks later.'), findsOneWidget);
+        expect(find.text("Started by Kofi Mensah · Mon 9 Nov, 10:42 am · \"The FA's congress\""), findsOneWidget);
+        expect(find.text('Finish'), findsOneWidget);
+        expect(find.text('2 teams · postponing: 42 of 306 moved'), findsOneWidget);
+        await tester.tap(find.byTooltip('More').first);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(find.text('Finish the postpone that stopped first'), findsOneWidget);
         expect(tester.takeException(), isNull);
       });
       testWidgets('New cup (C2), 18 teams, $width wide, $brightness', (tester) async {

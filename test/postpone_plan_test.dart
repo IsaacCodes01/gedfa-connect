@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gedfa_connect/features/fixtures/domain/fixture.dart';
+import 'package:gedfa_connect/features/fixtures/domain/postpone_job.dart';
 import 'package:gedfa_connect/features/fixtures/domain/postpone_plan.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/teams/domain/kit.dart';
@@ -86,6 +87,38 @@ void main() {
       expect(laterLabel(7), '1 week later');
       expect(laterLabel(10), '10 days later');
       expect(laterLabel(1), '1 day later');
+    });
+  });
+
+  group('PostponeJob (3.0c1d)', () {
+    final plan = PostponePlan.of([
+      _match('md1', DateTime(2026, 12, 5, 15)),
+      _match('md2', DateTime(2026, 12, 13, 16), round: 2),
+    ], now)!.movedTo(DateTime(2026, 12, 19));
+
+    test('a job holds every match with its old and new kick-off, none moved yet', () {
+      final job = PostponeJob.fromPlan(plan, name: 'Division League', reason: " The FA's congress ", byName: 'Kofi Mensah');
+      expect(job.competitionId, '2026-27_division-league');
+      expect(job.days, 14);
+      expect(job.reason, "The FA's congress");
+      expect(job.moves.map((m) => (m.id, m.from, m.to)), [
+        ('md1', DateTime(2026, 12, 5, 15), DateTime(2026, 12, 19, 15)),
+        ('md2', DateTime(2026, 12, 13, 16), DateTime(2026, 12, 27, 16)),
+      ]);
+      expect(job.movedCount, 0);
+      expect(job.allMoved, isFalse);
+    });
+
+    test('as saved and read back: what is ticked off and what is left', () {
+      final saved = {
+        ...PostponeJob.fromPlan(plan, name: 'Division League', reason: 'Congress', byName: 'Kofi Mensah').toMap(),
+        'done': ['md1', 'gone'],
+      };
+      final job = PostponeJob.fromMap('2026-27_division-league', saved)!;
+      expect(job.category, Competition.division);
+      expect(job.movedCount, 1);
+      expect(job.left.map((m) => m.id), ['md2']);
+      expect(job.moves.last.to, DateTime(2026, 12, 27, 16));
     });
   });
 }

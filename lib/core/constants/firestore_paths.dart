@@ -52,6 +52,12 @@ class FirestorePaths {
   /// A cup's history (3.0c1b): one doc per change, deleted with the cup.
   static String cupHistory(String id) => '$district/cups/$id/history';
 
+  /// A league's postpone while it runs (3.0c1d), FA only; ID = the
+  /// competition ('2026-27_division-league'). Deleted when finished.
+  static const postponeJobs = '$district/postponeJobs';
+  static String postponeJob(String competitionId) =>
+      '$district/postponeJobs/$competitionId';
+
   static const players = '$district/players';
   static String player(String playerId) => '$district/players/$playerId';
 

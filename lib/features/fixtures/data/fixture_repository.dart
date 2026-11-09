@@ -8,6 +8,7 @@ import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/features/fixtures/domain/fixture.dart';
 import 'package:gedfa_connect/features/fixtures/domain/kit_clash.dart';
+import 'package:gedfa_connect/features/fixtures/domain/postpone_job.dart';
 import 'package:gedfa_connect/features/fixtures/domain/postpone_plan.dart';
 import 'package:gedfa_connect/features/fixtures/domain/season_plan.dart';
 import 'package:gedfa_connect/features/notifications/data/notification_writer.dart';
@@ -415,37 +416,77 @@ class FixtureRepository {
     return batch.commit().timeout(_timeout);
   }
 
-  /// "Postpone" a league (3.0c1c, mockup C11), or a cup once it is drawn:
-  /// every match in [plan] moves [PostponePlan.days] later, each with a
-  /// line in its history. The rules look up both teams of every match, so
-  /// they go 3 at a time. A match already moved (calling this again with
-  /// the same [plan] after a lost connection) or changed since is skipped.
-  /// Then each team gets ONE note: its next match and the reason.
-  Future<void> postponeMatches(
+  /// "Postpone" a league (3.0c1c, mockup C11): saves the job first
+  /// (3.0c1d), every match in [plan] with its new kick-off, before
+  /// anything moves. The rules refuse a second job for the same league
+  /// while one is there. Then [finishPostpone] moves the matches.
+  Future<PostponeJob> startPostpone(
     PostponePlan plan, {
     required String competitionName,
     required String reason,
     required User by,
+  }) async {
+    final name = by.displayName?.trim();
+    final job = PostponeJob.fromPlan(
+      plan,
+      name: competitionName,
+      reason: reason,
+      byName: name == null || name.isEmpty ? (by.email ?? 'FA') : name,
+    );
+    await _db
+        .doc(FirestorePaths.postponeJob(job.competitionId))
+        .set({
+          ...job.toMap(),
+          'startedBy': by.uid,
+          'startedAt': FieldValue.serverTimestamp(),
+          ..._stamp(by),
+        })
+        .timeout(_timeout);
+    return job;
+  }
+
+  /// Moves the matches of [job] not moved yet (3.0c1c, 3.0c1d, mockups
+  /// C12, C15), each with a line in its history and ticked off in the job
+  /// in the same batch. The rules look up both teams of every match, so
+  /// they go 3 at a time. A match changed by hand since is left as it is.
+  /// Then each team gets ONE note (its next match and the reason), and the
+  /// job is removed with the last notes.
+  Future<void> finishPostpone(
+    PostponeJob job, {
+    required User by,
     void Function(int done, int total)? onProgress,
   }) async {
-    final total = plan.moving.length;
+    final jobRef = _db.doc(FirestorePaths.postponeJob(job.competitionId));
+    final total = job.moves.length;
     final now = {
       for (final doc
           in (await _fixtures
-                  .where('competitionId', isEqualTo: plan.first.competitionId)
+                  .where('competitionId', isEqualTo: job.competitionId)
                   .get()
                   .timeout(_timeout))
               .docs)
         doc.id: ?Fixture.fromMap(doc.id, doc.data()),
     };
-    final todo = [
-      for (final f in plan.moving)
-        if (now[f.id] case final current?
-            when current.isScheduled && current.kickoffAt == f.kickoffAt)
-          current,
-    ];
-    var done = total - todo.length;
+    final todo = <(Fixture, PostponeMove)>[];
+    final skipped = <String>[];
+    for (final m in job.left) {
+      final f = now[m.id];
+      if (f != null && f.isScheduled && f.kickoffAt == m.from) {
+        todo.add((f, m));
+      } else {
+        // Already at its new date, or changed by hand since
+        skipped.add(m.id);
+      }
+    }
+    var done = job.movedCount;
     onProgress?.call(done, total);
+    if (skipped.isNotEmpty) {
+      await jobRef
+          .update({'done': FieldValue.arrayUnion(skipped), ..._stamp(by)})
+          .timeout(_timeout);
+      done += skipped.length;
+      onProgress?.call(done, total);
+    }
 
     // Each team read once, fresh (the copy in the match must match it)
     final teams = <String, MatchTeam>{};
@@ -454,52 +495,58 @@ class FixtureRepository {
 
     String when(DateTime t) => '${formatShortDate(t)}, ${formatTime(t)}';
     for (var i = 0; i < todo.length; i += 3) {
+      final part = todo.skip(i).take(3).toList();
       final batch = _db.batch();
-      for (final f in todo.skip(i).take(3)) {
-        final to = plan.newKickoff(f);
+      for (final (f, m) in part) {
         batch.update(_fixtures.doc(f.id), {
           ..._freshCopy(
             f,
             await team(f.home.id, f.category),
             await team(f.away.id, f.category),
           ),
-          'kickoffAt': Timestamp.fromDate(to),
-          'note': reason.trim(),
+          'kickoffAt': Timestamp.fromDate(m.to),
+          'note': job.reason,
           ..._stamp(by),
         });
         _history(
           batch,
           f.id,
-          '$competitionName postponed: ${when(f.kickoffAt!)} → ${when(to)}',
-          reason,
+          '${job.name} postponed: ${when(m.from)} → ${when(m.to)}',
+          job.reason,
           by,
         );
       }
+      batch.update(jobRef, {
+        'done': FieldValue.arrayUnion([for (final (f, _) in part) f.id]),
+        ..._stamp(by),
+      });
       await batch.commit().timeout(_timeout);
-      done += todo.skip(i).take(3).length;
+      done += part.length;
       onProgress?.call(done, total);
     }
 
-    // One note per team, with its next match
-    final next = <String, Fixture>{};
-    for (final f in plan.moving) {
-      next.putIfAbsent(f.home.id, () => f);
-      next.putIfAbsent(f.away.id, () => f);
+    // One note per team, with its next match; the job goes with the last
+    final next = <String, (Fixture, PostponeMove)>{};
+    for (final m in job.moves) {
+      final f = now[m.id];
+      if (f == null || f.isCancelled) continue;
+      next.putIfAbsent(f.home.id, () => (f, m));
+      next.putIfAbsent(f.away.id, () => (f, m));
     }
     final teamIds = next.keys.toList();
-    for (var i = 0; i < teamIds.length; i += 9) {
+    for (var i = 0; i == 0 || i < teamIds.length; i += 9) {
       final batch = _db.batch();
       for (final id in teamIds.skip(i).take(9)) {
-        final f = next[id]!;
+        final (f, m) = next[id]!;
         _notify(
           batch,
           NotificationKind.fixturePostponed,
           f.isHome(id) ? f.home : f.away,
-          '$competitionName postponed ${laterLabel(plan.days)}: '
-          '${_vs(id, f)} now ${when(plan.newKickoff(f))}. '
-          '${_sentence(reason)}',
+          '${job.name} postponed ${laterLabel(job.days)}: '
+          '${_vs(id, f)} now ${when(m.to)}. ${_sentence(job.reason)}',
         );
       }
+      if (i + 9 >= teamIds.length) batch.delete(jobRef);
       await batch.commit().timeout(_timeout);
     }
   }
@@ -703,6 +750,22 @@ final fixtureHistoryProvider = StreamProvider.autoDispose
             ],
           );
     });
+
+/// FA: the season's postpones that are not finished (3.0c1d, C13), by
+/// competition ID.
+final postponeJobsProvider = StreamProvider<Map<String, PostponeJob>>((ref) {
+  return ref
+      .watch(firestoreProvider)
+      .collection(FirestorePaths.postponeJobs)
+      .where('season', isEqualTo: Season.current)
+      .snapshots()
+      .map(
+        (snap) => {
+          for (final doc in snap.docs)
+            doc.id: ?PostponeJob.fromMap(doc.id, doc.data()),
+        },
+      );
+});
 
 /// One match, live (change and kits screens).
 final fixtureProvider = StreamProvider.family<Fixture?, String>((ref, id) {

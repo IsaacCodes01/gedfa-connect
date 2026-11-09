@@ -3469,3 +3469,98 @@ describe('Postpone a league or a Gala (3.0c1c)', () => {
     await assertFails(updateDoc(doc(dbAs('fa1'), `${D}/cups/g1`), days(26, 27)));
   });
 });
+
+describe('Finish a stopped postpone: postponeJobs (3.0c1d)', () => {
+  const DAY = 86400000;
+  const later = (days) => Timestamp.fromMillis(Date.now() + days * DAY);
+  const JOB = `${D}/postponeJobs/2026-27_division-league`;
+  const jobData = (changes = {}) => ({
+    season: '2026-27',
+    competitionId: '2026-27_division-league',
+    category: 'division',
+    name: 'Division League',
+    days: 14,
+    reason: "The FA's congress",
+    moves: [
+      { id: 'm1', from: later(3), to: later(17) },
+      { id: 'm2', from: later(10), to: later(24) },
+    ],
+    done: [],
+    byName: 'Kofi Mensah',
+    startedBy: 'fa1',
+    startedAt: serverTimestamp(),
+    updatedBy: 'fa1',
+    updatedAt: serverTimestamp(),
+    ...changes,
+  });
+  const tick = (db, ids, changes = {}) => updateDoc(doc(db, JOB), {
+    done: arrayUnion(...ids), updatedBy: 'fa1', updatedAt: serverTimestamp(), ...changes,
+  });
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await updateDoc(doc(db, `${D}/teams/royal`), { shortName: 'RUF', logoUrl: null, kits: ROYAL_KITS });
+      await updateDoc(doc(db, `${D}/teams/stars`), { shortName: 'GST', logoUrl: null, kits: STARS_KITS });
+      await setDoc(doc(db, `${D}/fixtures/m1`), fixtureData({ kickoffAt: later(3) }));
+      await setDoc(doc(db, `${D}/fixtures/m2`), fixtureData({ round: 5, kickoffAt: later(10) }));
+    });
+  });
+
+  it('the FA saves the job before anything moves; only the FA reads it', async () => {
+    await assertFails(setDoc(doc(dbAs('admin1'), JOB), jobData({ startedBy: 'admin1', updatedBy: 'admin1' })));
+    await assertSucceeds(setDoc(doc(dbAs('fa1'), JOB), jobData()));
+    await assertSucceeds(getDoc(doc(dbAs('fa1'), JOB)));
+    await assertSucceeds(getDocs(query(collection(dbAs('fa1'), `${D}/postponeJobs`), where('season', '==', '2026-27'))));
+    await assertFails(getDoc(doc(dbAs('admin1'), JOB)));
+  });
+
+  it('a league has one job at a time, and a job must fit its league', async () => {
+    const db = dbAs('fa1');
+    await assertFails(setDoc(doc(db, `${D}/postponeJobs/2026-27_juvenile-league`), jobData()));
+    await assertFails(setDoc(doc(db, JOB), jobData({ done: ['m1'] })));
+    await assertFails(setDoc(doc(db, JOB), jobData({ days: 0 })));
+    await assertFails(setDoc(doc(db, JOB), jobData({ reason: 'ok' })));
+    await assertFails(setDoc(doc(db, JOB), jobData({ moves: [] })));
+    await assertFails(setDoc(doc(db, JOB), jobData({ startedBy: 'fa2' })));
+    await assertFails(setDoc(doc(db, JOB), jobData({ extra: true })));
+    await assertSucceeds(setDoc(doc(db, JOB), jobData()));
+    // A second postpone of the same league while this one is there
+    await assertFails(setDoc(doc(db, JOB), jobData({ days: 7 })));
+  });
+
+  it('each batch moves matches and ticks them off; ticks only grow and nothing else changes', async () => {
+    const db = dbAs('fa1');
+    await setDoc(doc(db, JOB), jobData());
+    const batch = writeBatch(db);
+    batch.update(doc(db, `${D}/fixtures/m1`), {
+      kickoffAt: later(17), note: "The FA's congress", updatedBy: 'fa1', updatedAt: serverTimestamp(),
+    });
+    batch.set(doc(db, `${D}/fixtures/m1/history/p1`), {
+      what: 'Division League postponed: Sat 5 Dec, 3:00 pm → Sat 19 Dec, 3:00 pm',
+      reason: "The FA's congress", by: 'fa1', byName: 'Kofi Mensah', at: serverTimestamp(),
+    });
+    batch.update(doc(db, JOB), { done: arrayUnion('m1'), updatedBy: 'fa1', updatedAt: serverTimestamp() });
+    await assertSucceeds(batch.commit());
+    await assertFails(tick(db, ['m2'], { days: 7 }));
+    await assertFails(tick(db, ['m2'], { reason: 'Something else' }));
+    await assertFails(updateDoc(doc(db, JOB), { done: [], updatedBy: 'fa1', updatedAt: serverTimestamp() }));
+    await assertFails(tick(db, ['m2', 'x1']));
+    await assertFails(tick(dbAs('admin1'), ['m2'], { updatedBy: 'admin1' }));
+    await assertSucceeds(tick(db, ['m2']));
+  });
+
+  it('the FA removes the finished job with the last notes; nobody else does', async () => {
+    const db = dbAs('fa1');
+    await setDoc(doc(db, JOB), jobData());
+    await assertFails(deleteDoc(doc(dbAs('admin1'), JOB)));
+    const batch = writeBatch(db);
+    batch.set(doc(db, `${D}/notifications/team-royal_fixturePostponed_royal_2026-11-09`), {
+      audience: 'team:royal', kind: 'fixturePostponed', teamId: 'royal', teamName: 'x',
+      names: arrayUnion('Division League postponed 2 weeks: v Gomoa Stars (Matchday 4) now Sat 19 Dec, 3:00 pm.'),
+      count: increment(1), day: '2026-11-09', updatedAt: serverTimestamp(),
+    }, { merge: true });
+    batch.delete(doc(db, JOB));
+    await assertSucceeds(batch.commit());
+  });
+});
