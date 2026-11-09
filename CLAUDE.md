@@ -124,9 +124,10 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
   `GedfaAppBar` adds ← to it. Never `push` a tab's page from a full-screen page: go_router crashes (Duplicate GlobalKey).
   `GoRouter.optionURLReflectsImperativeAPIs = true` in `main.dart`. Test: `test/back_navigation_test.dart`.
   Next: juvenile side names, then the team admin dashboard.
-- **Juvenile side names: mockup drawn** (9 Nov 2026), `docs/mockups/juvenile-side-names.html` (JS1–JS6, not approved yet).
-  Four questions in it for Isaac (short name "RUF B", reserve own names, ask the name when adding Juvenile, update
-  matches not played yet). Build in a new conversation once Isaac approves and answers.
+- **Juvenile side names: mockup drawn** (9 Nov 2026), `docs/mockups/juvenile-side-names.html` (JS1–JS6). Isaac's answers
+  (in `DATA_MODEL.md`): short name "RUF B"; own juvenile names reserved in `teamNames`; the name is asked in the same
+  "Add Juvenile" request ("B" by default); after approval **every** juvenile match shows the new name, played ones too,
+  with the gold "Previously …" pill (`previous_name_pill.dart`, like 2.10c). **Build it next, in a new conversation.**
 - **Plan agreed 9 Nov 2026 (deadline Thu 12 Nov, 12:30 pm; Isaac's prompts in that conversation):** next, in order:
   1. **3.0f Notifications and Back** (mockup `3.0f-notifications-and-back.html`, N1–N3, **approved**): a tap marks only
      that note read (reads kept per note in `readMarks/{uid}`: note ID → the `updatedAt` read; a grouped note with a newer
