@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.21, matches the rules after step 3.0c1b (8 Nov 2026)
+**Status:** v2.21.1, matches the rules after step 3.0c1c (9 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -644,6 +644,7 @@ A cup or a gala of one season. Made by the FA (C2, C2b); read by everyone with a
 | `createdBy`, `createdAt`, `updatedBy`, `updatedAt` | | Who and when (server time) |
 
 - **The format** (`cup_format.dart`): straight knockout, for 18 clubs: 2 first-round ties (4 clubs), 14 byes, then a round of 16. Groups: as few groups (2, 4, 8, 16) as possible; 18 clubs → 5, 5, 4, 4, the top 2 to the quarter-finals. The app suggests knockout; groups are offered from 6 clubs.
+- **Postpone (3.0c1c):** a Gala's `gala.firstDay` and `gala.lastDay` move by the same number of days, with a history line ("Postponed 4 weeks: … → …. Why.") and a `fixturePostponed` note for every club in it, in one batch. A league: every match not played yet (`scheduled`, kick-off in the future) gets `kickoffAt` the same number of days later at the same time and `note` = the reason, with a line in `fixtures/{id}/history`; then one `fixturePostponed` note per club. A cup (not a Gala) is postponed after the draw (3.0c2).
 - **`cups/{cupId}/history/{lineId}`** (3.0c1b): one line per change, `{ text (3–200), by, byName (1–80), at }`, written in the same batch as the cup ("Cup made", "Each round: one match → home and away", "Teams: Ojobi Stars left out"). Read by everyone with a role; created only by the FA, with the cup there after the batch; never changed; deleted with the cup. The lines come from `cupChanges` (`cup_changes.dart`).
 - **A gala's timetable** (`GalaPlan`): kick-offs every `gapMinutes` from the first kick-off, no later than 4:30 pm (before dark). A round starts 2 slots after the last kick-off of the round before, so every club has a free slot to rest. The form warns when the matches don't fit in the days.
 
@@ -780,6 +781,8 @@ Feed rules: never include dates of birth; player photos only if agreed with GEDF
 
 **Answered by GEDFA via Isaac (8 Nov 2026), cups (4):** the FA can **delete** a cup at any time (even after the draw) and everything goes, nothing is kept. The FA can **postpone** a cup or Gala to a new date, and even the **start of a league** (every matchday not played yet moves by the same number of days); the clubs are told, with the reason. In a seeded cup the **Pot 1 clubs get the byes first** in a first round. **Juvenile side names:** "**B**" is added when a club keeps the same name; the juvenile side gets its own short name only when it gets a new name; a club already in both competitions asks the FA (like a name change), and the name shows everywhere after approval. **Gala team sheets: 20 minutes before kick-off.** Only "Cup" takes a plural ("Cups and Gala").
 
+**Answered by Isaac (9 Nov 2026):** when a Gala is postponed **before its draw**, the clubs in it still get the note (they plan around its dates).
+
 Still open:
 
 
@@ -809,6 +812,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 9 Nov 2026 | v2.21.1 (3.0c1c): no new field or rule. Postpone a league (every match not played yet moves by the same days) or a Gala (its days move); the clubs get a `fixturePostponed` note with the reason. 314 rules tests. |
 | 8 Nov 2026 | v2.21 (3.0c1b): the FA changes a cup before the draw and deletes one at any time; new `cups/{id}/history`. GEDFA's cup answers (4) in Section 7 (delete, postpone, Pot 1 byes, juvenile "B", Gala sheets 20 minutes before). 310 rules tests. |
 | 8 Nov 2026 | v2.20.1: `cups.finalOneMatch` removed (the final is always one match, GEDFA). GEDFA's cup answers (3) in Section 7. 305 rules tests. |
 | 8 Nov 2026 | v2.20 (3.0c1): new `cups/{id}` (cups and galas: who plays, format, one or two legs, level rule, bracket fixed from, seeding, the gala's ground and days). Read by everyone with a role, made by the FA, not changed yet. GEDFA's cup answers (2) in Section 7. 305 rules tests. |

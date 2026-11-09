@@ -291,6 +291,18 @@ void main() {
         expect(find.textContaining('Open · Division and U17 sides · 12 teams · Apam Park'), findsOneWidget);
         expect(find.text('New cup or Gala'), findsOneWidget);
         expect(find.text('Cups and Gala'), findsOneWidget);
+        // The ⋯ on the Division League (C11)
+        await tester.tap(find.byTooltip('More').first);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+        await tester.tap(find.text('Postpone'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(find.text('Postpone the Division League?'), findsOneWidget);
+        expect(find.textContaining('weeks off included. All 2 clubs are told.'), findsOneWidget);
+        expect(find.textContaining('Pick the new date', findRichText: true), findsOneWidget);
+        expect(find.text('Why (the clubs see it)'), findsOneWidget);
+        expect(tester.takeException(), isNull);
       });
       testWidgets('New cup (C2), 18 teams, $width wide, $brightness', (tester) async {
         await _pump(tester, const CupFormScreen(), Size(width, 3000), brightness);
@@ -329,6 +341,8 @@ void main() {
         await tester.pump(const Duration(milliseconds: 400));
         expect(find.text('Delete the cup'), findsOneWidget);
         expect(find.text('Everything goes: matches and history'), findsOneWidget);
+        // A cup's matches get dates at the draw (3.0c2)
+        expect(find.text('Once its matches have dates, after the draw'), findsOneWidget);
         expect(tester.takeException(), isNull);
       });
       testWidgets("A Gala's page (C7), $width wide, $brightness", (tester) async {
@@ -340,6 +354,17 @@ void main() {
           findsOneWidget,
         );
         expect(find.text('Level at full time'), findsOneWidget);
+        // Postpone (C10)
+        await tester.tap(find.byTooltip('More'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+        await tester.tap(find.text('Postpone'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(find.textContaining('The clubs in the Gala are told.'), findsOneWidget);
+        expect(find.text('Starts'), findsOneWidget);
+        expect(find.textContaining('Pick the new date', findRichText: true), findsOneWidget);
+        expect(tester.takeException(), isNull);
       });
       testWidgets('Change the cup (C8), filled in, $width wide, $brightness', (tester) async {
         await _pump(tester, const CupFormScreen(cupId: 'c1'), Size(width, 3000), brightness);

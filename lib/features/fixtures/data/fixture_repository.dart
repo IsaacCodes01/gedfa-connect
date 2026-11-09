@@ -8,6 +8,7 @@ import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/features/fixtures/domain/fixture.dart';
 import 'package:gedfa_connect/features/fixtures/domain/kit_clash.dart';
+import 'package:gedfa_connect/features/fixtures/domain/postpone_plan.dart';
 import 'package:gedfa_connect/features/fixtures/domain/season_plan.dart';
 import 'package:gedfa_connect/features/notifications/data/notification_writer.dart';
 import 'package:gedfa_connect/features/notifications/domain/app_notification.dart';
@@ -42,11 +43,8 @@ class MatchTeam {
   TeamKits get teamKits => TeamKits(kits: kits, colours: colours);
 
   /// The match's copy of one of this team's kits.
-  KitChoice choice(KitSlot slot) => KitChoice(
-        slot: slot,
-        kit: kits[slot]!,
-        raw: rawKits[slot.name]!,
-      );
+  KitChoice choice(KitSlot slot) =>
+      KitChoice(slot: slot, kit: kits[slot]!, raw: rawKits[slot.name]!);
 
   static MatchTeam fromTeamDoc(
     String id,
@@ -67,15 +65,17 @@ class MatchTeam {
       for (final slot in KitSlot.values)
         if (rawKits[slot.name] case final raw?) slot: ?Kit.fromMap(raw),
     };
-    final colours =
-        TeamColours.fromMap(data['colours'] as Map<String, dynamic>?);
+    final colours = TeamColours.fromMap(
+      data['colours'] as Map<String, dynamic>?,
+    );
     return MatchTeam(
       side: FixtureSide(
         id: id,
         name: data['name'] as String? ?? '',
         shortName: data['shortName'] as String? ?? '',
         logoUrl: data['logoUrl'] as String?,
-        colour: colours?.home.main ??
+        colour:
+            colours?.home.main ??
             kits[KitSlot.home]?.primary ??
             const Color(0xFF1E88E5),
       ),
@@ -112,11 +112,11 @@ class FixtureDraft {
   final ({KitSlot home, KitSlot away, KitSlot homeGk, KitSlot awayGk}) kits;
 
   MatchKits get matchKits => MatchKits(
-        home: home.choice(kits.home),
-        away: away.choice(kits.away),
-        homeGk: home.choice(kits.homeGk),
-        awayGk: away.choice(kits.awayGk),
-      );
+    home: home.choice(kits.home),
+    away: away.choice(kits.away),
+    homeGk: home.choice(kits.homeGk),
+    awayGk: away.choice(kits.awayGk),
+  );
 }
 
 /// Matches (3.0a). Every save writes the match, a line in its history and
@@ -130,14 +130,12 @@ class FixtureRepository {
       _db.collection(FirestorePaths.fixtures);
 
   List<Fixture> _read(QuerySnapshot<Map<String, dynamic>> snap) => [
-        for (final doc in snap.docs) ?Fixture.fromMap(doc.id, doc.data()),
-      ];
+    for (final doc in snap.docs) ?Fixture.fromMap(doc.id, doc.data()),
+  ];
 
   /// FA: every match of the season.
-  Stream<List<Fixture>> watchSeason(String season) => _fixtures
-      .where('season', isEqualTo: season)
-      .snapshots()
-      .map(_read);
+  Stream<List<Fixture>> watchSeason(String season) =>
+      _fixtures.where('season', isEqualTo: season).snapshots().map(_read);
 
   /// A team's matches (this season, filtered in the app so no extra index
   /// is needed).
@@ -154,8 +152,10 @@ class FixtureRepository {
 
   /// FA: a team as a match needs it, read fresh.
   Future<MatchTeam> loadTeam(String teamId, Competition category) async {
-    final doc =
-        await _db.doc(FirestorePaths.team(teamId)).get().timeout(_timeout);
+    final doc = await _db
+        .doc(FirestorePaths.team(teamId))
+        .get()
+        .timeout(_timeout);
     return MatchTeam.fromTeamDoc(doc.id, doc.data() ?? {}, category);
   }
 
@@ -166,8 +166,12 @@ class FixtureRepository {
     final batch = _db.batch()..set(ref, _newFixture(d, by));
     _history(batch, ref.id, 'Match added', null, by);
     for (final team in [d.home.side, d.away.side]) {
-      _notify(batch, NotificationKind.fixtureAdded, team,
-          _line(team.id, d.round, d.home.side, d.away.side, d.kickoffAt));
+      _notify(
+        batch,
+        NotificationKind.fixtureAdded,
+        team,
+        _line(team.id, d.round, d.home.side, d.away.side, d.kickoffAt),
+      );
     }
     return batch.commit().timeout(_timeout);
   }
@@ -187,14 +191,17 @@ class FixtureRepository {
     void Function(int done, int total)? onProgress,
   }) async {
     if (matches.isEmpty) return;
-    final competitionId =
-        Fixture.leagueId(Season.current, matches.first.category);
+    final competitionId = Fixture.leagueId(
+      Season.current,
+      matches.first.category,
+    );
     final existing = {
-      for (final doc in (await _fixtures
-              .where('competitionId', isEqualTo: competitionId)
-              .get()
-              .timeout(_timeout))
-          .docs)
+      for (final doc
+          in (await _fixtures
+                  .where('competitionId', isEqualTo: competitionId)
+                  .get()
+                  .timeout(_timeout))
+              .docs)
         doc.id,
     };
     String idOf(FixtureDraft d) =>
@@ -232,10 +239,16 @@ class FixtureRepository {
         final list = byTeam[id]!
           ..sort((a, b) => a.kickoffAt.compareTo(b.kickoffAt));
         final first = list.first;
-        final other = first.home.side.id == id ? first.away.side : first.home.side;
-        _notify(batch, NotificationKind.fixtureAdded, sides[id]!,
-            '$leagueName: ${list.length} matches, the first v ${other.name} '
-            'on ${formatShortDate(first.kickoffAt)}');
+        final other = first.home.side.id == id
+            ? first.away.side
+            : first.home.side;
+        _notify(
+          batch,
+          NotificationKind.fixtureAdded,
+          sides[id]!,
+          '$leagueName: ${list.length} matches, the first v ${other.name} '
+          'on ${formatShortDate(first.kickoffAt)}',
+        );
       }
       if (i + 9 >= teamIds.length) {
         batch.delete(_db.doc(FirestorePaths.fixtureDraft(draftId)));
@@ -252,14 +265,17 @@ class FixtureRepository {
         .collection(FirestorePaths.teams)
         .get()
         .timeout(_timeout);
-    final teams = [
-      for (final doc in snap.docs)
-        if (Competition.fromList(doc.data()['categories'] as List<dynamic>?)
-            .contains(category))
-          MatchTeam.fromTeamDoc(doc.id, doc.data(), category),
-    ]..sort((a, b) => a.side.name.toLowerCase().compareTo(
-          b.side.name.toLowerCase(),
-        ));
+    final teams =
+        [
+          for (final doc in snap.docs)
+            if (Competition.fromList(
+              doc.data()['categories'] as List<dynamic>?,
+            ).contains(category))
+              MatchTeam.fromTeamDoc(doc.id, doc.data(), category),
+        ]..sort(
+          (a, b) =>
+              a.side.name.toLowerCase().compareTo(b.side.name.toLowerCase()),
+        );
     return teams;
   }
 
@@ -278,34 +294,35 @@ class FixtureRepository {
     required List<DraftMatch> matches,
     required User by,
   }) {
-    return _db.doc(FirestorePaths.fixtureDraft(draftId)).set({
-      'season': Season.current,
-      'competitionId': Fixture.leagueId(Season.current, category),
-      'category': category.name,
-      'ageGroup': ?ageGroup?.label,
-      'settings': settings.toMap(),
-      'teamIds': teamIds,
-      'matches': [for (final m in matches) m.toMap()],
-      'updatedBy': by.uid,
-      'updatedAt': FieldValue.serverTimestamp(),
-    }).timeout(_timeout);
+    return _db
+        .doc(FirestorePaths.fixtureDraft(draftId))
+        .set({
+          'season': Season.current,
+          'competitionId': Fixture.leagueId(Season.current, category),
+          'category': category.name,
+          'ageGroup': ?ageGroup?.label,
+          'settings': settings.toMap(),
+          'teamIds': teamIds,
+          'matches': [for (final m in matches) m.toMap()],
+          'updatedBy': by.uid,
+          'updatedAt': FieldValue.serverTimestamp(),
+        })
+        .timeout(_timeout);
   }
 
-  Future<void> deleteDraft(String draftId) => _db
-      .doc(FirestorePaths.fixtureDraft(draftId))
-      .delete()
-      .timeout(_timeout);
+  Future<void> deleteDraft(String draftId) =>
+      _db.doc(FirestorePaths.fixtureDraft(draftId)).delete().timeout(_timeout);
 
   /// A new match, as [add] and [publishSeason] write it.
   Map<String, dynamic> _newFixture(FixtureDraft d, User by) => {
-        ..._fields(d, status: FixtureStatus.scheduled, note: null, by: by),
-        'season': Season.current,
-        'competitionId': Fixture.leagueId(Season.current, d.category),
-        'category': d.category.name,
-        'ageGroup': ?d.ageGroup?.label,
-        'createdBy': by.uid,
-        'createdAt': FieldValue.serverTimestamp(),
-      };
+    ..._fields(d, status: FixtureStatus.scheduled, note: null, by: by),
+    'season': Season.current,
+    'competitionId': Fixture.leagueId(Season.current, d.category),
+    'category': d.category.name,
+    'ageGroup': ?d.ageGroup?.label,
+    'createdBy': by.uid,
+    'createdAt': FieldValue.serverTimestamp(),
+  };
 
   /// "Change a match": anything but the competition. Teams that leave the
   /// match are told too.
@@ -317,19 +334,26 @@ class FixtureRepository {
   }) {
     final what = _changes(old, d);
     final batch = _db.batch()
-      ..update(_fixtures.doc(old.id), _fields(
-        d,
-        status: FixtureStatus.scheduled,
-        note: reason.trim().isEmpty ? null : reason.trim(),
-        by: by,
-      ));
+      ..update(
+        _fixtures.doc(old.id),
+        _fields(
+          d,
+          status: FixtureStatus.scheduled,
+          note: reason.trim().isEmpty ? null : reason.trim(),
+          by: by,
+        ),
+      );
     _history(batch, old.id, what, reason, by);
     final told = <String>{};
     for (final team in [d.home.side, d.away.side, old.home, old.away]) {
       if (!told.add(team.id)) continue;
-      _notify(batch, NotificationKind.fixtureChanged, team,
-          '${_line(team.id, d.round, d.home.side, d.away.side, d.kickoffAt)}'
-          '${reason.trim().isEmpty ? '' : '. ${_sentence(reason)}'}');
+      _notify(
+        batch,
+        NotificationKind.fixtureChanged,
+        team,
+        '${_line(team.id, d.round, d.home.side, d.away.side, d.kickoffAt)}'
+        '${reason.trim().isEmpty ? '' : '. ${_sentence(reason)}'}',
+      );
     }
     return batch.commit().timeout(_timeout);
   }
@@ -340,6 +364,10 @@ class FixtureRepository {
   Future<Map<String, dynamic>> _freshTeams(Fixture f) async {
     final home = await loadTeam(f.home.id, f.category);
     final away = await loadTeam(f.away.id, f.category);
+    return _freshCopy(f, home, away);
+  }
+
+  Map<String, dynamic> _freshCopy(Fixture f, MatchTeam home, MatchTeam away) {
     KitChoice keep(MatchTeam team, KitSlot slot, KitSlot fallback) =>
         team.choice(team.kits[slot] != null ? slot : fallback);
     return {
@@ -368,8 +396,7 @@ class FixtureRepository {
         'status': newKickoff == null
             ? FixtureStatus.postponed.name
             : FixtureStatus.scheduled.name,
-        'kickoffAt':
-            newKickoff == null ? null : Timestamp.fromDate(newKickoff),
+        'kickoffAt': newKickoff == null ? null : Timestamp.fromDate(newKickoff),
         'note': reason.trim(),
         ..._stamp(by),
       });
@@ -378,10 +405,103 @@ class FixtureRepository {
         : 'now ${formatShortDate(newKickoff)}, ${formatTime(newKickoff)}';
     _history(batch, f.id, 'Postponed ($when)', reason, by);
     for (final team in [f.home, f.away]) {
-      _notify(batch, NotificationKind.fixturePostponed, team,
-          '${_vs(team.id, f)}: postponed, $when. ${_sentence(reason)}');
+      _notify(
+        batch,
+        NotificationKind.fixturePostponed,
+        team,
+        '${_vs(team.id, f)}: postponed, $when. ${_sentence(reason)}',
+      );
     }
     return batch.commit().timeout(_timeout);
+  }
+
+  /// "Postpone" a league (3.0c1c, mockup C11), or a cup once it is drawn:
+  /// every match in [plan] moves [PostponePlan.days] later, each with a
+  /// line in its history. The rules look up both teams of every match, so
+  /// they go 3 at a time. A match already moved (calling this again with
+  /// the same [plan] after a lost connection) or changed since is skipped.
+  /// Then each team gets ONE note: its next match and the reason.
+  Future<void> postponeMatches(
+    PostponePlan plan, {
+    required String competitionName,
+    required String reason,
+    required User by,
+    void Function(int done, int total)? onProgress,
+  }) async {
+    final total = plan.moving.length;
+    final now = {
+      for (final doc
+          in (await _fixtures
+                  .where('competitionId', isEqualTo: plan.first.competitionId)
+                  .get()
+                  .timeout(_timeout))
+              .docs)
+        doc.id: ?Fixture.fromMap(doc.id, doc.data()),
+    };
+    final todo = [
+      for (final f in plan.moving)
+        if (now[f.id] case final current?
+            when current.isScheduled && current.kickoffAt == f.kickoffAt)
+          current,
+    ];
+    var done = total - todo.length;
+    onProgress?.call(done, total);
+
+    // Each team read once, fresh (the copy in the match must match it)
+    final teams = <String, MatchTeam>{};
+    Future<MatchTeam> team(String id, Competition category) async =>
+        teams['$id:${category.name}'] ??= await loadTeam(id, category);
+
+    String when(DateTime t) => '${formatShortDate(t)}, ${formatTime(t)}';
+    for (var i = 0; i < todo.length; i += 3) {
+      final batch = _db.batch();
+      for (final f in todo.skip(i).take(3)) {
+        final to = plan.newKickoff(f);
+        batch.update(_fixtures.doc(f.id), {
+          ..._freshCopy(
+            f,
+            await team(f.home.id, f.category),
+            await team(f.away.id, f.category),
+          ),
+          'kickoffAt': Timestamp.fromDate(to),
+          'note': reason.trim(),
+          ..._stamp(by),
+        });
+        _history(
+          batch,
+          f.id,
+          '$competitionName postponed: ${when(f.kickoffAt!)} → ${when(to)}',
+          reason,
+          by,
+        );
+      }
+      await batch.commit().timeout(_timeout);
+      done += todo.skip(i).take(3).length;
+      onProgress?.call(done, total);
+    }
+
+    // One note per team, with its next match
+    final next = <String, Fixture>{};
+    for (final f in plan.moving) {
+      next.putIfAbsent(f.home.id, () => f);
+      next.putIfAbsent(f.away.id, () => f);
+    }
+    final teamIds = next.keys.toList();
+    for (var i = 0; i < teamIds.length; i += 9) {
+      final batch = _db.batch();
+      for (final id in teamIds.skip(i).take(9)) {
+        final f = next[id]!;
+        _notify(
+          batch,
+          NotificationKind.fixturePostponed,
+          f.isHome(id) ? f.home : f.away,
+          '$competitionName postponed ${laterLabel(plan.days)}: '
+          '${_vs(id, f)} now ${when(plan.newKickoff(f))}. '
+          '${_sentence(reason)}',
+        );
+      }
+      await batch.commit().timeout(_timeout);
+    }
   }
 
   /// A postponed match gets its new date.
@@ -401,8 +521,12 @@ class FixtureRepository {
     final when = '${formatShortDate(kickoff)}, ${formatTime(kickoff)}';
     _history(batch, f.id, 'New date: $when', null, by);
     for (final team in [f.home, f.away]) {
-      _notify(batch, NotificationKind.fixtureChanged, team,
-          '${_vs(team.id, f)}: new date $when');
+      _notify(
+        batch,
+        NotificationKind.fixtureChanged,
+        team,
+        '${_vs(team.id, f)}: new date $when',
+      );
     }
     return batch.commit().timeout(_timeout);
   }
@@ -423,8 +547,12 @@ class FixtureRepository {
       });
     _history(batch, f.id, 'Cancelled', reason, by);
     for (final team in [f.home, f.away]) {
-      _notify(batch, NotificationKind.fixtureCancelled, team,
-          '${_vs(team.id, f)}: cancelled. ${_sentence(reason)}');
+      _notify(
+        batch,
+        NotificationKind.fixtureCancelled,
+        team,
+        '${_vs(team.id, f)}: cancelled. ${_sentence(reason)}',
+      );
     }
     return batch.commit().timeout(_timeout);
   }
@@ -436,24 +564,23 @@ class FixtureRepository {
     required FixtureStatus status,
     required String? note,
     required User by,
-  }) =>
-      {
-        'round': d.round,
-        'teamIds': [d.home.side.id, d.away.side.id],
-        'home': d.home.side.toMap(),
-        'away': d.away.side.toMap(),
-        'kits': d.matchKits.toMap(),
-        'kickoffAt': Timestamp.fromDate(d.kickoffAt),
-        'venue': d.venue.trim(),
-        'status': status.name,
-        'note': note,
-        ..._stamp(by),
-      };
+  }) => {
+    'round': d.round,
+    'teamIds': [d.home.side.id, d.away.side.id],
+    'home': d.home.side.toMap(),
+    'away': d.away.side.toMap(),
+    'kits': d.matchKits.toMap(),
+    'kickoffAt': Timestamp.fromDate(d.kickoffAt),
+    'venue': d.venue.trim(),
+    'status': status.name,
+    'note': note,
+    ..._stamp(by),
+  };
 
   Map<String, dynamic> _stamp(User by) => {
-        'updatedBy': by.uid,
-        'updatedAt': FieldValue.serverTimestamp(),
-      };
+    'updatedBy': by.uid,
+    'updatedAt': FieldValue.serverTimestamp(),
+  };
 
   void _history(
     WriteBatch batch,
@@ -525,7 +652,8 @@ class FixtureRepository {
       ],
       if (old.kickoffAt != d.kickoffAt)
         'Kick-off: ${when(old.kickoffAt)} → ${when(d.kickoffAt)}',
-      if (old.venue != d.venue.trim()) 'Venue: ${old.venue} → ${d.venue.trim()}',
+      if (old.venue != d.venue.trim())
+        'Venue: ${old.venue} → ${d.venue.trim()}',
       if (old.round != d.round) 'Matchday ${old.round} → ${d.round}',
       if (old.kits.home.slot != d.kits.home ||
           old.kits.away.slot != d.kits.away ||
@@ -550,8 +678,8 @@ final seasonFixturesProvider = StreamProvider<List<Fixture>>((ref) {
 /// screen. Key: (team ID, competition).
 final matchTeamProvider = FutureProvider.autoDispose
     .family<MatchTeam, (String, Competition)>((ref, key) {
-  return ref.watch(fixtureRepositoryProvider).loadTeam(key.$1, key.$2);
-});
+      return ref.watch(fixtureRepositoryProvider).loadTeam(key.$1, key.$2);
+    });
 
 /// One line of a match's history: what changed, why, when.
 typedef FixtureChange = ({String what, String? reason, DateTime? at});
@@ -559,24 +687,25 @@ typedef FixtureChange = ({String what, String? reason, DateTime? at});
 /// A match's history, newest first (Match details: "What changed").
 final fixtureHistoryProvider = StreamProvider.autoDispose
     .family<List<FixtureChange>, String>((ref, id) {
-  return ref
-      .watch(firestoreProvider)
-      .collection(FirestorePaths.fixtureHistory(id))
-      .orderBy('at', descending: true)
-      .snapshots()
-      .map((snap) => [
-            for (final doc in snap.docs)
-              (
-                what: doc.data()['what'] as String? ?? '',
-                reason: doc.data()['reason'] as String?,
-                at: (doc.data()['at'] as Timestamp?)?.toDate(),
-              ),
-          ]);
-});
+      return ref
+          .watch(firestoreProvider)
+          .collection(FirestorePaths.fixtureHistory(id))
+          .orderBy('at', descending: true)
+          .snapshots()
+          .map(
+            (snap) => [
+              for (final doc in snap.docs)
+                (
+                  what: doc.data()['what'] as String? ?? '',
+                  reason: doc.data()['reason'] as String?,
+                  at: (doc.data()['at'] as Timestamp?)?.toDate(),
+                ),
+            ],
+          );
+    });
 
 /// One match, live (change and kits screens).
-final fixtureProvider =
-    StreamProvider.family<Fixture?, String>((ref, id) {
+final fixtureProvider = StreamProvider.family<Fixture?, String>((ref, id) {
   return ref.watch(fixtureRepositoryProvider).watchOne(id);
 });
 

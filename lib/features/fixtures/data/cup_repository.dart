@@ -6,11 +6,14 @@ import 'package:gedfa_connect/core/constants/season.dart';
 import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/features/fixtures/domain/cup.dart';
 import 'package:gedfa_connect/features/fixtures/domain/cup_changes.dart';
+import 'package:gedfa_connect/features/fixtures/domain/postpone_plan.dart';
+import 'package:gedfa_connect/features/notifications/data/notification_writer.dart';
+import 'package:gedfa_connect/features/notifications/domain/app_notification.dart';
 
 const _timeout = Duration(seconds: 15);
 
 /// Cups and galas (3.0c). The FA makes one (3.0c1), changes or deletes it
-/// (3.0c1b); the draw (3.0c2) writes its matches. Every write adds lines to
+/// (3.0c1b), postpones a Gala (3.0c1c); the draw (3.0c2) writes its matches. Every write adds lines to
 /// the cup's history in the same batch.
 class CupRepository {
   CupRepository(this._db);
@@ -89,6 +92,51 @@ class CupRepository {
         'updatedAt': FieldValue.serverTimestamp(),
       });
     _addLines(batch, after.id, lines, by);
+    await batch.commit().timeout(_timeout);
+  }
+
+  /// "Postpone" a Gala (3.0c1c, mockup C10): its days move [days] later,
+  /// with a line in its history and a note in every club's bell, in one
+  /// batch. [teamNames]: team ID to name, for the bells. (A drawn cup's
+  /// matches move with `FixtureRepository.postponeMatches`.)
+  Future<void> postponeGala(
+    Cup cup,
+    int days, {
+    required String reason,
+    required Map<String, String> teamNames,
+    required User by,
+  }) async {
+    final old = cup.gala!;
+    final gala = GalaSettings(
+      ground: old.ground,
+      firstDay: shiftDays(old.firstDay, days),
+      lastDay: shiftDays(old.lastDay, days),
+      kickoffHour: old.kickoffHour,
+      kickoffMinute: old.kickoffMinute,
+      gapMinutes: old.gapMinutes,
+    );
+    final why = '${reason.trim().replaceAll(RegExp(r'[.!\s]+$'), '')}.';
+    final batch = _db.batch()
+      ..update(_cups.doc(cup.id), {
+        'gala': gala.toMap(),
+        'updatedBy': by.uid,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    _addLines(batch, cup.id, [
+      'Postponed ${laterLabel(days)}: ${galaDays(old)} → ${galaDays(gala)}. '
+          '$why',
+    ], by);
+    for (final teamId in {for (final e in cup.entries) e.teamId}) {
+      NotificationWriter(_db).forTeamInBatch(
+        batch,
+        kind: NotificationKind.fixturePostponed,
+        teamId: teamId,
+        teamName: teamNames[teamId] ?? '',
+        name:
+            '${cup.name} postponed ${laterLabel(days)}: now '
+            '${galaDays(gala)} at ${gala.ground}. $why',
+      );
+    }
     await batch.commit().timeout(_timeout);
   }
 

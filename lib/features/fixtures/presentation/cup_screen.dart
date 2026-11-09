@@ -7,16 +7,20 @@ import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
+import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/dashboard/presentation/widgets/dashboard_card.dart';
 import 'package:gedfa_connect/features/fixtures/data/cup_repository.dart';
 import 'package:gedfa_connect/features/fixtures/domain/cup.dart';
 import 'package:gedfa_connect/features/fixtures/domain/cup_changes.dart';
 import 'package:gedfa_connect/features/fixtures/domain/cup_format.dart';
+import 'package:gedfa_connect/features/fixtures/domain/postpone_plan.dart';
+import 'package:gedfa_connect/features/fixtures/presentation/widgets/postpone_dialog.dart';
+import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:go_router/go_router.dart';
 
 /// FA: a cup's page before the draw (3.0c1b, mockup C7): what the first
 /// draw is, how the cup is played (with Change) and its history. The ⋯
-/// menu (C8) has Change, History and Delete (C9). After the draw (3.0c2)
+/// menu (C8) has Change, Postpone (C10, 3.0c1c), History and Delete (C9). After the draw (3.0c2)
 /// this page becomes the bracket.
 class CupScreen extends ConsumerStatefulWidget {
   const CupScreen({super.key, required this.cupId});
@@ -38,6 +42,49 @@ class _CupScreenState extends ConsumerState<CupScreen> {
       return;
     }
     context.push(Routes.adminEditCup(cup.id));
+  }
+
+  /// "Postpone" (C10): a Gala's days move; the clubs are told. A cup's
+  /// matches get dates at the draw (3.0c2), so a cup waits until then.
+  Future<void> _postpone(Cup cup) async {
+    final gala = cup.gala;
+    if (gala == null) return;
+    final choice = await showPostponeDialog(
+      context,
+      title: 'Postpone ${cup.name}?',
+      message:
+          'Every match not played yet moves by the same number of days. '
+          'The clubs in the Gala are told.',
+      fieldLabel: 'Starts',
+      from: gala.firstDay,
+      lastFrom: gala.lastDay,
+      lastWhat: 'The last day',
+    );
+    final me = ref.read(authRepositoryProvider).currentUser;
+    if (choice == null || me == null || !mounted) return;
+    final days = daysBetween(gala.firstDay, choice.newDay);
+    try {
+      await ref
+          .read(cupRepositoryProvider)
+          .postponeGala(
+            cup,
+            days,
+            reason: choice.reason,
+            teamNames: {
+              for (final t in ref.read(allTeamsProvider).value ?? const [])
+                t.id: t.name,
+            },
+            by: me,
+          );
+      if (mounted) {
+        AppToast.success(
+          context,
+          '${cup.name} postponed ${laterLabel(days)}. The clubs were told.',
+        );
+      }
+    } catch (error) {
+      if (mounted) AppToast.error(context, appErrorMessage(error));
+    }
   }
 
   void _showHistory() {
@@ -116,6 +163,23 @@ class _CupScreenState extends ConsumerState<CupScreen> {
               onTap: () {
                 Navigator.pop(sheet);
                 _change(cup);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.event_repeat),
+              title: const Text(
+                'Postpone',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle: Text(
+                cup.isGala
+                    ? 'Move it to a new date; the clubs are told'
+                    : 'Once its matches have dates, after the draw',
+              ),
+              enabled: cup.isGala,
+              onTap: () {
+                Navigator.pop(sheet);
+                _postpone(cup);
               },
             ),
             ListTile(
@@ -372,6 +436,8 @@ class _History extends ConsumerWidget {
                     _Line(
                       icon: line.text.endsWith(' made')
                           ? Icons.add_circle_outline
+                          : line.text.startsWith('Postponed')
+                          ? Icons.event_repeat
                           : Icons.edit_note,
                       title: line.text,
                       text: [

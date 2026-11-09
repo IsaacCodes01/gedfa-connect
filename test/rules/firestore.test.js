@@ -3374,3 +3374,98 @@ describe('Cups: change, delete and history (3.0c1b)', () => {
     await assertFails(updateDoc(doc(dbAs('fa1'), `${D}/cups/c1/history/h1`), { text: 'Cup made twice' }));
   });
 });
+
+describe('Postpone a league or a Gala (3.0c1c)', () => {
+  const DAY = 86400000;
+  const later = (days) => Timestamp.fromMillis(Date.now() + days * DAY);
+  const teamNote = (team) => ({
+    audience: `team:${team}`, kind: 'fixturePostponed', teamId: team, teamName: 'x',
+    names: arrayUnion('Division League postponed 2 weeks: v Someone (Matchday 4) now Sat 19 Dec, 3:00 pm.'),
+    count: increment(1), day: '2026-11-08', updatedAt: serverTimestamp(),
+  });
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await updateDoc(doc(db, `${D}/teams/royal`), { shortName: 'RUF', logoUrl: null, kits: ROYAL_KITS });
+      await updateDoc(doc(db, `${D}/teams/stars`), { shortName: 'GST', logoUrl: null, kits: STARS_KITS });
+      await setDoc(doc(db, `${D}/fixtures/m1`), fixtureData({ kickoffAt: later(3) }));
+      await setDoc(doc(db, `${D}/fixtures/m2`), fixtureData({ round: 5, kickoffAt: later(10) }));
+      await setDoc(doc(db, `${D}/fixtures/off`), fixtureData({ status: 'cancelled', note: 'Club withdrew' }));
+      await setDoc(doc(db, `${D}/cups/g1`), galaData());
+    });
+  });
+
+  it('the FA moves league matches 2 weeks later, each with a history line, then tells each team', async () => {
+    const db = dbAs('fa1');
+    const batch = writeBatch(db);
+    for (const [id, days] of [['m1', 3], ['m2', 10]]) {
+      batch.update(doc(db, `${D}/fixtures/${id}`), {
+        kickoffAt: later(days + 14), note: "The FA's congress", updatedBy: 'fa1', updatedAt: serverTimestamp(),
+      });
+      batch.set(doc(db, `${D}/fixtures/${id}/history/p1`), {
+        what: 'Division League postponed: Sat 5 Dec, 3:00 pm → Sat 19 Dec, 3:00 pm',
+        reason: "The FA's congress", by: 'fa1', byName: 'Kofi Mensah', at: serverTimestamp(),
+      });
+    }
+    await assertSucceeds(batch.commit());
+    const notes = writeBatch(db);
+    for (const team of ['royal', 'stars']) {
+      notes.set(doc(db, `${D}/notifications/team-${team}_fixturePostponed_${team}_2026-11-08`), teamNote(team), { merge: true });
+    }
+    await assertSucceeds(notes.commit());
+  });
+
+  it('a moved match stays in the future and in its league; a cancelled one never moves; only the FA moves them', async () => {
+    const db = dbAs('fa1');
+    await assertFails(changeFixture(db, 'm1', { kickoffAt: Timestamp.fromMillis(Date.now() - DAY) }));
+    await assertFails(changeFixture(db, 'm1', { kickoffAt: later(17), competitionId: '2026-27_juvenile-league' }));
+    await assertFails(changeFixture(db, 'off', { kickoffAt: later(14), note: "The FA's congress" }));
+    await assertFails(updateDoc(doc(dbAs('admin1'), `${D}/fixtures/m1`), {
+      kickoffAt: later(17), updatedBy: 'admin1', updatedAt: serverTimestamp(),
+    }));
+    await assertFails(setDoc(doc(dbAs('admin1'), `${D}/notifications/team-stars_fixturePostponed_stars_2026-11-08`),
+      teamNote('stars'), { merge: true }));
+  });
+
+  it("the FA postpones a Gala before the draw: new days, a history line and every club's note in one batch", async () => {
+    const db = dbAs('fa1');
+    const batch = writeBatch(db);
+    batch.update(doc(db, `${D}/cups/g1`), {
+      gala: galaData({
+        gala: {
+          ...galaData().gala,
+          firstDay: Timestamp.fromDate(new Date(Date.UTC(2026, 8, 26))),
+          lastDay: Timestamp.fromDate(new Date(Date.UTC(2026, 8, 27))),
+        },
+      }).gala,
+      updatedBy: 'fa1', updatedAt: serverTimestamp(),
+    });
+    batch.set(doc(db, `${D}/cups/g1/history/p1`), cupLine({
+      text: 'Postponed 4 weeks: Sat 29 Aug – Sun 30 Aug → Sat 26 Sep – Sun 27 Sep. The ground is being repaired.',
+    }));
+    for (const team of ['royal', 'stars']) {
+      batch.set(doc(db, `${D}/notifications/team-${team}_fixturePostponed_${team}_2026-11-08`), teamNote(team), { merge: true });
+    }
+    await assertSucceeds(batch.commit());
+  });
+
+  it("nobody else postpones a Gala, and its new days must make sense", async () => {
+    const days = (first, last) => ({
+      gala: {
+        ...galaData().gala,
+        firstDay: Timestamp.fromDate(new Date(Date.UTC(2026, 8, first))),
+        lastDay: Timestamp.fromDate(new Date(Date.UTC(2026, 8, last))),
+      },
+    });
+    await assertFails(updateDoc(doc(dbAs('admin1'), `${D}/cups/g1`), {
+      ...days(26, 27), updatedBy: 'admin1', updatedAt: serverTimestamp(),
+    }));
+    // The last day before the first
+    await assertFails(updateDoc(doc(dbAs('fa1'), `${D}/cups/g1`), {
+      ...days(27, 26), updatedBy: 'fa1', updatedAt: serverTimestamp(),
+    }));
+    // Without who and when
+    await assertFails(updateDoc(doc(dbAs('fa1'), `${D}/cups/g1`), days(26, 27)));
+  });
+});
