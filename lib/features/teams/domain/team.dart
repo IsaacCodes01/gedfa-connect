@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/teams/domain/kit.dart';
+import 'package:gedfa_connect/features/teams/domain/side_name.dart';
 import 'package:gedfa_connect/features/teams/domain/suspension.dart';
 import 'package:gedfa_connect/features/teams/domain/team_colours.dart';
 
@@ -23,6 +24,8 @@ class Team {
     this.colours,
     this.requestUid,
     this.suspension,
+    this.juvenileName,
+    this.juvenileShortName,
   });
 
   final String id;
@@ -43,6 +46,27 @@ class Team {
 
   /// Set by the chairman (2.11c); may have ended (see [isSuspended]).
   final Suspension? suspension;
+
+  /// A club in both competitions: its juvenile sides' own name and short
+  /// name. Null = they play as the club's name with " B" (see [sideName]).
+  final String? juvenileName;
+  final String? juvenileShortName;
+
+  /// "Royal Unique FC", or for its juvenile sides "Royal Unique FC B" /
+  /// their own name (juvenile side names).
+  String sideName(Competition category) => _side(category).name;
+
+  /// "RUF", or "RUF B" / the juvenile side's own short name.
+  String sideShortName(Competition category) => _side(category).shortName;
+
+  ({String name, String shortName}) _side(Competition category) => sideNames(
+    name: name,
+    shortName: shortName,
+    categories: categories,
+    category: category,
+    juvenileName: juvenileName,
+    juvenileShortName: juvenileShortName,
+  );
 
   /// Suspended now: no adding or editing players, profile edits or
   /// change requests.
@@ -73,6 +97,8 @@ class Team {
       suspension: Suspension.fromTeamMap(
         data['suspension'] as Map<String, dynamic>?,
       ),
+      juvenileName: data['juvenileName'] as String?,
+      juvenileShortName: data['juvenileShortName'] as String?,
     );
   }
 }

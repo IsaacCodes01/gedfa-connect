@@ -19,7 +19,7 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
    - test steps he can do himself in the app
 5. **Before every commit**, run (and show the result):
    - `flutter analyze` → must be **0 issues**
-   - `cd test/rules && npm test` → **all** rules tests pass (321 after 3.0f1)
+   - `cd test/rules && npm test` → **all** rules tests pass (324 after JSa)
    - `flutter test` → all Dart tests pass (layout smoke tests and the kit check)
 6. **Commit after each step** with a clear message, e.g.
    `feat(teams): change requests for name, short name, logo and competitions; 250 rules tests; docs v2.12`
@@ -130,6 +130,10 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
   (in `DATA_MODEL.md`): short name "RUF B"; own juvenile names reserved in `teamNames`; the name is asked in the same
   "Add Juvenile" request ("B" by default); after approval **every** juvenile match shows the new name, played ones too,
   with the gold "Previously …" pill (`previous_name_pill.dart`, like 2.10c). **Build it next, in a new conversation.**
+- **JSa** done (9 Nov 2026, 324 rules tests, 165 Dart tests): a club in both competitions plays its juvenile matches as
+  "Royal Unique FC B" / "RUF B" (`side_name.dart`, `Team.sideName(category)`, rules `sideNamesOf`); a "B" crest has a gold
+  ring (`FixtureSide.isBSide`). Match saves are near the rules' **1000-expression limit**: compute things once per side
+  (`let`), and test a juvenile match change. Rules changed: Isaac deploys to dev. Next: **JSb** registration, then **JSc** ask the FA.
 - **Plan agreed 9 Nov 2026 (deadline Thu 12 Nov, 12:30 pm; Isaac's prompts in that conversation):** next, in order:
   1. **3.0f Notifications and Back** (mockup `3.0f-notifications-and-back.html`, N1–N3, **approved**): a tap marks only
      that note read (reads kept per note in `readMarks/{uid}`: note ID → the `updatedAt` read; a grouped note with a newer

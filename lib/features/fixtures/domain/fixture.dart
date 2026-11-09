@@ -5,6 +5,7 @@ import 'package:gedfa_connect/features/players/domain/age_group.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/teams/domain/kit.dart';
 import 'package:gedfa_connect/features/teams/domain/kit_slot.dart';
+import 'package:gedfa_connect/features/teams/domain/side_name.dart';
 
 enum FixtureStatus {
   scheduled,
@@ -12,9 +13,9 @@ enum FixtureStatus {
   cancelled;
 
   static FixtureStatus fromString(String? value) => values.firstWhere(
-        (s) => s.name == value,
-        orElse: () => FixtureStatus.scheduled,
-      );
+    (s) => s.name == value,
+    orElse: () => FixtureStatus.scheduled,
+  );
 }
 
 /// One side of a match, copied from the team when the FA saves the match
@@ -37,22 +38,29 @@ class FixtureSide {
   /// The team's main home colour: behind the initials when there's no logo.
   final Color colour;
 
+  /// A club's juvenile side playing as its name with " B" ("RUF B"): its
+  /// crest gets a gold ring (juvenile side names, mockup JS5).
+  bool get isBSide => isBSideShortName(shortName);
+
+  /// What goes on the crest: "RUF" for "RUF B" (the ring says "B").
+  String get crestLabel =>
+      isBSide ? shortName.substring(0, shortName.length - 2) : shortName;
+
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'name': name,
-        'shortName': shortName,
-        'logoUrl': logoUrl,
-        'colour': colorToHex(colour),
-      };
+    'id': id,
+    'name': name,
+    'shortName': shortName,
+    'logoUrl': logoUrl,
+    'colour': colorToHex(colour),
+  };
 
   static FixtureSide fromMap(Map<String, dynamic>? map) => FixtureSide(
-        id: map?['id'] as String? ?? '',
-        name: map?['name'] as String? ?? '',
-        shortName: map?['shortName'] as String? ?? '',
-        logoUrl: map?['logoUrl'] as String?,
-        colour: colorFromHex(map?['colour'] as String?) ??
-            const Color(0xFF1E88E5),
-      );
+    id: map?['id'] as String? ?? '',
+    name: map?['name'] as String? ?? '',
+    shortName: map?['shortName'] as String? ?? '',
+    logoUrl: map?['logoUrl'] as String?,
+    colour: colorFromHex(map?['colour'] as String?) ?? const Color(0xFF1E88E5),
+  );
 }
 
 /// The kit a side wears in a match: which of the team's kits ([slot]), and
@@ -93,11 +101,11 @@ class MatchKits {
   final KitChoice awayGk;
 
   Map<String, dynamic> toMap() => {
-        'home': home.toMap(),
-        'away': away.toMap(),
-        'homeGk': homeGk.toMap(),
-        'awayGk': awayGk.toMap(),
-      };
+    'home': home.toMap(),
+    'away': away.toMap(),
+    'homeGk': homeGk.toMap(),
+    'awayGk': awayGk.toMap(),
+  };
 
   static MatchKits? fromMap(Map<String, dynamic>? map) {
     KitChoice? read(String key) =>
@@ -211,15 +219,15 @@ class Fixture {
 extension JuvenileMatchRules on AgeGroup {
   /// "2 × 45 min"
   String get matchLengthText => switch (this) {
-        AgeGroup.u17 => '2 × 45 min',
-        AgeGroup.u15 => '2 × 40 min',
-        AgeGroup.u13 => '2 × 25 min',
-      };
+    AgeGroup.u17 => '2 × 45 min',
+    AgeGroup.u15 => '2 × 40 min',
+    AgeGroup.u13 => '2 × 25 min',
+  };
 
   /// Who may play up into this group, or null for U13.
   String? get playUpText => switch (this) {
-        AgeGroup.u17 => 'Up to 1 U13 and 5 U15 playing up',
-        AgeGroup.u15 => 'U13 players may play up',
-        AgeGroup.u13 => null,
-      };
+    AgeGroup.u17 => 'Up to 1 U13 and 5 U15 playing up',
+    AgeGroup.u15 => 'U13 players may play up',
+    AgeGroup.u13 => null,
+  };
 }

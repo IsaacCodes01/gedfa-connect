@@ -3031,7 +3031,7 @@ describe('Fixtures (3.0a)', () => {
     const juvenile = fixtureData({
       competitionId: '2026-27_juvenile-league', category: 'juvenile', ageGroup: 'U15',
       teamIds: ['colts', 'youth'],
-      home: { id: 'colts', name: 'Apam Colts', shortName: 'APC', logoUrl: null, colour: '#1E5BC6' },
+      home: { id: 'colts', name: 'Apam Colts B', shortName: 'APC B', logoUrl: null, colour: '#1E5BC6' },
       away: { id: 'youth', name: 'Afransi Youth', shortName: 'AFY', logoUrl: null, colour: '#7A1F2B' },
       kits: {
         home: { slot: 'home', kit: COLTS_JUVENILE_KITS.home },
@@ -3045,6 +3045,70 @@ describe('Fixtures (3.0a)', () => {
     // The Colts' Division kit in a juvenile match is not their juvenile kit
     await assertFails(addFixture(dbAs('fa1'), 'j3', {
       ...juvenile, kits: { ...juvenile.kits, home: { slot: 'home', kit: STARS_KITS.home } },
+    }));
+  });
+
+  // Juvenile side names: a club in both plays its juvenile matches as
+  // "Apam Colts B" ("APC B"), or under its own juvenile name
+  function coltsYouth(colts) {
+    return fixtureData({
+      competitionId: '2026-27_juvenile-league', category: 'juvenile', ageGroup: 'U13',
+      teamIds: ['colts', 'youth'],
+      home: { id: 'colts', logoUrl: null, colour: '#1E5BC6', ...colts },
+      away: { id: 'youth', name: 'Afransi Youth', shortName: 'AFY', logoUrl: null, colour: '#7A1F2B' },
+      kits: {
+        home: { slot: 'home', kit: COLTS_JUVENILE_KITS.home },
+        away: { slot: 'away', kit: ROYAL_KITS.away },
+        homeGk: { slot: 'goalkeeper', kit: COLTS_JUVENILE_KITS.goalkeeper },
+        awayGk: { slot: 'goalkeeper', kit: ROYAL_KITS.goalkeeper },
+      },
+    });
+  }
+
+  it('a club in both plays its juvenile matches as "<name> B" ("APC B")', async () => {
+    const db = dbAs('fa1');
+    await assertSucceeds(addFixture(db, 'b1', coltsYouth({ name: 'Apam Colts B', shortName: 'APC B' })));
+    // ...and it can be changed later (stays under the rules' 1000-expression limit)
+    await assertSucceeds(changeFixture(db, 'b1', { status: 'postponed', kickoffAt: null, note: 'Pitch waterlogged' }));
+    // The club's own name is its Division side, not its juvenile side
+    await assertFails(addFixture(db, 'b2', coltsYouth({ name: 'Apam Colts', shortName: 'APC' })));
+    // Both the name and the short name carry the B
+    await assertFails(addFixture(db, 'b3', coltsYouth({ name: 'Apam Colts B', shortName: 'APC' })));
+    await assertFails(addFixture(db, 'b4', coltsYouth({ name: 'Apam Colts', shortName: 'APC B' })));
+  });
+
+  it('a juvenile side with its own name plays under that name, not "B"', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), `${D}/teams/colts`), {
+        juvenileName: 'Apam Colts Juniors', juvenileShortName: 'ACJ',
+      });
+    });
+    const db = dbAs('fa1');
+    await assertSucceeds(addFixture(db, 'o1', coltsYouth({ name: 'Apam Colts Juniors', shortName: 'ACJ' })));
+    await assertFails(addFixture(db, 'o2', coltsYouth({ name: 'Apam Colts B', shortName: 'APC B' })));
+  });
+
+  it('a club in one competition never gets a "B", and Division keeps the club name', async () => {
+    const db = dbAs('fa1');
+    // Afransi Youth is Juvenile only: its own name, no B
+    const withB = coltsYouth({ name: 'Apam Colts B', shortName: 'APC B' });
+    await assertFails(addFixture(db, 'n1', {
+      ...withB, away: { ...withB.away, name: 'Afransi Youth B', shortName: 'AFY B' },
+    }));
+    // The Colts' Division side plays as Apam Colts
+    const division = fixtureData({
+      teamIds: ['colts', 'stars'],
+      home: { id: 'colts', name: 'Apam Colts', shortName: 'APC', logoUrl: null, colour: '#D71920' },
+      kits: {
+        home: { slot: 'home', kit: STARS_KITS.home },
+        away: { slot: 'away', kit: STARS_KITS.away },
+        homeGk: { slot: 'goalkeeper', kit: STARS_KITS.goalkeeper },
+        awayGk: { slot: 'goalkeeper', kit: STARS_KITS.goalkeeper },
+      },
+    });
+    await assertSucceeds(addFixture(db, 'n2', division));
+    await assertFails(addFixture(db, 'n3', {
+      ...division, home: { ...division.home, name: 'Apam Colts B', shortName: 'APC B' },
     }));
   });
 

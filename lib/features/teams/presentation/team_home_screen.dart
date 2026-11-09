@@ -86,7 +86,8 @@ class _TeamHomeScreenState extends ConsumerState<TeamHomeScreen> {
             body: const EmptyView(
               icon: Icons.shield_outlined,
               title: 'No team linked',
-              message: 'Your account is not linked to a team yet. '
+              message:
+                  'Your account is not linked to a team yet. '
                   'Please contact the FA.',
             ),
           );
@@ -97,35 +98,40 @@ class _TeamHomeScreenState extends ConsumerState<TeamHomeScreen> {
   }
 
   Widget _buildForTeam(Team team) {
-    final competition = _competition != null &&
-            team.categories.contains(_competition)
+    final competition =
+        _competition != null && team.categories.contains(_competition)
         ? _competition!
         : Competition.values.firstWhere(team.categories.contains);
     final isDivision = competition == Competition.division;
 
-    final squadCount = ref
+    final squadCount =
+        ref
             .watch(teamPlayersProvider)
             .value
             ?.where((p) => p.category == competition)
             .length ??
         0;
-    final addLabel =
-        isDivision ? 'Add player' : 'Add ${_ageGroup.label} player';
+    final addLabel = isDivision
+        ? 'Add player'
+        : 'Add ${_ageGroup.label} player';
     void add() => _addPlayer(juvenile: !isDivision);
 
     // Suspended (2.11c): the button greys out like a closed registration
     final suspension = team.isSuspended ? team.suspension : null;
     final playersOpen =
         (ref.watch(leagueSettingsProvider).value?.playerRegistrationOpen ??
-                true) &&
-            suspension == null;
+            true) &&
+        suspension == null;
 
     return Scaffold(
       appBar: GedfaAppBar(
-        title: team.name,
-        subtitle: [team.shortName, team.town]
-            .where((part) => part.isNotEmpty)
-            .join(' · '),
+        // Juvenile tab of a club in both: "Royal Unique FC B" (or the
+        // juvenile side's own name), as in its juvenile matches
+        title: team.sideName(competition),
+        subtitle: [
+          team.sideShortName(competition),
+          team.town,
+        ].where((part) => part.isNotEmpty).join(' · '),
         leading: Padding(
           padding: const EdgeInsets.only(left: 12),
           child: Center(
@@ -141,28 +147,30 @@ class _TeamHomeScreenState extends ConsumerState<TeamHomeScreen> {
       ),
       floatingActionButton: squadCount > 0
           ? playersOpen
-              ? FloatingActionButton.extended(
-                  onPressed: add,
-                  icon: const Icon(Icons.add_rounded),
-                  label: Text(addLabel),
-                )
-              // Board L3: greyed out; a tap explains why
-              : FloatingActionButton.extended(
-                  onPressed: add,
-                  elevation: 0,
-                  backgroundColor:
-                      Theme.of(context).colorScheme.surfaceContainerHighest,
-                  foregroundColor:
-                      Theme.of(context).colorScheme.onSurfaceVariant,
-                  icon: Icon(
-                    suspension == null
-                        ? Icons.lock_outline_rounded
-                        : Icons.block_rounded,
-                  ),
-                  label: Text(
-                    suspension == null ? '$addLabel (closed)' : addLabel,
-                  ),
-                )
+                ? FloatingActionButton.extended(
+                    onPressed: add,
+                    icon: const Icon(Icons.add_rounded),
+                    label: Text(addLabel),
+                  )
+                // Board L3: greyed out; a tap explains why
+                : FloatingActionButton.extended(
+                    onPressed: add,
+                    elevation: 0,
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
+                    foregroundColor: Theme.of(
+                      context,
+                    ).colorScheme.onSurfaceVariant,
+                    icon: Icon(
+                      suspension == null
+                          ? Icons.lock_outline_rounded
+                          : Icons.block_rounded,
+                    ),
+                    label: Text(
+                      suspension == null ? '$addLabel (closed)' : addLabel,
+                    ),
+                  )
           : null,
       body: Column(
         children: [
@@ -215,19 +223,21 @@ class _TeamHomeScreenState extends ConsumerState<TeamHomeScreen> {
                 ),
               ),
             ),
-          Expanded(child: _SquadBody(
-            competition: competition,
-            ageGroup: _ageGroup,
-            onAgeGroupChanged: (group) => setState(() {
-              _ageGroup = group;
-              _status = null;
-            }),
-            status: _status,
-            search: _search,
-            onStatusChanged: (status) => setState(() => _status = status),
-            onSearchChanged: () => setState(() {}),
-            onAddPlayer: add,
-          )),
+          Expanded(
+            child: _SquadBody(
+              competition: competition,
+              ageGroup: _ageGroup,
+              onAgeGroupChanged: (group) => setState(() {
+                _ageGroup = group;
+                _status = null;
+              }),
+              status: _status,
+              search: _search,
+              onStatusChanged: (status) => setState(() => _status = status),
+              onSearchChanged: () => setState(() {}),
+              onAddPlayer: add,
+            ),
+          ),
         ],
       ),
     );
@@ -274,8 +284,9 @@ class _SquadBody extends ConsumerWidget {
         onRetry: () => ref.invalidate(teamPlayersProvider),
       ),
       data: (allPlayers) {
-        final competitionPlayers =
-            allPlayers.where((p) => p.category == competition).toList();
+        final competitionPlayers = allPlayers
+            .where((p) => p.category == competition)
+            .toList();
         // Juvenile: one age group at a time (board J1)
         final squad = isDivision
             ? competitionPlayers
@@ -297,8 +308,9 @@ class _SquadBody extends ConsumerWidget {
                 waiting: {
                   for (final g in AgeGroup.values)
                     g: competitionPlayers
-                        .where((p) =>
-                            p.ageGroup == g && p.isWaitingForScreening)
+                        .where(
+                          (p) => p.ageGroup == g && p.isWaitingForScreening,
+                        )
                         .length,
                 },
               );
@@ -319,7 +331,8 @@ class _SquadBody extends ConsumerWidget {
                     EmptyView(
                       icon: Icons.groups_outlined,
                       title: 'No ${ageGroup.label} players yet',
-                      message: 'Add them now. They wait for the FA\'s '
+                      message:
+                          'Add them now. They wait for the FA\'s '
                           'screening day, where each child is checked in '
                           'person.',
                     ),
@@ -402,8 +415,9 @@ class _SquadBody extends ConsumerWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     child: Text(
                       hint,
-                      style: textTheme.bodySmall
-                          ?.copyWith(color: scheme.onSurfaceVariant),
+                      style: textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -439,11 +453,13 @@ class _SquadBody extends ConsumerWidget {
                               text: rejected == 1
                                   ? '1 player was not approved. '
                                   : '$rejected players were not approved. ',
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w700),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                             const TextSpan(
-                              text: "Open the player to read the FA's "
+                              text:
+                                  "Open the player to read the FA's "
                                   'reason, correct the details and resubmit.',
                             ),
                           ],
@@ -457,8 +473,9 @@ class _SquadBody extends ConsumerWidget {
                       child: Text(
                         'No players match.',
                         textAlign: TextAlign.center,
-                        style: textTheme.bodyMedium
-                            ?.copyWith(color: scheme.onSurfaceVariant),
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
                       ),
                     )
                   else
@@ -477,10 +494,10 @@ class _SquadBody extends ConsumerWidget {
   }
 
   static String _statusWord(ApprovalStatus status) => switch (status) {
-        ApprovalStatus.approved => 'approved',
-        ApprovalStatus.pending => 'pending',
-        ApprovalStatus.rejected => 'rejected',
-      };
+    ApprovalStatus.approved => 'approved',
+    ApprovalStatus.pending => 'pending',
+    ApprovalStatus.rejected => 'rejected',
+  };
 }
 
 /// Board J1: U13 · 14 | U15 · 18 | U17 · 21, and a line saying who fits.
@@ -559,8 +576,9 @@ class _AgeGroupTabs extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 4),
           child: Text(
             '${selected.bornText()}. Younger players can play up.',
-            style:
-                textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+            style: textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
           ),
         ),
       ],
@@ -622,10 +640,9 @@ class _StatusTile extends StatelessWidget {
                   ),
                   Text(
                     label,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(color: scheme.onSurfaceVariant),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
                   ),
                 ],
               ),
@@ -682,16 +699,17 @@ class _ClosedBanner extends StatelessWidget {
                     style: TextStyle(fontWeight: FontWeight.w700),
                   ),
                   TextSpan(
-                    text: 'You can still correct players the FA rejected. '
+                    text:
+                        'You can still correct players the FA rejected. '
                         'New players can be added when the FA opens it again.',
                   ),
                 ],
               ),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontSize: 12.5,
-                    height: 1.5,
-                    color: ink,
-                  ),
+                fontSize: 12.5,
+                height: 1.5,
+                color: ink,
+              ),
             ),
           ),
         ],
@@ -711,39 +729,45 @@ class _EmptySquad extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
 
     Widget step(int number, String title, String text) => Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CircleAvatar(
-                radius: 13,
-                backgroundColor: scheme.primary.withValues(alpha: 0.14),
-                child: Text(
-                  '$number',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: scheme.primary,
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: 13,
+            backgroundColor: scheme.primary.withValues(alpha: 0.14),
+            child: Text(
+              '$number',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: scheme.primary,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title,
-                        style: textTheme.titleSmall
-                            ?.copyWith(fontWeight: FontWeight.w600)),
-                    Text(text,
-                        style: textTheme.bodySmall
-                            ?.copyWith(color: scheme.onSurfaceVariant)),
-                  ],
+                Text(
+                  text,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        );
+        ],
+      ),
+    );
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -764,20 +788,27 @@ class _EmptySquad extends StatelessWidget {
                     CircleAvatar(
                       radius: 30,
                       backgroundColor: AppColors.approvedBg,
-                      child: const Icon(Icons.check_rounded,
-                          size: 32, color: AppColors.approvedText),
+                      child: const Icon(
+                        Icons.check_rounded,
+                        size: 32,
+                        color: AppColors.approvedText,
+                      ),
                     ),
                     const SizedBox(height: 10),
-                    Text('Your team is approved',
-                        style: textTheme.titleLarge
-                            ?.copyWith(fontWeight: FontWeight.w600)),
+                    Text(
+                      'Your team is approved',
+                      style: textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     const SizedBox(height: 4),
                     Text(
                       'Next, add your Division players. The FA approves each '
                       'one before they can play.',
                       textAlign: TextAlign.center,
-                      style: textTheme.bodyMedium
-                          ?.copyWith(color: scheme.onSurfaceVariant),
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     SizedBox(
@@ -802,19 +833,30 @@ class _EmptySquad extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('HOW IT WORKS',
-                        style: textTheme.labelMedium?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                          letterSpacing: 0.6,
-                          fontWeight: FontWeight.w600,
-                        )),
+                    Text(
+                      'HOW IT WORKS',
+                      style: textTheme.labelMedium?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        letterSpacing: 0.6,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     const SizedBox(height: 10),
-                    step(1, 'Add your players',
-                        'Name, date of birth, position, jersey number and a passport photo.'),
-                    step(2, 'The FA checks each player',
-                        "You'll see Pending, Approved or the reason it was rejected."),
-                    step(3, 'Approved players can play',
-                        'Only they appear on team sheets.'),
+                    step(
+                      1,
+                      'Add your players',
+                      'Name, date of birth, position, jersey number and a passport photo.',
+                    ),
+                    step(
+                      2,
+                      'The FA checks each player',
+                      "You'll see Pending, Approved or the reason it was rejected.",
+                    ),
+                    step(
+                      3,
+                      'Approved players can play',
+                      'Only they appear on team sheets.',
+                    ),
                   ],
                 ),
               ),

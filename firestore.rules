@@ -1127,13 +1127,27 @@ service cloud.firestore {
           : team.get('kits', {});
       }
 
-      // { slot, kit }: one of the team's own kits, copied exactly
-      function isKitChoice(choice, team, category, slots) {
+      // { slot, kit }: one of the team's own kits ([kits], from kitsOf),
+      // copied exactly
+      function isKitChoice(choice, kits, slots) {
         return choice is map
           && choice.keys().hasOnly(['slot', 'kit'])
           && choice.get('slot', '') in slots
-          && kitsOf(team, category).get(choice.slot, null) != null
-          && choice.get('kit', null) == kitsOf(team, category)[choice.slot];
+          && kits.get(choice.slot, null) != null
+          && choice.get('kit', null) == kits[choice.slot];
+      }
+
+      // Juvenile side names: a club in both competitions plays its juvenile
+      // matches under its own juvenile name, or its name with " B"
+      // ("Royal Unique FC B", "RUF B"). Everyone else plays as the club.
+      // The app does the same (side_name.dart).
+      // [name, shortName] in one go: a match save is close to the rules'
+      // limit of 1000 expressions, so this is worked out once per side.
+      function sideNamesOf(team, category) {
+        return category == 'juvenile' && team.get('categories', []).size() == 2
+          ? [team.get('juvenileName', team.name + ' B'),
+             team.get('juvenileShortName', team.get('shortName', '') + ' B')]
+          : [team.name, team.get('shortName', '')];
       }
 
       // One side of a match: { id, name, shortName, logoUrl, colour }.
@@ -1141,14 +1155,14 @@ service cloud.firestore {
       // match the team as it is now. The team must play this competition.
       function isFixtureSide(side, category, outfield, goalkeeper) {
         let team = get(teamDoc(side.id)).data;
+        let kits = kitsOf(team, category);
         return side.keys().hasOnly(['id', 'name', 'shortName', 'logoUrl', 'colour'])
           && team.get('categories', []).hasAny([category])
-          && side.get('name', '') == team.name
-          && side.get('shortName', '') == team.get('shortName', '')
+          && [side.get('name', ''), side.get('shortName', '')] == sideNamesOf(team, category)
           && side.get('logoUrl', null) == team.get('logoUrl', null)
           && isHexColour(side.get('colour', null))
-          && isKitChoice(outfield, team, category, ['home', 'away', 'third'])
-          && isKitChoice(goalkeeper, team, category, ['goalkeeper', 'goalkeeper2']);
+          && isKitChoice(outfield, kits, ['home', 'away', 'third'])
+          && isKitChoice(goalkeeper, kits, ['goalkeeper', 'goalkeeper2']);
       }
 
       // A match. A league match's competition is '<season>_<category>-league'

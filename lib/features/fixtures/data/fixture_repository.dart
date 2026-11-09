@@ -17,6 +17,7 @@ import 'package:gedfa_connect/features/players/domain/age_group.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/teams/domain/kit.dart';
 import 'package:gedfa_connect/features/teams/domain/kit_slot.dart';
+import 'package:gedfa_connect/features/teams/domain/side_name.dart';
 import 'package:gedfa_connect/features/teams/domain/team_colours.dart';
 
 const _timeout = Duration(seconds: 15);
@@ -69,11 +70,21 @@ class MatchTeam {
     final colours = TeamColours.fromMap(
       data['colours'] as Map<String, dynamic>?,
     );
+    // A club in both competitions plays its juvenile matches as
+    // "Royal Unique FC B" or its own juvenile name (juvenile side names)
+    final names = sideNames(
+      name: data['name'] as String? ?? '',
+      shortName: data['shortName'] as String? ?? '',
+      categories: Competition.fromList(data['categories'] as List<dynamic>?),
+      category: category,
+      juvenileName: data['juvenileName'] as String?,
+      juvenileShortName: data['juvenileShortName'] as String?,
+    );
     return MatchTeam(
       side: FixtureSide(
         id: id,
-        name: data['name'] as String? ?? '',
-        shortName: data['shortName'] as String? ?? '',
+        name: names.name,
+        shortName: names.shortName,
         logoUrl: data['logoUrl'] as String?,
         colour:
             colours?.home.main ??

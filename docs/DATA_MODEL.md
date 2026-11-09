@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.23, matches the rules after step 3.0f1 (9 Nov 2026)
+**Status:** v2.24, matches the rules after step JSa, juvenile side names (9 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -235,6 +235,8 @@ Created by an FA admin when approving a request.
 | `requestUid`           | string           | The`teamRequests` document it came from                  |
 | `lastCorrectionId`     | string?          | The FA's latest correction (`corrections/{id}`, 2.11a)     |
 | `suspension`           | map?             | Set by the chairman (2.11c): `id`, `reason`, `since`, `until` (null = until lifted), `byUid`, `byName` |
+| `juvenileName`         | string?          | **Club in both competitions only** (juvenile side names): its juvenile sides' own name (U13, U15 and U17 alike). Absent = they play as `name` + " B" ("Royal Unique FC B"). Set only by the FA (registration JSb, change request JSc); never by a direct team edit |
+| `juvenileShortName`    | string?          | Only with `juvenileName`: 3–4 capitals. Absent = `shortName` + " B" ("RUF B") |
 | `createdAt`            | timestamp        | Approval time                                              |
 | `updatedAt`            | timestamp        |                                                            |
 
@@ -594,7 +596,7 @@ One match. Made by the FA (one at a time in 3.0a; "Make the season" and cups fol
 | `ageGroup` | string? | **Juvenile only**: `U13`, `U15`, `U17`; never changes. Absent for Division |
 | `round` | number | The matchday, 1 to 99 |
 | `teamIds` | array | `[home.id, away.id]`, exactly (teams query their matches with `array-contains`) |
-| `home`, `away` | map | `{ id, name, shortName, logoUrl, colour }`: a **copy** of the team (teams can't read other teams). The rules check it matches the team document as it is now, and that the team plays this competition |
+| `home`, `away` | map | `{ id, name, shortName, logoUrl, colour }`: a **copy** of the team (teams can't read other teams). The rules check it matches the team document as it is now, and that the team plays this competition. In a **juvenile** match a club in both competitions is copied with its juvenile side's name: `juvenileName` / `juvenileShortName`, or `name` + " B" / `shortName` + " B" (rules `sideNamesOf`, app `side_name.dart`). A short name ending in " B" marks a "B" side (gold ring on its crest) |
 | `kits` | map | `{ home, away, homeGk, awayGk }`, each `{ slot, kit }`: which of the team's kits it wears and that kit **exactly as on the team** (juvenile kits for a club in both competitions). Outfield slots `home`/`away`/`third`, goalkeeper slots `goalkeeper`/`goalkeeper2` |
 | `kickoffAt` | timestamp? | Empty only while **postponed** with no new date |
 | `venue` | string | 2–80; the home team's ground unless the FA changes it |
@@ -837,6 +839,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 9 Nov 2026 | v2.24 (JSa, juvenile side names): `teams` gain optional `juvenileName` and `juvenileShortName` (set in JSb / JSc). A club in both competitions is copied into its juvenile matches as "Royal Unique FC B" / "RUF B", or its own juvenile name; the rules check it (`sideNamesOf`). Rules: the kits of a side are looked up once (`isKitChoice` takes the kits), to stay under the 1000-expression limit. 324 rules tests. |
 | 9 Nov 2026 | v2.23 (3.0f2): no data change. Pages opened from another tab, or from a full-screen page, carry `back=` in their address (where ← goes). 321 rules tests. |
 | 9 Nov 2026 | v2.23 (3.0f1): `readMarks/{uid}` gains `reads` (map, at most 100): a tap marks only that note read; Notification details page. Owner-only, as before. 321 rules tests. |
 | 9 Nov 2026 | v2.22 (3.0c1d): new `postponeJobs/{competitionId}` (FA only): a league's postpone is saved before any match moves and ticked off in the same batch as each match, so a stopped one is finished later and nothing moves twice; deleted with the last notes. 318 rules tests. |

@@ -6,24 +6,56 @@ import 'package:gedfa_connect/features/fixtures/domain/fixture.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/team_logo.dart';
 
 /// A team's crest in a match: its logo, or its short name on its colour.
+/// A "B" side (a club's juvenile side, "RUF B") gets a thin gold ring,
+/// in the same space, so rows keep their size (mockup JS5).
 class FixtureCrest extends StatelessWidget {
   const FixtureCrest({super.key, required this.side, this.size = 32});
 
   final FixtureSide side;
   final double size;
 
+  /// The white gap and the gold ring around a "B" side's crest
+  static const _gap = 2.0;
+  static const _ring = 1.5;
+
   @override
   Widget build(BuildContext context) {
-    final label = side.shortName.isNotEmpty
-        ? side.shortName
+    final label = side.crestLabel.isNotEmpty
+        ? side.crestLabel
         : side.name.isEmpty
-            ? '?'
-            : side.name.substring(0, 1).toUpperCase();
-    return TeamLogo(
-      label: label,
-      color: side.colour,
-      url: side.logoUrl,
-      size: size,
+        ? '?'
+        : side.name.substring(0, 1).toUpperCase();
+    if (!side.isBSide) {
+      return TeamLogo(
+        label: label,
+        color: side.colour,
+        url: side.logoUrl,
+        size: size,
+      );
+    }
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Semantics(
+      label: '${side.name}, juvenile side',
+      child: Container(
+        width: size,
+        height: size,
+        padding: const EdgeInsets.all(_gap),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Theme.of(context).colorScheme.surface,
+          border: Border.all(
+            color: isDark ? const Color(0xFFF5D25B) : const Color(0xFF8A6A00),
+            width: _ring,
+          ),
+        ),
+        child: TeamLogo(
+          label: label,
+          color: side.colour,
+          url: side.logoUrl,
+          size: size - 2 * (_gap + _ring),
+        ),
+      ),
     );
   }
 }
@@ -86,10 +118,8 @@ class FixtureRow extends StatelessWidget {
 
     final tags = <Widget>[
       if (group != null) FixtureTag(group.label, tone: AccentTone.gold),
-      if (f.isPostponed)
-        const FixtureTag('Postponed', tone: AccentTone.red),
-      if (f.isCancelled)
-        const FixtureTag('Cancelled', tone: AccentTone.red),
+      if (f.isPostponed) const FixtureTag('Postponed', tone: AccentTone.red),
+      if (f.isCancelled) const FixtureTag('Cancelled', tone: AccentTone.red),
       if (showJuvenileRules && group != null) ...[
         FixtureTag(group.matchLengthText),
         if (group.playUpText case final text?) FixtureTag(text),
@@ -98,9 +128,10 @@ class FixtureRow extends StatelessWidget {
 
     return Semantics(
       button: onTap != null,
-      label: '${f.home.name} versus ${f.away.name}, '
+      label:
+          '${f.home.name} versus ${f.away.name}, '
           '${kickoff == null ? 'date to come' : '${formatShortDate(kickoff)} '
-              '${formatTime(kickoff)}'}, ${f.venue}'
+                    '${formatTime(kickoff)}'}, ${f.venue}'
           '${f.isPostponed ? ', postponed' : ''}'
           '${f.isCancelled ? ', cancelled' : ''}',
       excludeSemantics: true,
