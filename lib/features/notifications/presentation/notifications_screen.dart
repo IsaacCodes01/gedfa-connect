@@ -8,6 +8,7 @@ import 'package:gedfa_connect/core/widgets/app_toast.dart';
 import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/core/widgets/count_tabs.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
+import 'package:gedfa_connect/core/widgets/notification_bell.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/features/notifications/data/notifications_repository.dart';
@@ -89,6 +90,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     return Scaffold(
       appBar: GedfaAppBar(
         title: 'Notifications',
+        leading: const BellBackButton(),
         actions: [
           if (unread > 0)
             TextButton(
@@ -128,11 +130,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           isAnnouncement: true,
           onTap: () {
             _markRead(a.id, a.createdAt);
-            // The FA's announcement page is in the More tab: open() switches
-            // there with back= (a push over the bell would crash, 3.0f2)
+            // Full-screen above the bell, so ← comes back to it
             context.open(
               isFa
-                  ? Routes.adminAnnouncement(a.id)
+                  ? Routes.adminBellAnnouncement(a.id)
                   : Routes.teamAnnouncement(a.id),
             );
           },

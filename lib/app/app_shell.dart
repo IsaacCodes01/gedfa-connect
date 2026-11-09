@@ -111,9 +111,9 @@ class AppShell extends ConsumerStatefulWidget {
 }
 
 class _AppShellState extends ConsumerState<AppShell> {
-  /// Tabs whose screen was opened from Home. Going back to one of them
-  /// with the navigation bar opens its first screen instead, so it looks
-  /// as usual (no back arrow).
+  /// Tabs whose screen was opened from Home, or from a note with `back=`
+  /// (3.0f2). Going back to one of them with the navigation bar opens its
+  /// first screen instead, so it looks as usual (no back arrow).
   final _openedFromHome = <int>{};
 
   StatefulNavigationShell get navigationShell => widget.navigationShell;

@@ -123,6 +123,8 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
   `open` pushes full-screen pages and same-tab pages; otherwise it uses go with `back=` (`Routes.withBack`), and
   `GedfaAppBar` adds ← to it. Never `push` a tab's page from a full-screen page: go_router crashes (Duplicate GlobalKey).
   `GoRouter.optionURLReflectsImperativeAPIs = true` in `main.dart`. Test: `test/back_navigation_test.dart`.
+  The bell's ← goes where it was opened (`bellOriginProvider` in `notification_bell.dart`). Never call
+  `GoRouterState.of` on a page pushed with `Navigator.push` / `MaterialPageRoute`: it loops forever (app freezes).
   Next: juvenile side names, then the team admin dashboard.
 - **Juvenile side names: mockup drawn** (9 Nov 2026), `docs/mockups/juvenile-side-names.html` (JS1–JS6). Isaac's answers
   (in `DATA_MODEL.md`): short name "RUF B"; own juvenile names reserved in `teamNames`; the name is asked in the same

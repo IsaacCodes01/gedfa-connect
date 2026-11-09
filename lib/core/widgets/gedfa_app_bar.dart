@@ -71,8 +71,11 @@ class GedfaAppBar extends StatelessWidget implements PreferredSizeWidget {
     );
   }
 
-  /// The page's `back=`; null outside go_router (tests, dialogs).
+  /// The page's `back=`; null outside go_router (tests, dialogs, and
+  /// pages pushed by hand like "Coming soon", where looking it up would
+  /// never end and freeze the app).
   static String? _backParam(BuildContext context) {
+    if (ModalRoute.of(context)?.settings is! Page) return null;
     try {
       return Routes.backOf(GoRouterState.of(context).uri);
     } on GoError {

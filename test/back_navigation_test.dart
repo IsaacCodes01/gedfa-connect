@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
+import 'package:gedfa_connect/core/widgets/notification_bell.dart';
 import 'package:go_router/go_router.dart';
 
 /// Back (3.0f2) on a small copy of the app's shape: two tabs, a page
@@ -45,6 +47,28 @@ GoRouter _router() => GoRouter(
                     parentNavigatorKey: _rootKey,
                     builder: (_, _) => _page('note', fallback: '/a'),
                   ),
+                  // The bell and a note, full-screen like the app's
+                  GoRoute(
+                    path: 'bell',
+                    parentNavigatorKey: _rootKey,
+                    builder: (_, _) => Builder(builder: (context) {
+                      _ctx = context;
+                      return const Scaffold(
+                        appBar: GedfaAppBar(
+                          title: 'bell',
+                          leading: BellBackButton(),
+                        ),
+                        body: Text('page bell'),
+                      );
+                    }),
+                    routes: [
+                      GoRoute(
+                        path: 'note',
+                        parentNavigatorKey: _rootKey,
+                        builder: (_, _) => _page('bell note'),
+                      ),
+                    ],
+                  ),
                   GoRoute(
                     path: 'edit',
                     parentNavigatorKey: _rootKey,
@@ -61,9 +85,14 @@ GoRouter _router() => GoRouter(
       ],
     );
 
+final _container = ProviderContainer();
+
 Future<GoRouter> _start(WidgetTester tester) async {
   final router = _router();
-  await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+  await tester.pumpWidget(UncontrolledProviderScope(
+    container: _container,
+    child: MaterialApp.router(routerConfig: router),
+  ));
   await tester.pumpAndSettle();
   return router;
 }
@@ -123,5 +152,44 @@ void main() {
     _ctx.goBack('/a');
     await t.pumpAndSettle();
     expect(find.text('page A'), findsOneWidget);
+  });
+
+  testWidgets('a page pushed by hand ("Coming soon") does not freeze',
+      (t) async {
+    await _start(t);
+    Navigator.of(_ctx).push(MaterialPageRoute<void>(
+      builder: (_) => const Scaffold(
+        appBar: GedfaAppBar(title: 'Coming soon'),
+        body: Text('soon'),
+      ),
+    ));
+    await t.pumpAndSettle();
+    expect(find.text('soon'), findsOneWidget);
+  });
+
+  testWidgets("the bell's ← goes where it was opened, after another tab",
+      (t) async {
+    final router = await _start(t);
+    router.go('/b');
+    await t.pumpAndSettle();
+    // Opened from tab B (the bell's address is under tab A, like Teams)
+    _container.read(bellOriginProvider.notifier).set('/b');
+    router.push('/a/bell');
+    await t.pumpAndSettle();
+    _ctx.open('/a/bell/note');
+    await t.pumpAndSettle();
+    // A tab's page from the note's button: go with back=
+    t.element(find.text('page bell note')).open('/a/list');
+    await t.pumpAndSettle();
+    expect(find.text('page A list'), findsOneWidget);
+    await t.tap(find.byType(BackButton)); // → the note
+    await t.pumpAndSettle();
+    expect(find.text('page bell note'), findsOneWidget);
+    await t.tap(find.byType(BackButton)); // → the bell
+    await t.pumpAndSettle();
+    expect(find.text('page bell'), findsOneWidget);
+    await t.tap(find.byType(BackButton)); // → tab B, not tab A
+    await t.pumpAndSettle();
+    expect(find.text('page B'), findsOneWidget);
   });
 }

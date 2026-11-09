@@ -50,6 +50,11 @@ class Routes {
 
   /// One note's details (3.0f), for the FA and for teams.
   static String adminNote(String id) => '$adminNotifications/note/$id';
+
+  /// An announcement opened from the FA's bell: full-screen above the bell,
+  /// not the one in the More tab (so ← goes back to the bell).
+  static String adminBellAnnouncement(String id) =>
+      '$adminNotifications/announcement/$id';
   static const adminAnnouncements = '/admin/more/announcements';
   static const adminNewAnnouncement = '/admin/more/announcements/new';
   static String adminAnnouncement(String id) =>

@@ -125,7 +125,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, state, navigationShell) => AppShell(
           navigationShell: navigationShell,
           destinations: adminDestinations,
-          openedFromHome: Routes.isFromHome(state.uri),
+          openedFromHome: Routes.isFromHome(state.uri) ||
+              Routes.backOf(state.uri) != null,
         ),
         branches: [
           // Tab 0: Home (the dashboard, 2.12)
@@ -187,6 +188,14 @@ final routerProvider = Provider<GoRouter>((ref) {
                         path: 'note/:id',
                         parentNavigatorKey: rootNavigatorKey,
                         builder: (_, state) => NotificationDetailsScreen(
+                          id: state.pathParameters['id']!,
+                        ),
+                      ),
+                      // An announcement, opened from the bell
+                      GoRoute(
+                        path: 'announcement/:id',
+                        parentNavigatorKey: rootNavigatorKey,
+                        builder: (_, state) => FaAnnouncementScreen(
                           id: state.pathParameters['id']!,
                         ),
                       ),
@@ -441,9 +450,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       // Team admin area: a shell with tabs (Squad, Positions, More).
       StatefulShellRoute.indexedStack(
-        builder: (_, _, navigationShell) => AppShell(
+        builder: (_, state, navigationShell) => AppShell(
           navigationShell: navigationShell,
           destinations: teamDestinations,
+          // Opened from a note with back= (3.0f2)
+          openedFromHome: Routes.backOf(state.uri) != null,
         ),
         branches: [
           // Tab 0: Squad
