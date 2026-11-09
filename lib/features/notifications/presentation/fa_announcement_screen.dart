@@ -9,6 +9,7 @@ import 'package:gedfa_connect/core/widgets/app_toast.dart';
 import 'package:gedfa_connect/core/widgets/count_tabs.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/features/notifications/data/notifications_repository.dart';
 import 'package:gedfa_connect/features/notifications/domain/announcement.dart';
 import 'package:gedfa_connect/features/notifications/presentation/announcement_screen.dart';
@@ -19,7 +20,6 @@ import 'package:gedfa_connect/features/settings/presentation/more_screen.dart'
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/team.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/team_logo.dart';
-import 'package:go_router/go_router.dart';
 
 /// FA: one announcement, who has seen it (logos), unpin and delete.
 class FaAnnouncementScreen extends ConsumerStatefulWidget {
@@ -78,7 +78,7 @@ class _FaAnnouncementScreenState extends ConsumerState<FaAnnouncementScreen> {
       await ref.read(notificationsRepositoryProvider).delete(a.id);
       if (!mounted) return;
       AppToast.success(context, 'Announcement deleted.');
-      context.go(Routes.adminAnnouncements);
+      context.goBack(Routes.adminAnnouncements);
     } catch (error) {
       if (mounted) AppToast.error(context, appErrorMessage(error));
     }
@@ -93,11 +93,7 @@ class _FaAnnouncementScreenState extends ConsumerState<FaAnnouncementScreen> {
       appBar: GedfaAppBar(
         title: 'Announcement',
         subtitle: a == null ? null : 'Sent to ${a.to.label.toLowerCase()}',
-        leading: BackButton(
-          onPressed: () => context.canPop()
-              ? context.pop()
-              : context.go(Routes.adminAnnouncements),
-        ),
+        leading: const AppBackButton(fallback: Routes.adminAnnouncements),
         actions: [
           if (a != null)
             PopupMenuButton<String>(

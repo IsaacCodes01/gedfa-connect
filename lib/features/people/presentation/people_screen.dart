@@ -8,13 +8,13 @@ import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/widgets/count_tabs.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/people/data/people_repository.dart';
 import 'package:gedfa_connect/features/people/domain/invite.dart';
 import 'package:gedfa_connect/features/people/domain/member.dart';
 import 'package:gedfa_connect/features/settings/presentation/more_screen.dart'
     show PersonAvatar;
-import 'package:go_router/go_router.dart';
 
 enum _Tab { fa, referees, invited }
 
@@ -50,7 +50,7 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
         subtitle: 'Gomoa East District FA',
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.go(Routes.adminInvite),
+        onPressed: () => context.open(Routes.adminInvite),
         icon: const Icon(Icons.person_add_alt_1_rounded),
         label: const Text('Invite someone'),
       ),
@@ -83,7 +83,7 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
               isYou: m.uid == myUid,
               subtitle: m.email,
               chip: _RoleChip.forMember(m),
-              onTap: () => context.go(Routes.adminMember(m.uid)),
+              onTap: () => context.open(Routes.adminMember(m.uid)),
             ),
         ],
       _Tab.referees => [
@@ -93,7 +93,7 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
               isYou: m.uid == myUid,
               subtitle: m.email,
               chip: _RoleChip.forMember(m),
-              onTap: () => context.go(Routes.adminMember(m.uid)),
+              onTap: () => context.open(Routes.adminMember(m.uid)),
             ),
         ],
       _Tab.invited => [
@@ -103,7 +103,7 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
               isYou: false,
               subtitle: '${roleLabelFor(i.role)} · ${_inviteState(i)}',
               chip: i.isExpired ? _RoleChip.expired() : _RoleChip.waiting(),
-              onTap: () => context.go(Routes.adminInviteReady(i.email)),
+              onTap: () => context.open(Routes.adminInviteReady(i.email)),
             ),
         ],
     };

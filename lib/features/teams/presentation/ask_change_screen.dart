@@ -8,6 +8,7 @@ import 'package:gedfa_connect/core/utils/initials.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/teams/data/team_change_repository.dart';
@@ -41,7 +42,7 @@ class AskChangeScreen extends ConsumerWidget {
       return Scaffold(
         appBar: GedfaAppBar(
           title: 'Ask the FA to change',
-          leading: BackButton(onPressed: () => context.go(Routes.teamClub)),
+          leading: const AppBackButton(fallback: Routes.teamClub),
         ),
         body: detailsAsync.hasError
             ? ErrorView(message: appErrorMessage(detailsAsync.error!))
@@ -105,7 +106,7 @@ class _FormState extends ConsumerState<_Form> {
     if (context.canPop()) {
       context.pop();
     } else {
-      context.go(Routes.teamClub);
+      context.goBack(Routes.teamClub);
     }
   }
 

@@ -220,7 +220,7 @@ class _FaScreeningDaysScreenState
                       onCancel: _cancel,
                       // Board J4: one child after another (2.14c)
                       onStart: (day) =>
-                          context.goKeepingHome(Routes.adminScreeningDay(day.id)),
+                          context.open(Routes.adminScreeningDay(day.id)),
                       // The countdown reached 0: show Start screening
                       onStarted: () {
                         if (mounted) setState(() {});

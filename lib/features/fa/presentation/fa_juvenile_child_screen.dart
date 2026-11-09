@@ -16,7 +16,6 @@ import 'package:gedfa_connect/features/players/domain/player.dart';
 import 'package:gedfa_connect/features/players/presentation/widgets/player_photo.dart';
 import 'package:gedfa_connect/features/screening/data/screening_repository.dart';
 import 'package:gedfa_connect/features/screening/presentation/widgets/screening_countdown.dart';
-import 'package:go_router/go_router.dart';
 
 /// FA: one juvenile child, read only (Isaac, 3 Nov 2026). Opened from
 /// Players › Juvenile › a team. Shows what the FA needs on the screening
@@ -32,15 +31,9 @@ class FaJuvenileChildScreen extends ConsumerWidget {
     final playerAsync = ref.watch(playerProvider(playerId));
     final player = playerAsync.value;
 
-    void back() {
-      if (context.canPop()) {
-        context.pop();
-      } else if (player != null) {
-        context.goKeepingHome(Routes.adminTeamJuvenile(player.teamId));
-      } else {
-        context.goKeepingHome(Routes.adminPlayersJuvenile);
-      }
-    }
+    void back() => context.goBack(player == null
+        ? Routes.adminPlayersJuvenile
+        : Routes.adminTeamJuvenile(player.teamId));
 
     return Scaffold(
       appBar: GedfaAppBar(
@@ -303,7 +296,7 @@ class _ScreenButtonState extends ConsumerState<_ScreenButton> {
                   FilledButton.icon(
                     onPressed: openDay == null
                         ? null
-                        : () => context.goKeepingHome(Routes.adminScreeningDay(
+                        : () => context.open(Routes.adminScreeningDay(
                               openDay.id,
                               childId: player.id,
                             )),

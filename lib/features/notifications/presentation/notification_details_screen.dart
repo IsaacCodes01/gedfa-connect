@@ -6,12 +6,12 @@ import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/features/notifications/data/notifications_repository.dart';
 import 'package:gedfa_connect/features/notifications/domain/app_notification.dart';
 import 'package:gedfa_connect/features/notifications/presentation/widgets/note_look.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
-import 'package:go_router/go_router.dart';
 
 /// Notification details (3.0f, N2): the whole note, every name, who it is
 /// from, and a button to where it is about. Opening it marks only this
@@ -108,7 +108,7 @@ class _NotificationDetailsScreenState
           ? null
           : _OpenBar(
               label: target.button,
-              onOpen: () => context.go(target.target),
+              onOpen: () => context.open(target.target),
             ),
     );
   }

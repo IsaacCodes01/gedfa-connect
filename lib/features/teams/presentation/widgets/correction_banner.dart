@@ -4,10 +4,10 @@ import 'package:gedfa_connect/app/routes.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/teams/data/correction_request_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/correction_request.dart';
-import 'package:go_router/go_router.dart';
 
 /// Team › Squad: "The FA asked you to correct" (2.11b, mockup B3). Stays
 /// until the team taps "Send back to the FA"; then a short line says the
@@ -139,7 +139,7 @@ class _CorrectionBannerState extends ConsumerState<CorrectionBanner> {
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: _busy ? null : () => context.go(Routes.teamClub),
+                  onPressed: _busy ? null : () => context.open(Routes.teamClub),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: ink,
                     backgroundColor: isDark ? null : Colors.white,

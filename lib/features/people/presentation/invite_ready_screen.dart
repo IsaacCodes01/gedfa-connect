@@ -12,11 +12,11 @@ import 'package:gedfa_connect/core/utils/open_link.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/people/data/people_repository.dart';
 import 'package:gedfa_connect/features/people/domain/invite.dart';
-import 'package:go_router/go_router.dart';
 
 /// "a referee" or "an FA official".
 String roleWithArticle(UserRole role) =>
@@ -86,7 +86,7 @@ class _InviteReadyScreenState extends ConsumerState<InviteReadyScreen> {
       await ref.read(peopleRepositoryProvider).cancel(invite, by: me);
       if (!mounted) return;
       AppToast.success(context, 'Invitation cancelled.');
-      context.go(Routes.adminPeople);
+      context.goBack(Routes.adminPeople);
     } catch (error) {
       if (mounted) AppToast.error(context, appErrorMessage(error));
     } finally {
@@ -101,7 +101,7 @@ class _InviteReadyScreenState extends ConsumerState<InviteReadyScreen> {
     return Scaffold(
       appBar: GedfaAppBar(
         title: 'Invitation',
-        leading: CloseButton(onPressed: () => context.go(Routes.adminPeople)),
+        leading: const AppBackButton(fallback: Routes.adminPeople, close: true),
       ),
       body: inviteAsync.when(
         loading: () => const LoadingView(),

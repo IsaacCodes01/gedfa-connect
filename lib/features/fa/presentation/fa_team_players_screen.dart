@@ -148,8 +148,7 @@ class _FaTeamPlayersScreenState extends ConsumerState<FaTeamPlayersScreen> {
       appBar: GedfaAppBar(
         title: team?.name ?? 'Team players',
         subtitle: subtitle,
-        leading: BackButton(onPressed: () =>
-            context.goKeepingHome(Routes.adminPlayers)),
+        leading: const AppBackButton(fallback: Routes.adminPlayers),
         actions: [
           if (pending > 0)
             TextButton(

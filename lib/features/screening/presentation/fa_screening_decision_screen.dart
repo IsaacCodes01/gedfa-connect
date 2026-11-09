@@ -108,7 +108,7 @@ class _FaScreeningDecisionScreenState
     super.dispose();
   }
 
-  void _back() => context.goKeepingHome(Routes.adminScreening);
+  void _back() => context.goBack(Routes.adminScreening);
 
   /// Waiting children for this day: by team, age group and number, with
   /// skipped children at the end.

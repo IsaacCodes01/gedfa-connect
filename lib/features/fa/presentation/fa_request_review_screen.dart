@@ -64,8 +64,7 @@ class FaRequestReviewScreen extends ConsumerWidget {
     return Scaffold(
       appBar: GedfaAppBar(
         title: 'Review request',
-        leading: BackButton(onPressed: () =>
-            context.goKeepingHome(Routes.admin)),
+        leading: const AppBackButton(fallback: Routes.admin),
         // An approved team: Ask the team to correct… (2.11b, B1)
         actions: request != null && request.status == ApprovalStatus.approved
             ? [_TeamMenu(teamId: teamNameKey(request.teamName))]
@@ -896,7 +895,7 @@ class _ReviewActionsState extends ConsumerState<_ReviewActions> {
           .approve(request, faUid: faUid);
       if (!mounted) return;
       AppToast.success(context, '${request.teamName} approved.');
-      context.goKeepingHome(Routes.admin);
+      context.goBack(Routes.admin);
     } catch (error) {
       if (mounted) AppToast.error(context, _messageFor(error));
     } finally {
@@ -934,7 +933,7 @@ class _ReviewActionsState extends ConsumerState<_ReviewActions> {
         context,
         'Request rejected. The club can see your reason.',
       );
-      context.goKeepingHome(Routes.admin);
+      context.goBack(Routes.admin);
     } catch (error) {
       if (mounted) AppToast.error(context, _messageFor(error));
     } finally {

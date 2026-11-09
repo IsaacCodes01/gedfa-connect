@@ -228,7 +228,7 @@ class _FaPlayerTeamsScreenState extends ConsumerState<FaPlayerTeamsScreen> {
                     team: team,
                     groups: stats[team.id] ?? const {},
                     onTap: () =>
-                        context.goKeepingHome(Routes.adminTeamJuvenile(team.id)),
+                        context.open(Routes.adminTeamJuvenile(team.id)),
                   ),
                   const SizedBox(height: 8),
                 ],
@@ -373,7 +373,7 @@ class _FaPlayerTeamsScreenState extends ConsumerState<FaPlayerTeamsScreen> {
                     team: team,
                     stats: stats[team.id] ?? _TeamStats(),
                     onTap: () =>
-                        context.goKeepingHome(Routes.adminTeamPlayers(team.id)),
+                        context.open(Routes.adminTeamPlayers(team.id)),
                   ),
                   const SizedBox(height: 8),
                 ],

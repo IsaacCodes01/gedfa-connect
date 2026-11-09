@@ -117,7 +117,13 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
 - **3.0f1** done (9 Nov 2026, 321 rules tests, 152 Dart tests): a tap opens Notification details
   (`notification_details_screen.dart`, `Routes.adminNote` / `Routes.teamNote`) and marks only that note read
   (`readMarks/{uid}.reads`, `ReadMark.isUnread`); icons, targets and button names in `widgets/note_look.dart`.
-  The details button still uses `context.go` (3.0f2 changes it). Rules changed: Isaac deploys to dev. Next: **3.0f2** Back.
+  Rules changed: Isaac deploys to dev.
+- **3.0f2** done (9 Nov 2026, 157 Dart tests, no rules change): open pages with **`context.open(route)`** and leave
+  with **`context.goBack(fallback)`** / **`AppBackButton(fallback:)`** (`core/widgets/back_to_home.dart`), not `context.go`.
+  `open` pushes full-screen pages and same-tab pages; otherwise it uses go with `back=` (`Routes.withBack`), and
+  `GedfaAppBar` adds ← to it. Never `push` a tab's page from a full-screen page: go_router crashes (Duplicate GlobalKey).
+  `GoRouter.optionURLReflectsImperativeAPIs = true` in `main.dart`. Test: `test/back_navigation_test.dart`.
+  Next: juvenile side names (mockup first), then the team admin dashboard.
 - **Plan agreed 9 Nov 2026 (deadline Thu 12 Nov, 12:30 pm; Isaac's prompts in that conversation):** next, in order:
   1. **3.0f Notifications and Back** (mockup `3.0f-notifications-and-back.html`, N1–N3, **approved**): a tap marks only
      that note read (reads kept per note in `readMarks/{uid}`: note ID → the `updatedAt` read; a grouped note with a newer

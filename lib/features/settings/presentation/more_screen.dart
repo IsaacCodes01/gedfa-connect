@@ -9,13 +9,13 @@ import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/initials.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/payments/data/payment_repository.dart';
 import 'package:gedfa_connect/features/settings/data/app_version_provider.dart';
 import 'package:gedfa_connect/features/settings/presentation/widgets/settings_widgets.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
-import 'package:go_router/go_router.dart';
 
 /// The "More" tab: a menu. Your account card at the top (opens My profile),
 /// then Team profile (team admins only), Settings, league and help links,
@@ -49,31 +49,31 @@ class MoreScreen extends ConsumerWidget {
                         icon: Icons.campaign_outlined,
                         title: 'Announcements',
                         subtitle: 'Messages to teams and referees',
-                        onTap: () => context.go(Routes.adminAnnouncements),
+                        onTap: () => context.open(Routes.adminAnnouncements),
                       ),
                       SettingsTile(
                         icon: Icons.child_care_outlined,
                         title: 'Juvenile screening',
                         subtitle: 'Screening days, announced to Juvenile teams',
-                        onTap: () => context.go(Routes.adminScreening),
+                        onTap: () => context.open(Routes.adminScreening),
                       ),
                       SettingsTile(
                         icon: Icons.tune_rounded,
                         title: 'League settings',
                         subtitle: 'Registration, squad numbers, season and fee',
-                        onTap: () => context.go(Routes.adminLeagueSettings),
+                        onTap: () => context.open(Routes.adminLeagueSettings),
                       ),
                       SettingsTile(
                         icon: Icons.payments_outlined,
                         title: 'Season fees',
                         subtitle: 'What each team has paid this season',
-                        onTap: () => context.go(Routes.adminFees),
+                        onTap: () => context.open(Routes.adminFees),
                       ),
                       SettingsTile(
                         icon: Icons.manage_accounts_outlined,
                         title: 'People and roles',
                         subtitle: 'FA officials, referees and invitations',
-                        onTap: () => context.go(Routes.adminPeople),
+                        onTap: () => context.open(Routes.adminPeople),
                       ),
                     ],
                   ),
@@ -87,14 +87,14 @@ class MoreScreen extends ConsumerWidget {
                         icon: Icons.shield_outlined,
                         title: 'Team profile',
                         subtitle: 'Name, logo, kits and officials',
-                        onTap: () => context.go(Routes.teamClub),
+                        onTap: () => context.open(Routes.teamClub),
                       ),
                     if (isTeamAdmin) const _SeasonFeeTile(),
                     SettingsTile(
                       icon: Icons.settings_outlined,
                       title: 'Settings',
                       subtitle: 'Appearance, data saver, notifications',
-                      onTap: () => context.go(paths.settings),
+                      onTap: () => context.open(paths.settings),
                     ),
                   ],
                 ),
@@ -163,7 +163,7 @@ class _SeasonFeeTile extends ConsumerWidget {
               : '${cedis(summary.confirmed)} of '
                   '${cedis(Season.fee).substring(4)} paid · '
                   '${cedis(summary.left)} left',
-      onTap: () => context.go(Routes.teamFee),
+      onTap: () => context.open(Routes.teamFee),
     );
   }
 }
@@ -197,7 +197,7 @@ class _AccountCard extends ConsumerWidget {
         side: BorderSide(color: scheme.outline),
       ),
       child: InkWell(
-        onTap: () => context.go(MorePaths.of(context).profile),
+        onTap: () => context.open(MorePaths.of(context).profile),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(

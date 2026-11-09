@@ -9,11 +9,11 @@ import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/features/league/data/league_settings_repository.dart';
 import 'package:gedfa_connect/features/league/domain/league_settings.dart';
 import 'package:gedfa_connect/features/settings/presentation/widgets/settings_widgets.dart';
-import 'package:go_router/go_router.dart';
 
 /// Board L1: FA › More › League settings. Registration switches (any FA
 /// official), squad numbers, and the season, fee and MoMo number (the
@@ -82,7 +82,7 @@ class _LeagueSettingsScreenState extends ConsumerState<LeagueSettingsScreen> {
       appBar: GedfaAppBar(
         title: 'League settings',
         subtitle: 'District FA · More',
-        leading: BackButton(onPressed: () => context.go(Routes.adminMore)),
+        leading: const AppBackButton(fallback: Routes.adminMore),
       ),
       body: settingsAsync.when(
         loading: () => const LoadingView(),

@@ -8,6 +8,7 @@ import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/people/data/people_repository.dart';
@@ -16,7 +17,6 @@ import 'package:gedfa_connect/features/people/domain/role_log_entry.dart';
 import 'package:gedfa_connect/features/settings/presentation/more_screen.dart'
     show PersonAvatar;
 import 'package:gedfa_connect/features/settings/presentation/widgets/settings_widgets.dart';
-import 'package:go_router/go_router.dart';
 
 /// FA: one FA admin or referee, their role history, and Remove role.
 class MemberScreen extends ConsumerStatefulWidget {
@@ -69,7 +69,7 @@ class _MemberScreenState extends ConsumerState<MemberScreen> {
       await ref.read(peopleRepositoryProvider).removeRole(member, by: me);
       if (!mounted) return;
       AppToast.success(context, '${member.name} no longer has a role.');
-      context.go(Routes.adminPeople);
+      context.goBack(Routes.adminPeople);
     } catch (error) {
       if (mounted) AppToast.error(context, appErrorMessage(error));
     } finally {
@@ -85,7 +85,7 @@ class _MemberScreenState extends ConsumerState<MemberScreen> {
     return Scaffold(
       appBar: GedfaAppBar(
         title: member?.roleLabel ?? 'Person',
-        leading: BackButton(onPressed: () => context.go(Routes.adminPeople)),
+        leading: const AppBackButton(fallback: Routes.adminPeople),
       ),
       body: memberAsync.when(
         loading: () => const LoadingView(),

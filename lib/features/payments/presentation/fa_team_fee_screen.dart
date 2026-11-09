@@ -31,8 +31,7 @@ class FaTeamFeeScreen extends ConsumerWidget {
       appBar: GedfaAppBar(
         title: 'Season fee',
         subtitle: teamAsync.value?.name,
-        leading: BackButton(onPressed: () =>
-            context.goKeepingHome(Routes.adminFees)),
+        leading: const AppBackButton(fallback: Routes.adminFees),
       ),
       body: teamAsync.when(
         loading: () => const LoadingView(),

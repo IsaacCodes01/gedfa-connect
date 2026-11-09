@@ -83,7 +83,7 @@ class FaChangesView extends ConsumerWidget {
                   changes: changes.reversed.toList(),
                   team: teamOf(teamId),
                   onTap: () =>
-                      context.goKeepingHome(Routes.adminTeamChanges(teamId)),
+                      context.open(Routes.adminTeamChanges(teamId)),
                 ),
                 const SizedBox(height: 10),
               ],

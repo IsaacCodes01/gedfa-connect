@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:gedfa_connect/app/routes.dart';
 import 'package:gedfa_connect/app/theme.dart';
 import 'package:gedfa_connect/core/constants/approval_status.dart';
@@ -11,6 +10,7 @@ import 'package:gedfa_connect/core/widgets/app_toast.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/notification_bell.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/features/league/data/league_settings_repository.dart';
 import 'package:gedfa_connect/features/notifications/presentation/pinned_announcement_card.dart';
 import 'package:gedfa_connect/features/players/data/player_repository.dart';
@@ -61,7 +61,7 @@ class _TeamHomeScreenState extends ConsumerState<TeamHomeScreen> {
       );
       return;
     }
-    context.go(
+    context.open(
       juvenile ? Routes.addJuvenilePlayer(_ageGroup.label) : Routes.addPlayer,
     );
   }
@@ -465,7 +465,7 @@ class _SquadBody extends ConsumerWidget {
                     PositionRows(
                       sections: sectionsByGroup(shown, isDark: isDark),
                       cardLine: CardLine.squad,
-                      onTap: (player) => context.go(Routes.player(player.id)),
+                      onTap: (player) => context.open(Routes.player(player.id)),
                     ),
                 ],
               ),

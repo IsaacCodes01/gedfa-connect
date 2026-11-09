@@ -262,7 +262,7 @@ class _TeamFeeTile extends StatelessWidget {
         side: BorderSide(color: scheme.outline),
       ),
       child: InkWell(
-        onTap: () => context.goKeepingHome(Routes.adminTeamFee(team.id)),
+        onTap: () => context.open(Routes.adminTeamFee(team.id)),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Row(

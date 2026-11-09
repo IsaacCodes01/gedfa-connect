@@ -20,6 +20,17 @@ class Routes {
   static String fromHome(String route) =>
       '$route${route.contains('?') ? '&' : '?'}from=home';
   static bool isFromHome(Uri uri) => uri.queryParameters['from'] == 'home';
+
+  /// A page opened from another tab, or from a full-screen page, carries
+  /// `back=` the page it came from, and its ← goes there (3.0f2).
+  static String withBack(String route, String back) {
+    final uri = Uri.parse(route);
+    return uri.replace(
+      queryParameters: {...uri.queryParameters, 'back': back},
+    ).toString();
+  }
+
+  static String? backOf(Uri uri) => uri.queryParameters['back'];
   static String adminRequest(String uid) => '/admin/request/$uid';
 
   /// FA: Teams with the Changes switch on (2.10b), and all of one team's

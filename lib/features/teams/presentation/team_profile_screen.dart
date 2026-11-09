@@ -17,6 +17,7 @@ import 'package:gedfa_connect/features/teams/presentation/widgets/change_status_
 import 'package:gedfa_connect/features/teams/presentation/widgets/team_logo.dart';
 import 'package:go_router/go_router.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/team.dart';
 
@@ -44,7 +45,7 @@ class TeamProfileScreen extends ConsumerWidget {
       appBar: GedfaAppBar(
         title: 'Team profile',
         subtitle: detailsAsync.value?.teamName,
-        leading: BackButton(onPressed: () => context.go(Routes.teamMore)),
+        leading: const AppBackButton(fallback: Routes.teamMore),
       ),
       body: detailsAsync.when(
         loading: () => const LoadingView(),

@@ -8,6 +8,7 @@ import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/core/utils/initials.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/features/notifications/data/notifications_repository.dart';
 import 'package:gedfa_connect/features/notifications/domain/announcement.dart';
 import 'package:gedfa_connect/features/people/data/people_repository.dart';
@@ -145,7 +146,7 @@ class _AnnouncementCard extends ConsumerWidget {
         ),
       ),
       child: InkWell(
-        onTap: () => context.go(Routes.adminAnnouncement(a.id)),
+        onTap: () => context.open(Routes.adminAnnouncement(a.id)),
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Column(

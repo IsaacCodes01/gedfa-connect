@@ -7,12 +7,12 @@ import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/settings/presentation/more_screen.dart';
 import 'package:gedfa_connect/features/settings/presentation/widgets/settings_widgets.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
-import 'package:go_router/go_router.dart';
 
 /// Your own details: full name, email, password and the account itself.
 class MyProfileScreen extends ConsumerWidget {
@@ -310,7 +310,7 @@ class _EmailRow extends StatelessWidget {
           ),
           if (canChange)
             OutlinedButton(
-              onPressed: () => context.go(MorePaths.of(context).changeEmail),
+              onPressed: () => context.open(MorePaths.of(context).changeEmail),
               style: OutlinedButton.styleFrom(minimumSize: const Size(84, 40)),
               child: const Text('Change'),
             ),

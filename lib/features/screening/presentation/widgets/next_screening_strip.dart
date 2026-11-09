@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gedfa_connect/app/routes.dart';
 import 'package:gedfa_connect/features/screening/data/screening_repository.dart';
 import 'package:gedfa_connect/features/screening/presentation/widgets/screening_countdown.dart';
-import 'package:go_router/go_router.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 
 /// Board J5: "Next screening: Sat 14 Nov · Fetteh Park   Days ›" on the
 /// FA's Players › Juvenile. With no day set: "No screening day set yet
@@ -28,7 +28,7 @@ class NextScreeningStrip extends ConsumerWidget {
       borderRadius: BorderRadius.circular(14),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () => context.go(Routes.adminScreening),
+        onTap: () => context.open(Routes.adminScreening),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(

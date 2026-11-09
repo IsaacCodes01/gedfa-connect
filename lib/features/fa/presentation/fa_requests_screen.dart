@@ -229,7 +229,7 @@ class _FaRequestsScreenState extends ConsumerState<FaRequestsScreen> {
                   _RequestCard(
                     request: request,
                     onTap: () =>
-                        context.goKeepingHome(Routes.adminRequest(request.uid)),
+                        context.open(Routes.adminRequest(request.uid)),
                   ),
                   const SizedBox(height: 8),
                 ],

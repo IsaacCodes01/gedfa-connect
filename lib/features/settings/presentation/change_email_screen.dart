@@ -7,9 +7,9 @@ import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/validators.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/settings/presentation/widgets/settings_widgets.dart';
-import 'package:go_router/go_router.dart';
 
 /// Change your sign-in email. Firebase emails a link to the NEW address;
 /// the email only changes when that link is opened.
@@ -241,7 +241,7 @@ class _ChangeEmailScreenState extends ConsumerState<ChangeEmailScreen> {
           ),
           const SizedBox(height: 22),
           FilledButton(
-            onPressed: () => context.go(MorePaths.of(context).profile),
+            onPressed: () => context.goBack(MorePaths.of(context).profile),
             child: const Text('Back to my profile'),
           ),
           const SizedBox(height: 6),

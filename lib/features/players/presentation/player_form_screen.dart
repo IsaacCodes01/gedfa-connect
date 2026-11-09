@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:gedfa_connect/app/routes.dart';
 import 'package:gedfa_connect/core/constants/approval_status.dart';
 import 'package:gedfa_connect/core/constants/season.dart';
@@ -14,6 +13,7 @@ import 'package:gedfa_connect/core/utils/validators.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/features/league/data/league_settings_repository.dart';
 import 'package:gedfa_connect/features/league/domain/league_settings.dart';
 import 'package:gedfa_connect/features/players/data/player_repository.dart';
@@ -287,12 +287,12 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
                   'Bring them to the screening day.'
               : '${draft.fullName} sent to the FA.',
         );
-        context.go(Routes.team);
+        context.goBack(Routes.team);
       } else {
         await repository.update(existing, draft, newPhoto: newPhoto);
         if (!mounted) return;
         AppToast.success(context, 'Changes saved.');
-        context.go(Routes.player(existing.id));
+        context.goBack(Routes.player(existing.id));
       }
     } catch (error) {
       if (!mounted) return;
@@ -304,7 +304,8 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
 
   void _cancel() {
     final existing = _existing;
-    context.go(existing == null ? Routes.team : Routes.player(existing.id));
+    context.goBack(
+        existing == null ? Routes.team : Routes.player(existing.id));
   }
 
   // ---------- Build ----------

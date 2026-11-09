@@ -18,7 +18,6 @@ import 'package:gedfa_connect/features/players/domain/duplicates.dart';
 import 'package:gedfa_connect/features/players/domain/player.dart';
 import 'package:gedfa_connect/features/players/presentation/widgets/player_photo.dart';
 import 'package:gedfa_connect/features/settings/presentation/widgets/settings_widgets.dart';
-import 'package:go_router/go_router.dart';
 
 /// Youngest age for the Division (same as the Add player form).
 const _minDivisionAge = 13;
@@ -72,15 +71,11 @@ class FaPlayerReviewScreen extends ConsumerWidget {
 
 /// Back: to the screen we came from, or to the player's team if this
 /// page was opened directly (e.g. a refreshed browser tab).
-void _leave(BuildContext context, Player? player) {
-  if (context.canPop()) {
-    context.pop();
-  } else if (player != null) {
-    context.goKeepingHome(Routes.adminTeamPlayers(player.teamId));
-  } else {
-    context.goKeepingHome(Routes.adminPlayers);
-  }
-}
+void _leave(BuildContext context, Player? player) => context.goBack(
+      player == null
+          ? Routes.adminPlayers
+          : Routes.adminTeamPlayers(player.teamId),
+    );
 
 class _ReviewBody extends StatelessWidget {
   const _ReviewBody({required this.player});

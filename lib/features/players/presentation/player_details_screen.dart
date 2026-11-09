@@ -9,12 +9,12 @@ import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/pitch_lines_painter.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/core/widgets/status_badge.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/features/players/data/player_repository.dart';
 import 'package:gedfa_connect/features/players/domain/age_group.dart';
 import 'package:gedfa_connect/features/players/domain/player.dart';
 import 'package:gedfa_connect/features/players/presentation/widgets/player_photo.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
-import 'package:go_router/go_router.dart';
 import 'package:gedfa_connect/app/routes.dart';
 
 class PlayerDetailsScreen extends ConsumerWidget {
@@ -23,7 +23,7 @@ class PlayerDetailsScreen extends ConsumerWidget {
   final String playerId;
 
     void _edit(BuildContext context) =>
-      context.go(Routes.editPlayer(playerId));
+      context.open(Routes.editPlayer(playerId));
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

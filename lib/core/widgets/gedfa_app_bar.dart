@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:gedfa_connect/app/routes.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/core/widgets/flag_stripe.dart';
+import 'package:go_router/go_router.dart';
 
 /// The blue app bar with the Ghana flag stripe underneath.
 ///
@@ -54,8 +57,11 @@ class GedfaAppBar extends StatelessWidget implements PreferredSizeWidget {
             ],
           );
 
+    // Opened with back= (3.0f2) and no ← of its own: one that goes there
+    final back = leading == null ? _backParam(context) : null;
+
     return AppBar(
-      leading: leading,
+      leading: leading ?? (back == null ? null : BackParamButton(back: back)),
       title: titleWidget,
       actions: actions == null ? null : [...actions!, const SizedBox(width: 8)],
       bottom: const PreferredSize(
@@ -63,5 +69,14 @@ class GedfaAppBar extends StatelessWidget implements PreferredSizeWidget {
         child: FlagStripe(height: _stripeHeight),
       ),
     );
+  }
+
+  /// The page's `back=`; null outside go_router (tests, dialogs).
+  static String? _backParam(BuildContext context) {
+    try {
+      return Routes.backOf(GoRouterState.of(context).uri);
+    } on GoError {
+      return null;
+    }
   }
 }

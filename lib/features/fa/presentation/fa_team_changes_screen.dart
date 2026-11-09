@@ -49,7 +49,7 @@ class _FaTeamChangesScreenState extends ConsumerState<FaTeamChangesScreen> {
 
   String? get _faUid => ref.read(authRepositoryProvider).currentUser?.uid;
 
-  void _back() => context.goKeepingHome(Routes.adminChanges);
+  void _back() => context.goBack(Routes.adminChanges);
 
   /// Friendly message when Firestore refuses the change.
   String _messageFor(Object error) {

@@ -39,8 +39,7 @@ class FaAskCorrectionScreen extends ConsumerWidget {
       return Scaffold(
         appBar: GedfaAppBar(
           title: 'Ask to correct',
-          leading: CloseButton(onPressed: () =>
-              context.goKeepingHome(Routes.admin)),
+          leading: const AppBackButton(fallback: Routes.admin, close: true),
         ),
         body: error != null
             ? ErrorView(message: appErrorMessage(error))
@@ -93,7 +92,7 @@ class _FormState extends ConsumerState<_Form> {
     if (context.canPop()) {
       context.pop();
     } else {
-      context.goKeepingHome(Routes.admin);
+      context.goBack(Routes.admin);
     }
   }
 

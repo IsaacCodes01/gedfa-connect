@@ -72,9 +72,7 @@ class _FaTeamJuvenileScreenState extends ConsumerState<FaTeamJuvenileScreen> {
       appBar: GedfaAppBar(
         title: team?.name ?? 'Juvenile players',
         subtitle: subtitle,
-        leading: BackButton(
-          onPressed: () => context.goKeepingHome(Routes.adminPlayersJuvenile),
-        ),
+        leading: const AppBackButton(fallback: Routes.adminPlayersJuvenile),
       ),
       body: body,
     );

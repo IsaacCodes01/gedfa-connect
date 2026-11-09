@@ -34,8 +34,7 @@ class FaCorrectDetailsScreen extends ConsumerWidget {
       return Scaffold(
         appBar: GedfaAppBar(
           title: 'Correct club details',
-          leading: BackButton(onPressed: () =>
-              context.goKeepingHome(Routes.admin)),
+          leading: const AppBackButton(fallback: Routes.admin),
         ),
         body: detailsAsync.hasError
             ? ErrorView(message: appErrorMessage(detailsAsync.error!))
@@ -112,7 +111,7 @@ class _FormState extends ConsumerState<_Form> {
     if (context.canPop()) {
       context.pop();
     } else {
-      context.goKeepingHome(Routes.admin);
+      context.goBack(Routes.admin);
     }
   }
 
