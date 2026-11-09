@@ -171,6 +171,102 @@ class FixtureRepository {
     return MatchTeam.fromTeamDoc(doc.id, doc.data() ?? {}, category);
   }
 
+  // ---------- Renamed teams (JSc2) ----------
+
+  /// The names a match should show for [teamId]'s side, from its team
+  /// document as it is now (club name, "B" or its juvenile side's name).
+  static ({String name, String shortName}) namesFor(
+    Map<String, dynamic> team,
+    Competition category,
+  ) => sideNames(
+    name: team['name'] as String? ?? '',
+    shortName: team['shortName'] as String? ?? '',
+    categories: Competition.fromList(team['categories'] as List<dynamic>?),
+    category: category,
+    juvenileName: team['juvenileName'] as String?,
+    juvenileShortName: team['juvenileShortName'] as String?,
+  );
+
+  /// What renaming [teamId] changes in one match, or null if it shows the
+  /// right names already. Works on the raw document, so only the name and
+  /// short name of the side change (the rules check nothing else does).
+  /// A new name keeps the old one in `previousNames` for the pill.
+  static Map<String, dynamic>? renameUpdate(
+    Map<String, dynamic> match,
+    String teamId,
+    Map<String, dynamic> team,
+    DateTime until,
+  ) {
+    final category = Competition.fromString(match['category'] as String?);
+    if (category == null) return null;
+    final names = namesFor(team, category);
+    final previous = {
+      ...?(match['previousNames'] as Map<String, dynamic>?),
+    };
+    final update = <String, dynamic>{};
+    for (final key in const ['home', 'away']) {
+      final side = match[key] as Map<String, dynamic>?;
+      if (side == null || side['id'] != teamId) continue;
+      final oldName = side['name'] as String? ?? '';
+      if (oldName == names.name && side['shortName'] == names.shortName) {
+        continue;
+      }
+      update[key] = {...side, 'name': names.name, 'shortName': names.shortName};
+      if (oldName != names.name) {
+        previous[teamId] = {
+          'name': oldName,
+          'until': Timestamp.fromDate(until),
+        };
+      }
+    }
+    if (update.isEmpty) return null;
+    return {...update, 'previousNames': previous};
+  }
+
+  /// JSc2: after the FA approves a new club name, short name or juvenile
+  /// side name, every match of [teamId] shows it (played ones, postponed
+  /// and cancelled ones too), with "Previously …" for everyone. [until] is
+  /// when the FA approved it.
+  ///
+  /// 6 matches per save: the rules may also try the normal "change a
+  /// match" rule, which looks up both teams of each match (at most 20
+  /// documents per save). Matches already right are skipped, so running
+  /// it again (Finish renaming) carries on where it stopped. Returns how
+  /// many matches changed.
+  Future<int> renameTeam(
+    String teamId, {
+    required DateTime until,
+    required User by,
+    void Function(int done, int total)? onProgress,
+  }) async {
+    final team =
+        (await _db.doc(FirestorePaths.team(teamId)).get().timeout(_timeout))
+            .data() ??
+        const <String, dynamic>{};
+    final matches = await _fixtures
+        .where('teamIds', arrayContains: teamId)
+        .get()
+        .timeout(_timeout);
+    final todo = [
+      for (final doc in matches.docs)
+        if (renameUpdate(doc.data(), teamId, team, until) case final update?)
+          (doc.reference, update),
+    ];
+    onProgress?.call(0, todo.length);
+    for (var i = 0; i < todo.length; i += 6) {
+      final batch = _db.batch();
+      for (final (ref, update) in todo.skip(i).take(6)) {
+        batch.update(ref, {...update, ..._stamp(by)});
+      }
+      await batch.commit().timeout(_timeout);
+      onProgress?.call(
+        (i + 6).clamp(0, todo.length),
+        todo.length,
+      );
+    }
+    return todo.length;
+  }
+
   /// "Add one match": the match, its first history line, and "New match"
   /// in both teams' bells.
   Future<void> add(FixtureDraft d, {required User by}) {

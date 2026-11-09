@@ -3529,6 +3529,141 @@ describe('Fixtures (3.0a)', () => {
   });
 });
 
+describe('Renamed teams in matches (JSc2)', () => {
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await updateDoc(doc(db, `${D}/teams/royal`), { shortName: 'RUF', logoUrl: null, kits: ROYAL_KITS });
+      await updateDoc(doc(db, `${D}/teams/stars`), { shortName: 'GST', logoUrl: null, kits: STARS_KITS });
+      await setDoc(doc(db, `${D}/teams/colts`), {
+        name: 'Apam Colts', shortName: 'APC', logoUrl: null, categories: ['division', 'juvenile'],
+        kits: STARS_KITS, juvenileKits: COLTS_JUVENILE_KITS,
+      });
+      await setDoc(doc(db, `${D}/teams/youth`), {
+        name: 'Afransi Youth', shortName: 'AFY', logoUrl: null, categories: ['juvenile'], kits: ROYAL_KITS,
+      });
+    });
+    await addFixture(dbAs('fa1'), 'm1');
+  });
+
+  /** The FA renamed a team (rules off, like the approved change). */
+  const renameTeam = (id, changes) => testEnv.withSecurityRulesDisabled(async (context) => {
+    await updateDoc(doc(context.firestore(), `${D}/teams/${id}`), changes);
+  });
+
+  const HOME = fixtureData().home;
+  const until = () => Timestamp.fromMillis(Date.now() - 60000);
+
+  /** The FA's rename of one match, as the app sends it. */
+  const rename = (db, id, changes) => updateDoc(doc(db, `${D}/fixtures/${id}`), {
+    ...changes, updatedBy: 'fa1', updatedAt: serverTimestamp(),
+  });
+
+  it('after a new club name, the FA renames the match with "Previously"', async () => {
+    await renameTeam('royal', { name: 'Royal Stars FC' });
+    await assertSucceeds(rename(dbAs('fa1'), 'm1', {
+      home: { ...HOME, name: 'Royal Stars FC' },
+      previousNames: { royal: { name: 'Royal Unique FC', until: until() } },
+    }));
+  });
+
+  it('only to the name the team has now, and the old name goes in "Previously"', async () => {
+    await renameTeam('royal', { name: 'Royal Stars FC' });
+    const db = dbAs('fa1');
+    await assertFails(rename(db, 'm1', {
+      home: { ...HOME, name: 'Royal Something FC' },
+      previousNames: { royal: { name: 'Royal Unique FC', until: until() } },
+    }));
+    // "Previously" must be the name the match had
+    await assertFails(rename(db, 'm1', {
+      home: { ...HOME, name: 'Royal Stars FC' },
+      previousNames: { royal: { name: 'Gomoa United', until: until() } },
+    }));
+    // ...for a team in the match
+    await assertFails(rename(db, 'm1', {
+      home: { ...HOME, name: 'Royal Stars FC' },
+      previousNames: { royal: { name: 'Royal Unique FC', until: until() }, colts: { name: 'X', until: until() } },
+    }));
+  });
+
+  it('a rename changes nothing else, and only the FA does it', async () => {
+    await renameTeam('royal', { name: 'Royal Stars FC' });
+    const renamed = {
+      home: { ...HOME, name: 'Royal Stars FC' },
+      previousNames: { royal: { name: 'Royal Unique FC', until: until() } },
+    };
+    await assertFails(rename(dbAs('fa1'), 'm1', { ...renamed, venue: 'Royal Park' }));
+    await assertFails(rename(dbAs('fa1'), 'm1', { ...renamed, home: { ...renamed.home, logoUrl: 'https://x.com/l.png' } }));
+    await assertFails(updateDoc(doc(dbAs('admin1'), `${D}/fixtures/m1`), {
+      ...renamed, updatedBy: 'admin1', updatedAt: serverTimestamp(),
+    }));
+  });
+
+  it('a new short name alone changes the crest letters, with no "Previously"', async () => {
+    await renameTeam('royal', { shortName: 'RSF' });
+    await assertSucceeds(rename(dbAs('fa1'), 'm1', { home: { ...HOME, shortName: 'RSF' } }));
+    await assertFails(rename(dbAs('fa1'), 'm1', {
+      home: { ...HOME, shortName: 'RSF' },
+      previousNames: { royal: { name: 'Royal Unique FC', until: until() } },
+    }));
+  });
+
+  it('played and cancelled matches are renamed too, even if the kits changed since', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), `${D}/fixtures/m1`), {
+        status: 'cancelled', note: 'Club withdrew', kickoffAt: Timestamp.fromMillis(Date.now() - 86400000),
+      });
+    });
+    await renameTeam('royal', { name: 'Royal Stars FC', kits: { ...ROYAL_KITS, home: { primary: '#000000' } } });
+    await assertSucceeds(rename(dbAs('fa1'), 'm1', {
+      home: { ...HOME, name: 'Royal Stars FC' },
+      previousNames: { royal: { name: 'Royal Unique FC', until: until() } },
+    }));
+  });
+
+  it('a "B" side follows its club: "Apam Colts B" becomes "Apam Rangers B"', async () => {
+    const juvenile = fixtureData({
+      competitionId: '2026-27_juvenile-league', category: 'juvenile', ageGroup: 'U15',
+      teamIds: ['colts', 'youth'],
+      home: { id: 'colts', name: 'Apam Colts B', shortName: 'APC B', logoUrl: null, colour: '#1E5BC6' },
+      away: { id: 'youth', name: 'Afransi Youth', shortName: 'AFY', logoUrl: null, colour: '#7A1F2B' },
+      kits: {
+        home: { slot: 'home', kit: COLTS_JUVENILE_KITS.home },
+        away: { slot: 'away', kit: ROYAL_KITS.away },
+        homeGk: { slot: 'goalkeeper', kit: COLTS_JUVENILE_KITS.goalkeeper },
+        awayGk: { slot: 'goalkeeper', kit: ROYAL_KITS.goalkeeper },
+      },
+    });
+    await addFixture(dbAs('fa1'), 'j1', juvenile);
+    await renameTeam('colts', { name: 'Apam Rangers' });
+    const db = dbAs('fa1');
+    // Not the club's Division name
+    await assertFails(rename(db, 'j1', {
+      home: { ...juvenile.home, name: 'Apam Rangers' },
+      previousNames: { colts: { name: 'Apam Colts B', until: until() } },
+    }));
+    await assertSucceeds(rename(db, 'j1', {
+      home: { ...juvenile.home, name: 'Apam Rangers B' },
+      previousNames: { colts: { name: 'Apam Colts B', until: until() } },
+    }));
+  });
+
+  it('a normal change keeps "Previously" as it is, and a new match has none', async () => {
+    await renameTeam('royal', { name: 'Royal Stars FC' });
+    await rename(dbAs('fa1'), 'm1', {
+      home: { ...HOME, name: 'Royal Stars FC' },
+      previousNames: { royal: { name: 'Royal Unique FC', until: until() } },
+    });
+    const db = dbAs('fa1');
+    await assertSucceeds(changeFixture(db, 'm1', { venue: 'Gomoa Park' }));
+    await assertFails(changeFixture(db, 'm1', { previousNames: {} }));
+    await assertFails(addFixture(db, 'm2', fixtureData({
+      home: { ...HOME, name: 'Royal Stars FC' },
+      previousNames: { royal: { name: 'Royal Unique FC', until: until() } },
+    })));
+  });
+});
+
 describe('Fixtures: a team changes its kit after the match is made (3.0a)', () => {
   beforeEach(async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {

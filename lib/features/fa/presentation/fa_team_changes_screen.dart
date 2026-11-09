@@ -14,6 +14,8 @@ import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/fa/presentation/widgets/fa_changes_view.dart';
 import 'package:gedfa_connect/features/fa/presentation/widgets/review_widgets.dart';
+import 'package:gedfa_connect/features/fixtures/data/fixture_repository.dart';
+import 'package:gedfa_connect/features/fixtures/presentation/widgets/rename_matches.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/b_side_ring.dart';
 import 'package:gedfa_connect/features/teams/domain/side_name.dart';
 import 'package:gedfa_connect/features/teams/data/team_change_repository.dart';
@@ -55,6 +57,7 @@ class _FaTeamChangesScreenState extends ConsumerState<FaTeamChangesScreen> {
 
   /// Friendly message when Firestore refuses the change.
   String _messageFor(Object error) {
+    if (error is RenameStoppedException) return error.message;
     if (error is FirebaseException && error.code == 'permission-denied') {
       return "Couldn't save. Another official may have decided already, or "
           'the team changed something. Go back and open it again.';
@@ -97,7 +100,9 @@ class _FaTeamChangesScreenState extends ConsumerState<FaTeamChangesScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text('${_approveLabel(change)}?'),
-        content: Text(_whatApprovingDoes(change, teamName)),
+        content: Text(
+          _whatApprovingDoes(change, teamName) + _matchesLine(change),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
@@ -115,14 +120,73 @@ class _FaTeamChangesScreenState extends ConsumerState<FaTeamChangesScreen> {
       ),
     );
     if (ok != true || !mounted) return;
-    await _decide(
-      change,
-      waiting,
-      (faUid) => ref
+    await _decide(change, waiting, (faUid) async {
+      await ref
           .read(teamChangeRepositoryProvider)
-          .approve(change, faUid: faUid),
-      teamName,
-    );
+          .approve(change, faUid: faUid);
+      // JSc2: every match of the team shows the new name
+      if (_renamesMatches(change) && mounted) {
+        await renameTeamMatches(
+          context,
+          ref,
+          teamId: change.teamId,
+          newName: _newNameOf(change, teamName),
+        );
+      }
+    }, teamName);
+  }
+
+  /// A new club name, short name or juvenile side name changes the
+  /// team's matches (JSc2).
+  static bool _renamesMatches(TeamChange change) => const {
+    TeamChangeKind.name,
+    TeamChangeKind.shortName,
+    TeamChangeKind.juvenileName,
+  }.contains(change.kind);
+
+  /// "Royal Stars FC" (for the renaming dialog)
+  static String _newNameOf(TeamChange change, String teamName) =>
+      switch (change.kind) {
+        TeamChangeKind.name => change.to,
+        TeamChangeKind.juvenileName =>
+          change.isBackToB ? '$teamName B' : change.to,
+        _ => teamName,
+      };
+
+  /// The Approve dialog's second paragraph (mockup R4): how many matches
+  /// change, with "Previously …" for a new name.
+  String _matchesLine(TeamChange change) {
+    final team = ref.read(teamByIdProvider(change.teamId)).value;
+    if (team == null || !_renamesMatches(change)) return '';
+    final now = DateTime.now();
+    final season = ref.read(seasonFixturesProvider).value ?? const [];
+    // The matches showing the name that changes: the club's own name
+    // (and its "B" side), or the juvenile side's name
+    final matches = [
+      for (final f in season)
+        for (final side in [f.home, f.away])
+          if (side.id == team.id &&
+              switch (change.kind) {
+                TeamChangeKind.juvenileName =>
+                  f.category == Competition.juvenile,
+                TeamChangeKind.name =>
+                  f.category == Competition.division ||
+                      team.juvenileName == null,
+                _ => true,
+              })
+            f,
+    ];
+    if (matches.isEmpty) return '';
+    final played = matches.where((f) => f.isPlayed(now)).length;
+    final count = matches.length == 1 ? '1 match' : '${matches.length} matches';
+    if (change.kind == TeamChangeKind.shortName) {
+      return '\n\n$count show the new short name on the crest.';
+    }
+    final old = change.kind == TeamChangeKind.juvenileName
+        ? team.sideName(Competition.juvenile)
+        : team.name;
+    return '\n\n$count ($played played) show the new name, with '
+        '"Previously $old" for everyone.';
   }
 
   /// Approve all: one change after another, oldest first. Each is its own
@@ -185,6 +249,19 @@ class _FaTeamChangesScreenState extends ConsumerState<FaTeamChangesScreen> {
         } on TeamNameTakenException {
           skipped++;
         }
+      }
+      // JSc2: one renaming for all of them (to the team's names now)
+      if (oldestFirst.any(
+            (c) => _decidedHere.contains(c.id) && _renamesMatches(c),
+          ) &&
+          mounted) {
+        await renameTeamMatches(
+          context,
+          ref,
+          teamId: widget.teamId,
+          newName: ref.read(teamByIdProvider(widget.teamId)).value?.name ??
+              teamName,
+        );
       }
     } catch (error) {
       if (mounted) AppToast.error(context, _messageFor(error));

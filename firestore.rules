@@ -1270,7 +1270,8 @@ service cloud.firestore {
         return data.keys().hasOnly([
             'season', 'competitionId', 'category', 'ageGroup', 'round',
             'teamIds', 'home', 'away', 'kits', 'kickoffAt', 'venue', 'status',
-            'note', 'createdBy', 'createdAt', 'updatedBy', 'updatedAt'
+            'note', 'createdBy', 'createdAt', 'updatedBy', 'updatedAt',
+            'previousNames'
           ])
           && data.keys().hasAll([
             'season', 'competitionId', 'category', 'round', 'teamIds', 'home',
@@ -1302,6 +1303,43 @@ service cloud.firestore {
           && data.updatedAt == request.time;
       }
 
+      // JSc2: one side of a match after the FA renamed its team (a new club
+      // name, short name or juvenile side name). Only its name and short
+      // name change, to the team's names as they are now. A new name keeps
+      // the one before in previousNames ({ name, until }) for the gold
+      // "Previously ..." pill; a new short name alone keeps no pill.
+      function isRenamedSide(before, after, category, prev, prevBefore) {
+        let id = before.id;
+        return (after == before
+              && prev.get(id, null) == prevBefore.get(id, null))
+          || (after.diff(before).affectedKeys().hasOnly(['name', 'shortName'])
+              && [after.name, after.shortName]
+                   == sideNamesOf(getAfter(teamDoc(id)).data, category)
+              && (after.name == before.name
+                  ? prev.get(id, null) == prevBefore.get(id, null)
+                  : (prev.get(id, null) is map
+                     && prev[id].keys().hasOnly(['name', 'until'])
+                     && prev[id].name == before.name
+                     && prev[id].until is timestamp)));
+      }
+
+      // JSc2: the FA renames a team in its matches, played ones too (even
+      // cancelled ones). Nothing else in the match changes.
+      function isRenamingMatch() {
+        let before = resource.data;
+        let after = request.resource.data;
+        let prev = after.get('previousNames', {});
+        let prevBefore = before.get('previousNames', {});
+        return after.diff(before).affectedKeys()
+                 .hasOnly(['home', 'away', 'previousNames', 'updatedBy', 'updatedAt'])
+          && after.updatedBy == request.auth.uid
+          && after.updatedAt == request.time
+          && prev is map
+          && prev.keys().hasOnly([before.home.id, before.away.id])
+          && isRenamedSide(before.home, after.home, before.category, prev, prevBefore)
+          && isRenamedSide(before.away, after.away, before.category, prev, prevBefore);
+      }
+
       match /fixtures/{fixtureId} {
         // The schedule is for everyone with a role (teams, referees, FA)
         allow get, list: if hasRole();
@@ -1309,6 +1347,7 @@ service cloud.firestore {
         // The FA adds a match: always scheduled, kick-off in the future
         allow create: if isFaAdmin()
           && isValidFixture(request.resource.data)
+          && !('previousNames' in request.resource.data)
           && request.resource.data.status == 'scheduled'
           && request.resource.data.kickoffAt > request.time
           && request.resource.data.createdBy == request.auth.uid
@@ -1317,6 +1356,10 @@ service cloud.firestore {
         // The FA changes, postpones or cancels it. A cancelled match is
         // final, and cancelling keeps its date. A new date is in the future.
         allow update: if isFaAdmin()
+          // "Previously" changes only with a rename (below); checked first,
+          // so a rename doesn't spend the 1000-expression limit here
+          && request.resource.data.get('previousNames', null)
+               == resource.data.get('previousNames', null)
           && resource.data.status != 'cancelled'
           && isValidFixture(request.resource.data)
           && request.resource.data.season == resource.data.season
@@ -1330,6 +1373,9 @@ service cloud.firestore {
           && (request.resource.data.kickoffAt == resource.data.kickoffAt
               || request.resource.data.kickoffAt == null
               || request.resource.data.kickoffAt > request.time);
+
+        // The FA renames a team in its matches (JSc2)
+        allow update: if isFaAdmin() && isRenamingMatch();
 
         // Never deleted: cancel it instead, so the teams keep the record
 

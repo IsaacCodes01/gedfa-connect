@@ -15,6 +15,7 @@ import 'package:gedfa_connect/features/fixtures/data/fixture_repository.dart';
 import 'package:gedfa_connect/features/fixtures/domain/fixture.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/widgets/fixture_actions.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/widgets/fixture_row.dart';
+import 'package:gedfa_connect/features/fixtures/presentation/widgets/renamed_pill.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/kit_thumb.dart';
 
 /// Match details (mockups F5 coming up, F6 played): a stadium-night header
@@ -66,6 +67,9 @@ class _DetailsState extends ConsumerState<_Details> {
   // The countdown moves on every minute
   late final Timer _clock;
 
+  /// The renamed team whose "Previously" note is open (JSc2), if any
+  String? _openTeamId;
+
   @override
   void initState() {
     super.initState();
@@ -84,6 +88,9 @@ class _DetailsState extends ConsumerState<_Details> {
   Widget build(BuildContext context) {
     final f = widget.fixture;
     final now = DateTime.now();
+    final open = f.renamedSides
+        .where((r) => r.$1.id == _openTeamId)
+        .firstOrNull;
     final history =
         ref.watch(fixtureHistoryProvider(f.id)).value ?? const [];
     // "Match added" alone is not news
@@ -98,8 +105,30 @@ class _DetailsState extends ConsumerState<_Details> {
         body: ListView(
           padding: EdgeInsets.zero,
           children: [
-            _Hero(fixture: f, now: now, isFa: widget.isFa),
+            _Hero(
+              fixture: f,
+              now: now,
+              isFa: widget.isFa,
+              openTeamId: _openTeamId,
+              onPillTap: (id) => setState(
+                () => _openTeamId = _openTeamId == id ? null : id,
+              ),
+            ),
             const FlagStripe(height: 4),
+            // The pill's note, under the match card (mockup R2)
+            if (open != null)
+              ResponsiveCenter(
+                maxWidth: 720,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+                  child: RenamedNote(
+                    side: open.$1,
+                    previous: open.$2,
+                    isHome: f.isHome(open.$1.id),
+                    onClose: () => setState(() => _openTeamId = null),
+                  ),
+                ),
+              ),
             ResponsiveCenter(
               maxWidth: 720,
               child: Padding(
@@ -150,11 +179,21 @@ class _DetailsState extends ConsumerState<_Details> {
 // ---------- The header ----------
 
 class _Hero extends StatelessWidget {
-  const _Hero({required this.fixture, required this.now, required this.isFa});
+  const _Hero({
+    required this.fixture,
+    required this.now,
+    required this.isFa,
+    required this.openTeamId,
+    required this.onPillTap,
+  });
 
   final Fixture fixture;
   final DateTime now;
   final bool isFa;
+
+  /// JSc2: the renamed team whose note is open, and a tap on its pill
+  final String? openTeamId;
+  final ValueChanged<String> onPillTap;
 
   @override
   Widget build(BuildContext context) {
@@ -268,7 +307,27 @@ class _Hero extends StatelessWidget {
                       ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                // A renamed team: the gold pill in the top-right corner,
+                // under the ⋯ (mockup R2)
+                if (f.renamedSides.isEmpty)
+                  const SizedBox(height: 12)
+                else
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        for (final (side, previous) in f.renamedSides)
+                          RenamedPill(
+                            side: side,
+                            previous: previous,
+                            open: openTeamId == side.id,
+                            onTap: () => onPillTap(side.id),
+                            maxWidth: 240,
+                          ),
+                      ],
+                    ),
+                  ),
                 Text(
                   competition,
                   textAlign: TextAlign.center,

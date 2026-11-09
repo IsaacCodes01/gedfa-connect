@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.26, matches the rules after step JSc1, juvenile side name requests (9 Nov 2026)
+**Status:** v2.27, matches the rules after step JSc2, renamed teams in matches (9 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -605,6 +605,7 @@ One match. Made by the FA (one at a time in 3.0a; "Make the season" and cups fol
 | `teamIds` | array | `[home.id, away.id]`, exactly (teams query their matches with `array-contains`) |
 | `home`, `away` | map | `{ id, name, shortName, logoUrl, colour }`: a **copy** of the team (teams can't read other teams). The rules check it matches the team document as it is now, and that the team plays this competition. In a **juvenile** match a club in both competitions is copied with its juvenile side's name: `juvenileName` / `juvenileShortName`, or `name` + " B" / `shortName` + " B" (rules `sideNamesOf`, app `side_name.dart`). A short name ending in " B" marks a "B" side (gold ring on its crest) |
 | `kits` | map | `{ home, away, homeGk, awayGk }`, each `{ slot, kit }`: which of the team's kits it wears and that kit **exactly as on the team** (juvenile kits for a club in both competitions). Outfield slots `home`/`away`/`third`, goalkeeper slots `goalkeeper`/`goalkeeper2` |
+| `previousNames` | map? | **JSc2:** team ID → `{ name, until }`: the team's name in this match before the FA approved a new club name or juvenile side name, and when (the gold "Previously …" pill and its note, for everyone). Only the FA's rename sets it; a new match has none; a normal change keeps it as it is |
 | `kickoffAt` | timestamp? | Empty only while **postponed** with no new date |
 | `venue` | string | 2–80; the home team's ground unless the FA changes it |
 | `status` | string | `scheduled` → `postponed` → `scheduled` again, or `cancelled` (final) |
@@ -850,6 +851,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 9 Nov 2026 | v2.27 (JSc2, renamed teams in matches): `fixtures` gain `previousNames` (team ID → `{ name, until }`). New FA rule `isRenamingMatch`: only a side's `name` / `shortName` change, to the team's names now (`sideNamesOf`), with the old name in `previousNames` (a short name alone: none); played, postponed and cancelled matches too. The normal change rule checks `previousNames` first (1000-expression limit). The app renames 6 matches per save right after the FA approves a new name, short name or juvenile side name; Finish renaming on the team's page carries on. 355 rules tests. |
 | 9 Nov 2026 | v2.26 (JSc1, juvenile side names: ask the FA): new change kind `juvenileName` (`from`/`fromShortName` = how the side plays now, `to`/`toShortName` = its own name, or empty = back to "B"; `nameKey`; "Why" optional); "Add Juvenile" (`competition`) may carry `juvenileName` / `juvenileShortName` / `nameKey`. Approval sets or removes the team's juvenile name and reserves the own name in `teamNames`. Rules: `sideNamesOf` moved up (used by teamChanges), `isOwnJuvenileName`, `isApprovedNameKey`. 348 rules tests. |
 | 9 Nov 2026 | v2.25 (JSb, juvenile side names at registration): `teamRequests` gain `juvenileName`, `juvenileShortName`, `juvenileNameKey` (clubs in both only; empty = "B"); the own name is reserved in `teamNames` in the same batch; the FA's approval copies `juvenileName` / `juvenileShortName` to the team (left out for "B") and the rules check they match the request. 334 rules tests. |
 | 9 Nov 2026 | v2.24 (JSa, juvenile side names): `teams` gain optional `juvenileName` and `juvenileShortName` (set in JSb / JSc). A club in both competitions is copied into its juvenile matches as "Royal Unique FC B" / "RUF B", or its own juvenile name; the rules check it (`sideNamesOf`). Rules: the kits of a side are looked up once (`isKitChoice` takes the kits), to stay under the 1000-expression limit. 324 rules tests. |

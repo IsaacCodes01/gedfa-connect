@@ -20,6 +20,8 @@ import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/features/fa/presentation/widgets/suspension_widgets.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/widgets/fixture_row.dart';
+import 'package:gedfa_connect/features/fixtures/data/fixture_repository.dart';
+import 'package:gedfa_connect/features/fixtures/presentation/widgets/rename_matches.dart';
 import 'package:gedfa_connect/features/teams/data/suspension_repository.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/suspension.dart';
@@ -235,6 +237,29 @@ class _ApprovedBodyState extends ConsumerState<_ApprovedBody> {
     }
   }
 
+  /// "Finish renaming" (JSc2, R5): the matches not renamed yet.
+  Future<void> _finishRenaming(Team team) async {
+    setState(() => _busy = true);
+    try {
+      final count = await renameTeamMatches(
+        context,
+        ref,
+        teamId: team.id,
+        newName: team.name,
+      );
+      if (mounted) {
+        AppToast.success(
+          context,
+          count == 1 ? '1 match renamed.' : '$count matches renamed.',
+        );
+      }
+    } on RenameStoppedException catch (error) {
+      if (mounted) AppToast.error(context, error.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final request = widget.request;
@@ -263,6 +288,13 @@ class _ApprovedBodyState extends ConsumerState<_ApprovedBody> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // JSc2: renaming the matches stopped (mockup R5)
+              if (liveTeam != null)
+                _StaleMatches(
+                  team: liveTeam,
+                  busy: _busy,
+                  onFinish: () => _finishRenaming(liveTeam),
+                ),
               _Header(
                 request: request,
                 onCorrectName: _busy ? null : () => _correctName(team),
@@ -611,6 +643,80 @@ class _Header extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ── Matches still showing an old name (JSc2, mockup R5) ──────────────────
+
+/// Shown only while some of the team's matches don't show its names yet
+/// (renaming stopped after an approval).
+class _StaleMatches extends ConsumerWidget {
+  const _StaleMatches({
+    required this.team,
+    required this.busy,
+    required this.onFinish,
+  });
+
+  final Team team;
+  final bool busy;
+  final VoidCallback onFinish;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final season = ref.watch(seasonFixturesProvider).value ?? const [];
+    final stale = staleMatchesOf(team, season);
+    if (stale.isEmpty) return const SizedBox.shrink();
+
+    final first = stale.first;
+    final oldName = first.home.id == team.id ? first.home.name : first.away.name;
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final ink = isDark ? const Color(0xFFF5D25B) : const Color(0xFF5C4700);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF3D3410) : const Color(0xFFFFF4C2),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.sync_problem_rounded, color: ink, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    '${stale.length == 1 ? '1 match still shows' : '${stale.length} matches still show'} '
+                    '"$oldName"',
+                    style: TextStyle(color: ink, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Renaming stopped. The name is approved; finish renaming '
+                    'the matches.',
+                    style: TextStyle(color: ink, fontSize: 12.5),
+                  ),
+                  const SizedBox(height: 10),
+                  FilledButton.icon(
+                    onPressed: busy ? null : onFinish,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: scheme.primary,
+                    ),
+                    icon: const Icon(Icons.sync_rounded),
+                    label: const Text('Finish renaming'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

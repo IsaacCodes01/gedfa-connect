@@ -3,6 +3,7 @@ import 'package:gedfa_connect/app/theme.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/features/dashboard/presentation/widgets/dashboard_card.dart';
 import 'package:gedfa_connect/features/fixtures/domain/fixture.dart';
+import 'package:gedfa_connect/features/fixtures/presentation/widgets/renamed_pill.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/b_side_ring.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/team_logo.dart';
 
@@ -66,7 +67,7 @@ class FixtureTag extends StatelessWidget {
 
 /// One match in a list (mockup F1, F3, F4): the date and ground, both
 /// teams with the kick-off between them, then any tags.
-class FixtureRow extends StatelessWidget {
+class FixtureRow extends StatefulWidget {
   const FixtureRow({
     super.key,
     required this.fixture,
@@ -85,9 +86,21 @@ class FixtureRow extends StatelessWidget {
   final bool showJuvenileRules;
 
   @override
+  State<FixtureRow> createState() => _FixtureRowState();
+}
+
+class _FixtureRowState extends State<FixtureRow> {
+  /// The renamed team whose note is open (JSc2), if any
+  String? _openTeamId;
+
+  @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final f = fixture;
+    final f = widget.fixture;
+    final dateLabel = widget.dateLabel;
+    final onTap = widget.onTap;
+    final renamed = f.renamedSides;
+    final open = renamed.where((r) => r.$1.id == _openTeamId).firstOrNull;
     final kickoff = f.kickoffAt;
     final muted = TextStyle(fontSize: 11.5, color: scheme.onSurfaceVariant);
     final group = f.ageGroup;
@@ -96,7 +109,7 @@ class FixtureRow extends StatelessWidget {
       if (group != null) FixtureTag(group.label, tone: AccentTone.gold),
       if (f.isPostponed) const FixtureTag('Postponed', tone: AccentTone.red),
       if (f.isCancelled) const FixtureTag('Cancelled', tone: AccentTone.red),
-      if (showJuvenileRules && group != null) ...[
+      if (widget.showJuvenileRules && group != null) ...[
         FixtureTag(group.matchLengthText),
         if (group.playUpText case final text?) FixtureTag(text),
       ],
@@ -109,7 +122,8 @@ class FixtureRow extends StatelessWidget {
           '${kickoff == null ? 'date to come' : '${formatShortDate(kickoff)} '
                     '${formatTime(kickoff)}'}, ${f.venue}'
           '${f.isPostponed ? ', postponed' : ''}'
-          '${f.isCancelled ? ', cancelled' : ''}',
+          '${f.isCancelled ? ', cancelled' : ''}'
+          '${[for (final (side, previous) in renamed) ', ${side.name} was ${previous.name}'].join()}',
       excludeSemantics: true,
       child: InkWell(
         onTap: onTap,
@@ -124,23 +138,42 @@ class FixtureRow extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        dateLabel ??
-                            (kickoff == null
-                                ? 'New date to come'
-                                : formatShortDate(kickoff)),
+                        // A renamed team's pill takes the top-right corner;
+                        // the ground moves next to the date (mockup R1)
+                        '${dateLabel ?? (kickoff == null ? 'New date to come' : formatShortDate(kickoff))}'
+                        '${renamed.isEmpty ? '' : ' · ${f.venue}'}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: muted,
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        f.venue,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.end,
-                        style: muted,
+                    if (renamed.isEmpty)
+                      Flexible(
+                        child: Text(
+                          f.venue,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.end,
+                          style: muted,
+                        ),
+                      )
+                    else
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          for (final (side, previous) in renamed)
+                            RenamedPill(
+                              side: side,
+                              previous: previous,
+                              open: _openTeamId == side.id,
+                              onTap: () => setState(
+                                () => _openTeamId =
+                                    _openTeamId == side.id ? null : side.id,
+                              ),
+                            ),
+                        ],
                       ),
-                    ),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -179,6 +212,16 @@ class FixtureRow extends StatelessWidget {
                     (f.note ?? '').isNotEmpty) ...[
                   const SizedBox(height: 6),
                   Text('Reason: ${f.note}', style: muted),
+                ],
+                // The pill's note, under the row (no pop-up)
+                if (open != null) ...[
+                  const SizedBox(height: 10),
+                  RenamedNote(
+                    side: open.$1,
+                    previous: open.$2,
+                    isHome: f.isHome(open.$1.id),
+                    onClose: () => setState(() => _openTeamId = null),
+                  ),
                 ],
               ],
             ),

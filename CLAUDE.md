@@ -19,7 +19,7 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
    - test steps he can do himself in the app
 5. **Before every commit**, run (and show the result):
    - `flutter analyze` → must be **0 issues**
-   - `cd test/rules && npm test` → **all** rules tests pass (348 after JSc1)
+   - `cd test/rules && npm test` → **all** rules tests pass (355 after JSc2)
    - `flutter test` → all Dart tests pass (layout smoke tests and the kit check)
 6. **Commit after each step** with a clear message, e.g.
    `feat(teams): change requests for name, short name, logo and competitions; 250 rules tests; docs v2.12`
@@ -143,6 +143,11 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
   `toShortName`, `fromShortName`; "Why" optional) and "Add Juvenile" with `juvenileName` / `juvenileShortName` / `nameKey`;
   approval sets or deletes the team's name and reserves it (`_reserveJuvenileName`). Chip in `ask_change_screen.dart`
   (`JuvenileNamePicker(compact: true)`), row on Team profile, FA card `_JuvenileNameChange`. Next: **JSc2** rename matches.
+- **JSc2** done, **juvenile side names finished** (9 Nov 2026, 355 rules tests, 189 Dart tests): `fixtures.previousNames`
+  (team ID → `{ name, until }`); `FixtureRepository.renameTeam` (6 per save, `renameUpdate` on the raw doc) after the FA
+  approves a name / short name / juvenile name (`renameTeamMatches` dialog in `widgets/rename_matches.dart`); pill and note
+  `widgets/renamed_pill.dart` in `FixtureRow` and match details; FA team page `_StaleMatches` + Finish renaming. Rules
+  `isRenamingMatch`; the normal match update checks `previousNames` FIRST (expression limit). Next: **Team admin dashboard**.
 - **Plan agreed 9 Nov 2026 (deadline Thu 12 Nov, 12:30 pm; Isaac's prompts in that conversation):** next, in order:
   1. **3.0f Notifications and Back** (mockup `3.0f-notifications-and-back.html`, N1–N3, **approved**): a tap marks only
      that note read (reads kept per note in `readMarks/{uid}`: note ID → the `updatedAt` read; a grouped note with a newer

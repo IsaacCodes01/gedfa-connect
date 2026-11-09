@@ -121,6 +121,27 @@ class MatchKits {
   }
 }
 
+/// A team's name before the FA approved a new one (JSc2): the gold
+/// "Previously Royal Unique FC" pill on its matches.
+class PreviousName {
+  const PreviousName({required this.name, this.until});
+
+  final String name;
+
+  /// When the FA approved the new name ("until Mon 9 Nov 2026")
+  final DateTime? until;
+
+  static PreviousName? fromMap(Object? map) {
+    if (map is! Map<String, dynamic>) return null;
+    final name = map['name'];
+    if (name is! String || name.isEmpty) return null;
+    return PreviousName(
+      name: name,
+      until: (map['until'] as Timestamp?)?.toDate(),
+    );
+  }
+}
+
 /// `fixtures/{id}`: one match (3.0a). Made by the FA; teams and referees
 /// read it. Never deleted: a called-off match is cancelled instead.
 class Fixture {
@@ -138,6 +159,7 @@ class Fixture {
     this.ageGroup,
     this.kickoffAt,
     this.note,
+    this.previousNames = const {},
   });
 
   final String id;
@@ -161,6 +183,16 @@ class Fixture {
 
   /// Why it was postponed, cancelled or last changed (teams read it).
   final String? note;
+
+  /// JSc2: team ID → its name before the FA approved a new one. Everyone
+  /// sees "Previously …" on the match.
+  final Map<String, PreviousName> previousNames;
+
+  /// The renamed sides of this match, home first, with their old names.
+  List<(FixtureSide, PreviousName)> get renamedSides => [
+    for (final side in [home, away])
+      if (previousNames[side.id] case final previous?) (side, previous),
+  ];
 
   /// GEDFA: team sheets are due 1 hour before kick-off.
   static const sheetLead = Duration(hours: 1);
@@ -210,6 +242,11 @@ class Fixture {
       venue: data['venue'] as String? ?? '',
       status: FixtureStatus.fromString(data['status'] as String?),
       note: data['note'] as String?,
+      previousNames: {
+        for (final MapEntry(:key, :value)
+            in ((data['previousNames'] as Map<String, dynamic>?) ?? {}).entries)
+          key: ?PreviousName.fromMap(value),
+      },
     );
   }
 }
