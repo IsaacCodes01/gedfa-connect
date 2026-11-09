@@ -5,6 +5,7 @@ import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/core/widgets/count_tabs.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
@@ -13,7 +14,6 @@ import 'package:gedfa_connect/features/notifications/data/notifications_reposito
 import 'package:gedfa_connect/features/notifications/domain/announcement.dart';
 import 'package:gedfa_connect/features/notifications/domain/app_notification.dart';
 import 'package:gedfa_connect/features/notifications/presentation/widgets/note_look.dart';
-import 'package:go_router/go_router.dart';
 
 enum _Tab { all, fromFa }
 
@@ -128,7 +128,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           isAnnouncement: true,
           onTap: () {
             _markRead(a.id, a.createdAt);
-            context.push(
+            // The FA's announcement page is in the More tab: open() switches
+            // there with back= (a push over the bell would crash, 3.0f2)
+            context.open(
               isFa
                   ? Routes.adminAnnouncement(a.id)
                   : Routes.teamAnnouncement(a.id),
@@ -258,7 +260,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       title: n.title,
       body: n.body,
       time: n.updatedAt,
-      onTap: () => context.push(
+      onTap: () => context.open(
         isFa ? Routes.adminNote(n.id) : Routes.teamNote(n.id),
       ),
     );
