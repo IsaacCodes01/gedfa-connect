@@ -19,6 +19,7 @@ import 'package:gedfa_connect/core/widgets/status_badge.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/features/fa/presentation/widgets/suspension_widgets.dart';
+import 'package:gedfa_connect/features/fixtures/presentation/widgets/fixture_row.dart';
 import 'package:gedfa_connect/features/teams/data/suspension_repository.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/suspension.dart';
@@ -131,6 +132,16 @@ class _ReviewBody extends StatelessWidget {
               const SectionTitle('Club details'),
               TileGroup(
                 children: [
+                  // Clubs in both: how the juvenile sides are called (JS2)
+                  if (request.hasSeparateJuvenileKits)
+                    DetailRow(
+                      'Juvenile side name',
+                      '${request.juvenileSide.name} · '
+                          '${request.juvenileSide.shortName}',
+                      badge: FixtureTag(
+                        request.hasOwnJuvenileName ? 'Own name' : '"B"',
+                      ),
+                    ),
                   DetailRow('Home ground', request.homeGround),
                   DetailRow(
                     'Directions',

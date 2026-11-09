@@ -100,6 +100,10 @@ class TeamRequestRepository {
           'officials',
         ])
           key: details[key],
+        // The juvenile side's own name (JSb). Left out for "B": the rules
+        // and the app then show the club's name with " B".
+        'juvenileName': ?details['juvenileName'],
+        'juvenileShortName': ?details['juvenileShortName'],
         'adminUids': [request.uid],
         'requestUid': request.uid,
         'createdAt': FieldValue.serverTimestamp(),
@@ -203,6 +207,8 @@ class TeamRequestRepository {
       ...request.toEditableMap(),
       'teamNameLower': request.teamName.trim().toLowerCase(),
       'nameKey': teamNameKey(request.teamName),
+      // The juvenile side's own name is reserved under this key (JSb)
+      'juvenileNameKey': _juvenileKey(request),
       'agreedToRules': true,
       // The season this registration is for (its fee must be started
       // before the FA can approve, 2.13c)
@@ -211,6 +217,19 @@ class TeamRequestRepository {
       'rejectionReason': null,
       'updatedAt': FieldValue.serverTimestamp(),
     };
+  }
+
+  /// The reservation key of the juvenile side's own name, or null for "B".
+  static String? _juvenileKey(TeamRequest request) =>
+      request.hasOwnJuvenileName ? teamNameKey(request.juvenileName!) : null;
+
+  /// Checked BEFORE the batch, so the club gets a clear message (the
+  /// rules refuse it too).
+  Future<void> _checkJuvenileName(TeamRequest request) async {
+    if (_juvenileKey(request) == null) return;
+    if (!await isNameAvailable(request.juvenileName!, uid: request.uid)) {
+      throw const JuvenileNameTakenException();
+    }
   }
 
   Map<String, dynamic> _reservation(String uid) => {
@@ -228,14 +247,19 @@ class TeamRequestRepository {
     if (!await isNameAvailable(request.teamName, uid: uid)) {
       throw const TeamNameTakenException();
     }
+    await _checkJuvenileName(request);
 
     final key = teamNameKey(request.teamName);
+    final juvenileKey = _juvenileKey(request);
     final batch = _db.batch()
       ..set(_requestRef(uid), {
         ..._buildData(request),
         'createdAt': FieldValue.serverTimestamp(),
       })
       ..set(_nameRef(key), _reservation(uid));
+    if (juvenileKey != null) {
+      batch.set(_nameRef(juvenileKey), _reservation(uid));
+    }
     // The FA's bell: "New team request: Afransi Stars"
     NotificationWriter(_db).forFaInBatch(
       batch,
@@ -249,24 +273,42 @@ class TeamRequestRepository {
     await batch.commit().timeout(_timeout);
   }
 
+  /// [previousJuvenileNameKey]: the juvenile name the request held
+  /// before (null for "B"). A new one is reserved and the old one freed
+  /// in the same batch.
   Future<void> update(
     TeamRequest request, {
     required String previousNameKey,
+    String? previousJuvenileNameKey,
     void Function(WriteBatch batch)? alsoInBatch,
   }) async {
     final uid = request.uid;
     final key = teamNameKey(request.teamName);
     final renamed = key != previousNameKey;
+    final juvenileKey = _juvenileKey(request);
+    final juvenileRenamed = juvenileKey != previousJuvenileNameKey;
 
     if (renamed && !await isNameAvailable(request.teamName, uid: uid)) {
       throw const TeamNameTakenException();
     }
+    if (juvenileRenamed) await _checkJuvenileName(request);
 
     final batch = _db.batch()..update(_requestRef(uid), _buildData(request));
-    if (renamed) {
-      batch
-        ..delete(_nameRef(previousNameKey))
-        ..set(_nameRef(key), _reservation(uid));
+    // Names given up are freed, unless the club or its juvenile side
+    // still uses them (a name may move from one to the other)
+    final kept = {key, ?juvenileKey};
+    if (renamed && !kept.contains(previousNameKey)) {
+      batch.delete(_nameRef(previousNameKey));
+    }
+    if (juvenileRenamed &&
+        previousJuvenileNameKey != null &&
+        !kept.contains(previousJuvenileNameKey)) {
+      batch.delete(_nameRef(previousJuvenileNameKey));
+    }
+    final held = {previousNameKey, ?previousJuvenileNameKey};
+    if (!held.contains(key)) batch.set(_nameRef(key), _reservation(uid));
+    if (juvenileKey != null && !held.contains(juvenileKey)) {
+      batch.set(_nameRef(juvenileKey), _reservation(uid));
     }
     alsoInBatch?.call(batch);
 

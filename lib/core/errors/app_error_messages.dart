@@ -7,6 +7,11 @@ class TeamNameTakenException implements Exception {
   const TeamNameTakenException();
 }
 
+/// The juvenile side's own name is already another club's (JSb).
+class JuvenileNameTakenException implements Exception {
+  const JuvenileNameTakenException();
+}
+
 /// Another player in this squad already wears this number.
 class JerseyTakenException implements Exception {
   const JerseyTakenException(this.number);
@@ -64,6 +69,10 @@ String appErrorMessage(Object error) {
   if (error is PlayerNotPendingException) {
     return 'This player has already been reviewed or changed. '
         'Go back and open them again.';
+  }
+  if (error is JuvenileNameTakenException) {
+    return 'Another club already uses this juvenile side name. '
+        'Please choose a different one.';
   }
   if (error is TeamNameTakenException) {
     return 'Another team already uses this name. Please choose a different one.';

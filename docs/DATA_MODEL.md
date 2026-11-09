@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.24, matches the rules after step JSa, juvenile side names (9 Nov 2026)
+**Status:** v2.25, matches the rules after step JSb, juvenile side names at registration (9 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -166,6 +166,9 @@ Keyed by the requester's `uid`, so each person can have at most one request.
 | **Kits**           |                  |                                                                                                                                   |
 | `kits`                 | map              | `home`, `away`, `goalkeeper` required; `third`, `goalkeeper2` optional. Each value is a Kit (see Kit shape), designed or photos. A club in one competition (Division **or** Juvenile) has only these |
 | `juvenileKits`         | map?             | **Clubs in both competitions only, required** (2.13b): the juvenile sides' own kits, same keys as `kits`. Must be empty for a club in one competition |
+| `juvenileName`         | string?          | **Clubs in both competitions only, optional** (JSb, mockup JS1b): the juvenile sides' own name, 2–60 characters. Empty = "B" (the club's name + " B"). Must be empty for a club in one competition |
+| `juvenileShortName`    | string?          | Required with `juvenileName`, empty without it: 3–4 capitals, not the club's `shortName` |
+| `juvenileNameKey`      | string?          | Required with `juvenileName`: its reservation key in `teamNames` (same key format), not the club's `nameKey`. Reserved for this club in the same batch |
 | **Colours** (2.13b)  |                  |                                                                                                                                   |
 | `colours`              | map              | Required: `{ home: { main, second }, away: { main, second } }`, each `#RRGGBB`. Suggested from the designed home and away kits |
 | **Declaration**    |                  |                                                                                                                                   |
@@ -209,6 +212,7 @@ Stops two teams registering the same name, without letting anyone read other tea
 - Created **only if it doesn't exist**, in the **same batch** as the team request.
 - **New club name (2.10b):** the FA's approval reserves the new name for the club (`uid` = the team's `requestUid`, `teamId` set), in the same batch. The old name stays reserved for the club too (the team ID is still the old key). A reservation with `teamId` is never deleted by the club.
 - If the team name changes while pending or rejected, the old reservation is deleted and the new one created in the same batch.
+- **Juvenile side's own name (JSb):** reserved the same way, under the request's `juvenileNameKey` (`uid` = the club), in the same batch as the request. It blocks a club name and another juvenile name alike. Changing it, or going back to "B", frees the old one in the same batch. The club cannot delete a reservation its request still uses (club name or juvenile name).
 - The holder may delete their own reservation; an FA admin may delete any (e.g. to free a name from an abandoned request).
 - Any signed-in user may `get` a single key, so the form can say "This name is taken" before submitting.
 
@@ -841,6 +845,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 9 Nov 2026 | v2.25 (JSb, juvenile side names at registration): `teamRequests` gain `juvenileName`, `juvenileShortName`, `juvenileNameKey` (clubs in both only; empty = "B"); the own name is reserved in `teamNames` in the same batch; the FA's approval copies `juvenileName` / `juvenileShortName` to the team (left out for "B") and the rules check they match the request. 334 rules tests. |
 | 9 Nov 2026 | v2.24 (JSa, juvenile side names): `teams` gain optional `juvenileName` and `juvenileShortName` (set in JSb / JSc). A club in both competitions is copied into its juvenile matches as "Royal Unique FC B" / "RUF B", or its own juvenile name; the rules check it (`sideNamesOf`). Rules: the kits of a side are looked up once (`isKitChoice` takes the kits), to stay under the 1000-expression limit. 324 rules tests. |
 | 9 Nov 2026 | v2.23 (3.0f2): no data change. Pages opened from another tab, or from a full-screen page, carry `back=` in their address (where ← goes). 321 rules tests. |
 | 9 Nov 2026 | v2.23 (3.0f1): `readMarks/{uid}` gains `reads` (map, at most 100): a tap marks only that note read; Notification details page. Owner-only, as before. 321 rules tests. |

@@ -827,6 +827,24 @@ service cloud.firestore {
                  && data.get('licenceType', null) in ['pdf', 'image']));
       }
 
+      // Juvenile side names (JSb): a club in both competitions may give its
+      // juvenile sides their own name and short name, reserved in teamNames
+      // like a club name (same batch). Without one they play as the club's
+      // name with " B". A club in one competition has neither.
+      function isValidJuvenileName(data, uid) {
+        let name = data.get('juvenileName', null);
+        return (name == null
+            && data.get('juvenileShortName', null) == null
+            && data.get('juvenileNameKey', null) == null)
+          || (data.categories.size() == 2
+            && isText(name, 2, 60)
+            && data.get('juvenileShortName', '').matches('^[A-Z]{3,4}$')
+            && data.juvenileShortName != data.shortName
+            && data.get('juvenileNameKey', '').matches('^[a-z0-9-]{2,60}$')
+            && data.juvenileNameKey != data.nameKey
+            && getAfter(teamNameDoc(data.juvenileNameKey)).data.uid == uid);
+      }
+
       function isValidTeamRequest(data, uid) {
         return data.keys().hasOnly([
             'teamName', 'teamNameLower', 'nameKey', 'shortName', 'town',
@@ -835,7 +853,8 @@ service cloud.firestore {
             'rejectionReason', 'createdAt', 'updatedAt',
             'reviewedAt', 'reviewedBy', 'teamId',
             'clubStatus', 'lastLeague', 'letterUrl', 'licenceUrl', 'licenceType',
-            'juvenileKits', 'colours', 'season'
+            'juvenileKits', 'colours', 'season',
+            'juvenileName', 'juvenileShortName', 'juvenileNameKey'
           ])
           && isText(data.teamName, 2, 60)
           && (data.get('season', null) == null || isSeason(data.season))
@@ -866,6 +885,7 @@ service cloud.firestore {
               || (data.categories.size() == 1
                  && data.get('juvenileKits', null) == null))
           && isValidTeamColours(data.get('colours', null))
+          && isValidJuvenileName(data, uid)
           && data.officials is list
           && data.officials.size() >= 2
           && data.officials.size() <= 7
@@ -1082,13 +1102,21 @@ service cloud.firestore {
       }
 
       // ---------- teamNames/{nameKey} ----------
+
+      // A name the signed-in club's request uses (after this write): its
+      // club name, or its juvenile side's own name (JSb)
+      function isMyRequestName(nameKey) {
+        let req = getAfter(teamRequestDoc(request.auth.uid)).data;
+        return req.nameKey == nameKey || req.get('juvenileNameKey', null) == nameKey;
+      }
+
       match /teamNames/{nameKey} {
         allow get: if isSignedIn();
 
         allow create: if isOwner(request.resource.data.uid)
           && request.resource.data.keys().hasOnly(['uid', 'createdAt'])
           && request.resource.data.createdAt == request.time
-          && getAfter(teamRequestDoc(request.auth.uid)).data.nameKey == nameKey;
+          && isMyRequestName(nameKey);
 
         // The FA approves a new club name (2.10b): the new name is reserved
         // for the club in the same batch. The old one stays the club's too.
@@ -1110,7 +1138,7 @@ service cloud.firestore {
         allow delete: if isOwner(resource.data.uid)
           && !('teamId' in resource.data)
           && (!existsAfter(teamRequestDoc(request.auth.uid))
-              || getAfter(teamRequestDoc(request.auth.uid)).data.nameKey != nameKey);
+              || !isMyRequestName(nameKey));
       }
 
       // ---------- fixtures/{fixtureId} (3.0a) ----------
@@ -1654,6 +1682,11 @@ service cloud.firestore {
           && get(teamNameDoc(teamId)).data.uid == request.resource.data.requestUid
           && getAfter(teamRequestDoc(request.resource.data.requestUid)).data.status == 'approved'
           && getAfter(teamRequestDoc(request.resource.data.requestUid)).data.teamId == teamId
+          // The juvenile side's own name, exactly as on the request (JSb)
+          && request.resource.data.get('juvenileName', null)
+               == getAfter(teamRequestDoc(request.resource.data.requestUid)).data.get('juvenileName', null)
+          && request.resource.data.get('juvenileShortName', null)
+               == getAfter(teamRequestDoc(request.resource.data.requestUid)).data.get('juvenileShortName', null)
           && request.resource.data.createdAt == request.time;
 
         // ---------- teams/{teamId}/jerseys/{jerseyId} ----------

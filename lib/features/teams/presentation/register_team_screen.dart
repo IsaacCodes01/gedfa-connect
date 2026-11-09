@@ -131,6 +131,12 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
   // Competitions (step 1)
   Set<Competition> _competitions = {Competition.division};
 
+  // Juvenile side's name (JSb): "B" (false) or its own name, clubs in both
+  bool _juvenileOwnName = false;
+  final _juvenileName = TextEditingController();
+  final _juvenileShortName = TextEditingController();
+  String? _juvenileNameTakenError;
+
   // Editing an existing request: the files already uploaded
   TeamRequest? _existing;
   String? _existingLogoUrl;
@@ -155,6 +161,9 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
       _shortNameEdited = true;
       _existingLogoUrl = existing.logoUrl;
       _competitions = {...existing.categories};
+      _juvenileOwnName = existing.hasOwnJuvenileName;
+      _juvenileName.text = existing.juvenileName ?? '';
+      _juvenileShortName.text = existing.juvenileShortName ?? '';
       _clubStatus = existing.clubStatus;
       _lastLeague.text = existing.lastLeague ?? '';
       _existingLetterUrl = existing.letterUrl;
@@ -193,6 +202,8 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
       _payAmount,
       _payWhen,
       _payTo,
+      _juvenileName,
+      _juvenileShortName,
     ]) {
       controller.dispose();
     }
@@ -236,6 +247,28 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
           .isNameAvailable(_teamName.text, uid: uid);
       if (!available && mounted) {
         setState(() => _nameTakenError = 'Another team already uses this name');
+        _clubFormKey.currentState?.validate();
+      }
+      return available;
+    } catch (_) {
+      // Can't check right now (e.g. offline). Submit checks again.
+      return true;
+    }
+  }
+
+  /// A club in both with its own juvenile name: is the name free? (JSb)
+  Future<bool> _isJuvenileNameAvailable() async {
+    final uid = ref.read(authStateProvider).value?.uid;
+    if (uid == null || !_bothCompetitions || !_juvenileOwnName) return true;
+    try {
+      final available = await ref
+          .read(teamRequestRepositoryProvider)
+          .isNameAvailable(_juvenileName.text, uid: uid);
+      if (!available && mounted) {
+        setState(
+          () => _juvenileNameTakenError =
+              'Another club already uses this name',
+        );
         _clubFormKey.currentState?.validate();
       }
       return available;
@@ -378,7 +411,7 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
       case _clubStep:
         final fieldsOk = _clubFormKey.currentState!.validate();
         if (!fieldsOk || !_hasLogo) return false;
-        return _isNameAvailable();
+        return await _isNameAvailable() && await _isJuvenileNameAvailable();
       case _statusStep:
         final fieldsOk = _statusFormKey.currentState!.validate();
         return fieldsOk &&
@@ -474,6 +507,12 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
       email: _email.text,
       logoUrl: logoUrl,
       categories: _competitions,
+      juvenileName: _bothCompetitions && _juvenileOwnName
+          ? _juvenileName.text
+          : null,
+      juvenileShortName: _bothCompetitions && _juvenileOwnName
+          ? _juvenileShortName.text
+          : null,
       clubStatus: _clubStatus,
       lastLeague: _lastLeague.text,
       letterUrl: letterUrl,
@@ -650,6 +689,9 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
         await repository.update(
           request,
           previousNameKey: teamNameKey(existing.teamName),
+          previousJuvenileNameKey: existing.hasOwnJuvenileName
+              ? teamNameKey(existing.juvenileName!)
+              : null,
           alsoInBatch: addPayment,
         );
       }
@@ -670,6 +712,17 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
         _step = _clubStep;
       });
       AppToast.error(context, appErrorMessage(const TeamNameTakenException()));
+    } on JuvenileNameTakenException {
+      if (!mounted) return;
+      setState(() {
+        _juvenileNameTakenError = 'Another club already uses this name';
+        _showErrors.add(_clubStep);
+        _step = _clubStep;
+      });
+      AppToast.error(
+        context,
+        appErrorMessage(const JuvenileNameTakenException()),
+      );
     } catch (error) {
       if (!mounted) return;
       AppToast.error(context, appErrorMessage(error));
@@ -711,6 +764,17 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
           competitions: _competitions,
           onCompetitionsChanged: (value) =>
               setState(() => _competitions = value),
+          juvenileOwnName: _juvenileOwnName,
+          onJuvenileOwnNameChanged: (value) =>
+              setState(() => _juvenileOwnName = value),
+          juvenileName: _juvenileName,
+          juvenileShortName: _juvenileShortName,
+          juvenileNameError: _juvenileNameTakenError,
+          onJuvenileNameChanged: (_) {
+            if (_juvenileNameTakenError != null) {
+              setState(() => _juvenileNameTakenError = null);
+            }
+          },
         ),
       _statusStep => ClubStatusStep(
           formKey: _statusFormKey,
@@ -790,6 +854,13 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
           officials: _officials,
           logoUrl: _existingLogoUrl,
           competitions: _competitions,
+          juvenileSide: _bothCompetitions
+              ? (_juvenileOwnName
+                    ? '${_juvenileName.text.trim()} · '
+                          '${_juvenileShortName.text.trim().toUpperCase()}'
+                    : '${_teamName.text.trim()} B · '
+                          '${_shortName.text.trim().toUpperCase()} B')
+              : null,
           clubStatus: _clubStatus,
           lastLeague: _lastLeague.text.trim(),
           letterName: _letter?.name ??

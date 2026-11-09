@@ -7,6 +7,7 @@ import 'package:gedfa_connect/features/teams/domain/kit_slot.dart';
 import 'package:gedfa_connect/features/teams/domain/team_colours.dart';
 import 'package:gedfa_connect/features/teams/domain/official.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
+import 'package:gedfa_connect/features/teams/domain/side_name.dart';
 
 class TeamRequest {
   const TeamRequest({
@@ -33,6 +34,8 @@ class TeamRequest {
     this.thirdKit,
     this.goalkeeperKit2,
     this.juvenileKits = const {},
+    this.juvenileName,
+    this.juvenileShortName,
     this.colours,
     this.rejectionReason,
     this.createdAt,
@@ -78,6 +81,28 @@ class TeamRequest {
   final Map<KitSlot, Kit> juvenileKits;
 
   bool get hasSeparateJuvenileKits => categories.length > 1;
+
+  /// A club in both competitions: its juvenile sides' own name and short
+  /// name (JSb). Null = they play as the club's name with " B".
+  final String? juvenileName;
+  final String? juvenileShortName;
+
+  /// The juvenile side has its own name (not "B").
+  bool get hasOwnJuvenileName =>
+      hasSeparateJuvenileKits && (juvenileName ?? '').trim().isNotEmpty;
+
+  /// How the juvenile sides show: "Royal Unique FC B" / "RUF B", or the
+  /// own name. Only for a club in both competitions.
+  ({String name, String shortName}) get juvenileSide => sideNames(
+    name: teamName.trim(),
+    shortName: shortName.trim().toUpperCase(),
+    categories: categories,
+    category: Competition.juvenile,
+    juvenileName: hasOwnJuvenileName ? juvenileName!.trim() : null,
+    juvenileShortName: hasOwnJuvenileName
+        ? juvenileShortName?.trim().toUpperCase()
+        : null,
+  );
 
   /// Behind the initials when the logo can't load: the home colour, or
   /// the home shirt on requests sent before team colours.
@@ -157,6 +182,11 @@ class TeamRequest {
                 entry.key.name: entry.value.toMap(),
             }
           : null,
+      // The juvenile side's own name (JSb); none = "B"
+      'juvenileName': hasOwnJuvenileName ? juvenileName!.trim() : null,
+      'juvenileShortName': hasOwnJuvenileName
+          ? juvenileShortName?.trim().toUpperCase()
+          : null,
       'colours': colours?.toMap(),
       'officials': officials.map((official) => official.toMap()).toList(),
     };
@@ -206,6 +236,8 @@ class TeamRequest {
           for (final slot in KitSlot.values)
           slot: ?Kit.fromMap(juvenile?[slot.name] as Map<String, dynamic>?),
       },
+      juvenileName: data['juvenileName'] as String?,
+      juvenileShortName: data['juvenileShortName'] as String?,
       colours: TeamColours.fromMap(data['colours'] as Map<String, dynamic>?),
       officials: officials,
       status: ApprovalStatus.fromString(data['status'] as String? ?? 'pending'),

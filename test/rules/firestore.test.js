@@ -112,7 +112,7 @@ const KITS = {
 };
 
 /** Sends a team request the way the app does: request + name reservation. */
-function sendTeamRequest(db, uid, changes = {}) {
+function sendTeamRequest(db, uid, changes = {}, { reserveJuvenile = true } = {}) {
   const data = {
     teamName: 'Test United',
     teamNameLower: 'test united',
@@ -142,6 +142,13 @@ function sendTeamRequest(db, uid, changes = {}) {
     uid,
     createdAt: serverTimestamp(),
   });
+  // A juvenile side's own name is reserved in the same batch (JSb)
+  if (data.juvenileNameKey && reserveJuvenile) {
+    batch.set(doc(db, `${D}/teamNames/${data.juvenileNameKey}`), {
+      uid,
+      createdAt: serverTimestamp(),
+    });
+  }
   return batch.commit();
 }
 
@@ -1143,6 +1150,69 @@ describe('League settings', () => {
   });
 });
 
+// ---------- Juvenile side names: registration (JSb) ----------
+
+describe('Team requests: juvenile side name (JSb)', () => {
+  const BOTH = { categories: ['division', 'juvenile'], juvenileKits: KITS };
+  const OWN = {
+    ...BOTH,
+    juvenileName: 'Test United Colts', juvenileShortName: 'TUC', juvenileNameKey: 'test-united-colts',
+  };
+
+  it('a club in both may keep "B" (no juvenile name)', async () => {
+    await assertSucceeds(sendTeamRequest(dbAs('newbie'), 'newbie', BOTH));
+  });
+
+  it('...or send its own juvenile name, reserved in the same batch', async () => {
+    await assertSucceeds(sendTeamRequest(dbAs('newbie'), 'newbie', OWN));
+  });
+
+  it('an own juvenile name must be reserved in the same batch', async () => {
+    await assertFails(sendTeamRequest(dbAs('newbie'), 'newbie', OWN, { reserveJuvenile: false }));
+  });
+
+  it("an own juvenile name can't be another club's name", async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `${D}/teamNames/test-united-colts`), { uid: 'someoneElse' });
+    });
+    await assertFails(sendTeamRequest(dbAs('newbie'), 'newbie', OWN));
+  });
+
+  it('a club in one competition has no juvenile name', async () => {
+    await assertFails(sendTeamRequest(dbAs('newbie'), 'newbie', {
+      ...OWN, categories: ['juvenile'], juvenileKits: null,
+    }));
+  });
+
+  it("the juvenile name and short name differ from the club's, and the short name is 3–4 capitals", async () => {
+    const db = dbAs('newbie');
+    await assertFails(sendTeamRequest(db, 'newbie', { ...OWN, juvenileShortName: 'TUN' }));
+    await assertFails(sendTeamRequest(db, 'newbie', { ...OWN, juvenileShortName: 'tuc' }));
+    await assertFails(sendTeamRequest(db, 'newbie', { ...OWN, juvenileShortName: 'TU' }));
+    await assertFails(sendTeamRequest(db, 'newbie', { ...OWN, juvenileNameKey: 'test-united' }));
+    await assertFails(sendTeamRequest(db, 'newbie', { ...OWN, juvenileName: 'T' }));
+    // A name needs its short name, and the other way round
+    await assertFails(sendTeamRequest(db, 'newbie', without(OWN, 'juvenileShortName')));
+    await assertFails(sendTeamRequest(db, 'newbie', without(OWN, 'juvenileName')));
+  });
+
+  it("the club can't give up its juvenile name while its request uses it", async () => {
+    await sendTeamRequest(dbAs('newbie'), 'newbie', OWN);
+    await assertFails(deleteDoc(doc(dbAs('newbie'), `${D}/teamNames/test-united-colts`)));
+  });
+
+  it('switching back to "B" frees the juvenile name in the same batch', async () => {
+    await sendTeamRequest(dbAs('newbie'), 'newbie', OWN);
+    const db = dbAs('newbie');
+    const batch = writeBatch(db);
+    batch.update(doc(db, `${D}/teamRequests/newbie`), {
+      juvenileName: null, juvenileShortName: null, juvenileNameKey: null, updatedAt: serverTimestamp(),
+    });
+    batch.delete(doc(db, `${D}/teamNames/test-united-colts`));
+    await assertSucceeds(batch.commit());
+  });
+});
+
 // ---------- FA admin: approve and reject (2.2) ----------
 
 /**
@@ -1150,7 +1220,7 @@ describe('League settings', () => {
  * one batch. Pass changes to break one part on purpose.
  */
 function approve(db, { uid = 'applicant', teamId = 'gomoa-united-fc', by = 'fa1',
-  role = 'teamAdmin', skipTeam = false, skipUser = false } = {}) {
+  role = 'teamAdmin', skipTeam = false, skipUser = false, team = {} } = {}) {
   const batch = writeBatch(db);
   batch.update(doc(db, `${D}/teamRequests/${uid}`), {
     status: 'approved',
@@ -1168,6 +1238,7 @@ function approve(db, { uid = 'applicant', teamId = 'gomoa-united-fc', by = 'fa1'
       requestUid: uid,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
+      ...team,
     });
   }
   if (!skipUser) {
@@ -1220,6 +1291,25 @@ describe('FA admin: approve and reject', () => {
 
   it('cannot sign the review as someone else', async () => {
     await assertFails(approve(dbAs('fa1'), { by: 'admin1' }));
+  });
+
+  it("the team gets the request's juvenile side name exactly (JSb)", async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), `${D}/teamRequests/applicant`), {
+        juvenileName: 'Gomoa United Colts', juvenileShortName: 'GUC',
+      });
+    });
+    await assertFails(approve(dbAs('fa1'), { team: { categories: ['division', 'juvenile'] } }));
+    await assertFails(approve(dbAs('fa1'), { team: {
+      categories: ['division', 'juvenile'], juvenileName: 'Other Colts', juvenileShortName: 'GUC',
+    } }));
+    await assertSucceeds(approve(dbAs('fa1'), { team: {
+      categories: ['division', 'juvenile'], juvenileName: 'Gomoa United Colts', juvenileShortName: 'GUC',
+    } }));
+  });
+
+  it('a request with "B" makes a team without a juvenile name', async () => {
+    await assertFails(approve(dbAs('fa1'), { team: { juvenileName: 'Gomoa United Colts' } }));
   });
 
   it('cannot approve the same request twice', async () => {

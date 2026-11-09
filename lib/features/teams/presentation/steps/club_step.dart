@@ -6,6 +6,7 @@ import 'package:gedfa_connect/core/utils/validators.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/logo_picker.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/competition_picker.dart';
+import 'package:gedfa_connect/features/teams/presentation/widgets/juvenile_name_picker.dart';
 
 class ClubStep extends StatelessWidget {
   const ClubStep({
@@ -29,6 +30,12 @@ class ClubStep extends StatelessWidget {
     required this.onShortNameEdited,
     required this.onLogoPicked,
     required this.onLogoRemoved,
+    required this.juvenileOwnName,
+    required this.onJuvenileOwnNameChanged,
+    required this.juvenileName,
+    required this.juvenileShortName,
+    this.juvenileNameError,
+    this.onJuvenileNameChanged,
     this.logoUrl,
   });
 
@@ -52,6 +59,14 @@ class ClubStep extends StatelessWidget {
   final void Function(Uint8List bytes, String contentType) onLogoPicked;
   final VoidCallback onLogoRemoved;
   final String? logoUrl;
+
+  // Juvenile side names (JSb, mockups JS1, JS1b): clubs in both only
+  final bool juvenileOwnName;
+  final ValueChanged<bool> onJuvenileOwnNameChanged;
+  final TextEditingController juvenileName;
+  final TextEditingController juvenileShortName;
+  final String? juvenileNameError;
+  final ValueChanged<String>? onJuvenileNameChanged;
 
   static String? _shortNameValidator(String? value) {
     final text = value?.trim() ?? '';
@@ -109,11 +124,29 @@ class ClubStep extends StatelessWidget {
                   validator: teamNameValidator,
                 ),
                 gap,
-                  CompetitionPicker(
+                CompetitionPicker(
                   initialValue: competitions,
                   onChanged: onCompetitionsChanged,
                   enabled: enabled,
                 ),
+                // Both ticked: how the juvenile sides are called (JS1)
+                if (competitions.length > 1) ...[
+                  const SizedBox(height: 20),
+                  JuvenileNamePicker(
+                    clubName: teamName.text,
+                    clubShortName: shortName.text,
+                    ownName: juvenileOwnName,
+                    onOwnNameChanged: onJuvenileOwnNameChanged,
+                    name: juvenileName,
+                    shortName: juvenileShortName,
+                    nameError: juvenileNameError,
+                    onNameChanged: onJuvenileNameChanged,
+                    enabled: enabled,
+                    logoColor: logoColor,
+                    logoBytes: logoBytes,
+                    logoUrl: logoUrl,
+                  ),
+                ],
                 gap,
                 Container(
                   padding: const EdgeInsets.all(12),

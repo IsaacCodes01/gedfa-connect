@@ -39,6 +39,7 @@ class ReviewStep extends StatelessWidget {
     required this.email,
     this.logoUrl,
     required this.competitions,
+    this.juvenileSide,
     required this.clubStatus,
     required this.lastLeague,
     this.letterName,
@@ -67,6 +68,9 @@ class ReviewStep extends StatelessWidget {
   final String email;
   final String? logoUrl;
   final Set<Competition> competitions;
+
+  /// Clubs in both: "Royal Unique FC B · RUF B" or the own name (JSb)
+  final String? juvenileSide;
   final ClubStatus clubStatus;
   final String lastLeague;
 
@@ -140,6 +144,8 @@ class ReviewStep extends StatelessWidget {
                     const SizedBox(height: 12),
                     _ReviewRow(label: 'Team name', value: teamName),
                     _ReviewRow(label: 'Short name', value: shortName),
+                    if (juvenileSide case final side?)
+                      _ReviewRow(label: 'Juvenile side', value: side),
                     _ReviewRow(label: 'Logo', value: hasLogo ? 'Added' : ''),
                     _ReviewRow(label: 'Town', value: town),
                     _ReviewRow(label: 'Home ground', value: homeGround),

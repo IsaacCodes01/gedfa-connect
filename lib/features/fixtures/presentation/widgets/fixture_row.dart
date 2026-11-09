@@ -3,6 +3,7 @@ import 'package:gedfa_connect/app/theme.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/features/dashboard/presentation/widgets/dashboard_card.dart';
 import 'package:gedfa_connect/features/fixtures/domain/fixture.dart';
+import 'package:gedfa_connect/features/teams/presentation/widgets/b_side_ring.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/team_logo.dart';
 
 /// A team's crest in a match: its logo, or its short name on its colour.
@@ -14,10 +15,6 @@ class FixtureCrest extends StatelessWidget {
   final FixtureSide side;
   final double size;
 
-  /// The white gap and the gold ring around a "B" side's crest
-  static const _gap = 2.0;
-  static const _ring = 1.5;
-
   @override
   Widget build(BuildContext context) {
     final label = side.crestLabel.isNotEmpty
@@ -25,37 +22,16 @@ class FixtureCrest extends StatelessWidget {
         : side.name.isEmpty
         ? '?'
         : side.name.substring(0, 1).toUpperCase();
-    if (!side.isBSide) {
-      return TeamLogo(
-        label: label,
-        color: side.colour,
-        url: side.logoUrl,
-        size: size,
-      );
-    }
-
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    Widget logo(double size) => TeamLogo(
+      label: label,
+      color: side.colour,
+      url: side.logoUrl,
+      size: size,
+    );
+    if (!side.isBSide) return logo(size);
     return Semantics(
       label: '${side.name}, juvenile side',
-      child: Container(
-        width: size,
-        height: size,
-        padding: const EdgeInsets.all(_gap),
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: Theme.of(context).colorScheme.surface,
-          border: Border.all(
-            color: isDark ? const Color(0xFFF5D25B) : const Color(0xFF8A6A00),
-            width: _ring,
-          ),
-        ),
-        child: TeamLogo(
-          label: label,
-          color: side.colour,
-          url: side.logoUrl,
-          size: size - 2 * (_gap + _ring),
-        ),
-      ),
+      child: BSideRing(size: size, builder: logo),
     );
   }
 }
