@@ -84,6 +84,10 @@ class ChangeStatusNote extends StatelessWidget {
 
   String get _competition => change.competition?.label ?? change.to;
 
+  /// "Royal Unique Colts", or "Royal Unique FC B" when going back to "B"
+  String get _juvenileTo =>
+      change.isBackToB ? '${change.teamName} B' : change.to;
+
   String get _title => switch ((change.status, change.kind)) {
         (ApprovalStatus.pending, TeamChangeKind.competition) =>
           '$_competition request pending',
@@ -136,6 +140,14 @@ class ChangeStatusNote extends StatelessWidget {
                     '${_other(change.competition)}.',
               ),
             ]),
+          TeamChangeKind.juvenileName => TextSpan(children: [
+              const TextSpan(text: 'You asked for your juvenile sides to play as '),
+              TextSpan(text: _juvenileTo, style: bold),
+              TextSpan(
+                text: '$on. The old name is used everywhere until the FA '
+                    'approves.',
+              ),
+            ]),
         };
       case ApprovalStatus.rejected:
         return TextSpan(children: [
@@ -157,6 +169,11 @@ class ChangeStatusNote extends StatelessWidget {
             ]),
           TeamChangeKind.logo =>
             const TextSpan(text: 'Your new logo is now used everywhere.'),
+          TeamChangeKind.juvenileName => TextSpan(children: [
+              const TextSpan(text: 'Your juvenile sides now play as '),
+              TextSpan(text: _juvenileTo, style: bold),
+              const TextSpan(text: '.'),
+            ]),
           TeamChangeKind.competition =>
             change.competition == Competition.division
                 ? const TextSpan(

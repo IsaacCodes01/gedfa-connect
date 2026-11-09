@@ -191,6 +191,16 @@ class _Body extends StatelessWidget {
                     value: team.shortName,
                     onAsk: () => _ask(context, TeamChangeKind.shortName),
                   ),
+                  // Clubs in both: how the juvenile sides are called (JS3)
+                  if (both)
+                    _Row(
+                      label: 'Juvenile side name',
+                      value: team.juvenileSide.name,
+                      note: team.hasOwnJuvenileName
+                          ? '${team.juvenileSide.shortName} · U13, U15, U17'
+                          : '"B" · U13, U15, U17',
+                      onAsk: () => _ask(context, TeamChangeKind.juvenileName),
+                    ),
                   _Row(
                     label: 'Logo',
                     value: '',

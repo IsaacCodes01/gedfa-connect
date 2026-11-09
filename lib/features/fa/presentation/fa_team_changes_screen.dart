@@ -14,6 +14,8 @@ import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/fa/presentation/widgets/fa_changes_view.dart';
 import 'package:gedfa_connect/features/fa/presentation/widgets/review_widgets.dart';
+import 'package:gedfa_connect/features/teams/presentation/widgets/b_side_ring.dart';
+import 'package:gedfa_connect/features/teams/domain/side_name.dart';
 import 'package:gedfa_connect/features/teams/data/team_change_repository.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
@@ -237,6 +239,10 @@ class _FaTeamChangesScreenState extends ConsumerState<FaTeamChangesScreen> {
             'Registration for this competition is closed',
             'Please talk to the FA first',
           ],
+        TeamChangeKind.juvenileName => const [
+            "Too close to another club's name",
+            'Please talk to the FA first',
+          ],
       },
     );
     if (reason == null || !mounted) return;
@@ -342,6 +348,7 @@ class _FaTeamChangesScreenState extends ConsumerState<FaTeamChangesScreen> {
         TeamChangeKind.logo => 'Approve the logo',
         TeamChangeKind.competition =>
           'Approve ${change.competition?.label ?? 'it'}',
+        TeamChangeKind.juvenileName => 'Approve the name',
       };
 
   /// In the confirm dialog: exactly what approving does.
@@ -358,9 +365,16 @@ class _FaTeamChangesScreenState extends ConsumerState<FaTeamChangesScreen> {
               ? '$teamName will play Division too. Its kits are kept as its '
                   'Juvenile kits (and used for Division until it changes '
                   'them). The season fee stays the same.'
-              : '$teamName will play Juvenile (U13, U15 and U17) too. It then '
-                  'adds Juvenile kits and children for screening. The season '
-                  'fee stays the same.',
+              : '$teamName will play Juvenile (U13, U15 and U17) too, as '
+                  '${change.juvenileName ?? '$teamName B'}. It then adds '
+                  'Juvenile kits and children for screening. The season fee '
+                  'stays the same.',
+        TeamChangeKind.juvenileName => change.isBackToB
+            ? "$teamName's juvenile sides (U13, U15 and U17) play as "
+                  '$teamName B again.'
+            : "$teamName's juvenile sides (U13, U15 and U17) play as "
+                  '${change.to} (${change.toShortName}). The name is kept for '
+                  'the club.',
       };
 }
 
@@ -441,7 +455,12 @@ class _ChangeCard extends ConsumerWidget {
           const SizedBox(height: 12),
           Text('Why', style: label),
           const SizedBox(height: 2),
-          Text('"${change.reason}"', style: textTheme.bodyLarge),
+          Text(
+            change.reason.isEmpty ? 'No reason given' : '"${change.reason}"',
+            style: change.reason.isEmpty
+                ? textTheme.bodyLarge?.copyWith(color: scheme.onSurfaceVariant)
+                : textTheme.bodyLarge,
+          ),
           Text(
             asker == null || asker.isEmpty
                 ? 'Team admin'
@@ -565,6 +584,11 @@ class _NowAndAskedFor extends StatelessWidget {
       );
     }
 
+    // The juvenile side's name (mockup JS4): crest and name, then the new
+    if (change.kind == TeamChangeKind.juvenileName) {
+      return _JuvenileNameChange(change: change, team: team);
+    }
+
     final (now, askedFor) = switch (change.kind) {
       TeamChangeKind.competition => (
           competitionsText(change.fromCompetitions),
@@ -572,6 +596,13 @@ class _NowAndAskedFor extends StatelessWidget {
         ),
       _ => (change.from ?? '', change.to),
     };
+    // "Add Juvenile": how its juvenile sides will be called (JSc)
+    final juvenileName = change.kind == TeamChangeKind.competition &&
+            change.competition == Competition.juvenile
+        ? (change.juvenileName == null
+            ? '${team?.name ?? change.teamName} B'
+            : '${change.juvenileName} · ${change.juvenileShortName}')
+        : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -590,6 +621,77 @@ class _NowAndAskedFor extends StatelessWidget {
           askedFor,
           style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
         ),
+        if (juvenileName != null) ...[
+          const SizedBox(height: 8),
+          Text('Juvenile side name', style: label),
+          Text(
+            juvenileName,
+            style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// A juvenile side's name (mockup JS4): the crest and name now (a gold
+/// ring for "B"), an arrow, then the crest and the name asked for.
+class _JuvenileNameChange extends StatelessWidget {
+  const _JuvenileNameChange({required this.change, required this.team});
+
+  final TeamChange change;
+  final Team? team;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
+    final muted = textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant);
+    final clubName = team?.name ?? change.teamName;
+    final clubShort = team?.shortName ?? '';
+    final (toName, toShort) = change.isBackToB
+        ? ('$clubName B', '$clubShort B')
+        : (change.to, change.toShortName ?? '');
+
+    Widget side(String name, String shortName, {required bool now}) {
+      final isB = isBSideShortName(shortName);
+      final label = isB
+          ? shortName.substring(0, shortName.length - 2)
+          : shortName;
+      Widget logo(double size) => TeamLogo(
+        label: label.isEmpty ? '?' : label,
+        color: team?.logoColor ?? scheme.primary,
+        url: team?.logoUrl,
+        size: size,
+      );
+      return Column(
+        children: [
+          isB ? BSideRing(size: 40, builder: logo) : logo(40),
+          const SizedBox(height: 6),
+          Text(
+            name,
+            textAlign: TextAlign.center,
+            style: now
+                ? muted
+                : textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          if (!now && shortName.isNotEmpty)
+            Text(shortName, textAlign: TextAlign.center, style: muted),
+        ],
+      );
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: side(change.from ?? '', change.fromShortName ?? '', now: true),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: 10),
+          child: Icon(Icons.arrow_forward_rounded, color: scheme.onSurfaceVariant),
+        ),
+        Expanded(child: side(toName, toShort, now: false)),
       ],
     );
   }

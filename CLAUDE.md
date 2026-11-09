@@ -19,7 +19,7 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
    - test steps he can do himself in the app
 5. **Before every commit**, run (and show the result):
    - `flutter analyze` → must be **0 issues**
-   - `cd test/rules && npm test` → **all** rules tests pass (334 after JSb)
+   - `cd test/rules && npm test` → **all** rules tests pass (348 after JSc1)
    - `flutter test` → all Dart tests pass (layout smoke tests and the kit check)
 6. **Commit after each step** with a clear message, e.g.
    `feat(teams): change requests for name, short name, logo and competitions; 250 rules tests; docs v2.12`
@@ -139,6 +139,10 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
   name to the team (left out for "B": a null field would break `team.get('juvenileName', name + ' B')`). Picker
   `widgets/juvenile_name_picker.dart` (reuse it for JS3b), ring `widgets/b_side_ring.dart`. Run `dart format` on single
   files only (the folder reformats ~44 untouched files). Rules changed: Isaac deploys to dev. Next: **JSc** ask the FA.
+- **JSc1** done (9 Nov 2026, 348 rules tests, 177 Dart tests): change kind `juvenileName` (`to` '' = back to "B",
+  `toShortName`, `fromShortName`; "Why" optional) and "Add Juvenile" with `juvenileName` / `juvenileShortName` / `nameKey`;
+  approval sets or deletes the team's name and reserves it (`_reserveJuvenileName`). Chip in `ask_change_screen.dart`
+  (`JuvenileNamePicker(compact: true)`), row on Team profile, FA card `_JuvenileNameChange`. Next: **JSc2** rename matches.
 - **Plan agreed 9 Nov 2026 (deadline Thu 12 Nov, 12:30 pm; Isaac's prompts in that conversation):** next, in order:
   1. **3.0f Notifications and Back** (mockup `3.0f-notifications-and-back.html`, N1–N3, **approved**): a tap marks only
      that note read (reads kept per note in `readMarks/{uid}`: note ID → the `updatedAt` read; a grouped note with a newer

@@ -2523,6 +2523,217 @@ describe('Change requests (2.10b)', () => {
   });
 });
 
+// ---------- Juvenile side names: ask the FA (JSc) ----------
+
+describe('Juvenile side name requests (JSc)', () => {
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      const now = Timestamp.now();
+      // A club in both competitions, its juvenile sides playing as "B"
+      await setDoc(doc(db, `${D}/teams/royal`), {
+        name: 'Royal Unique FC', nameLower: 'royal unique fc', nameKey: 'royal',
+        shortName: 'RUFC', town: 'Gomoa Fetteh', homeGround: 'Fetteh Park',
+        categories: ['division', 'juvenile'], kits: KITS, juvenileKits: KITS, colours: COLOURS,
+        officials: OFFICIALS, logoUrl: 'https://example.com/logo.png',
+        adminUids: ['admin1'], requestUid: 'admin1', updatedAt: now,
+      });
+      await setDoc(doc(db, `${D}/teams/stars`), {
+        name: 'Gomoa Stars', shortName: 'GST', categories: ['juvenile'], kits: KITS,
+        adminUids: ['admin2'], requestUid: 'admin2', updatedAt: now,
+      });
+      await setDoc(doc(db, `${D}/teamNames/royal`), { uid: 'admin1', createdAt: now });
+      await setDoc(doc(db, `${D}/teamNames/gomoa-stars`), { uid: 'admin2', createdAt: now });
+    });
+  });
+
+  const OWN = {
+    from: 'Royal Unique FC B', fromShortName: 'RUFC B',
+    to: 'Royal Unique Colts', toShortName: 'RUC', nameKey: 'royal-unique-colts',
+  };
+
+  /** What the team sends (kind juvenileName unless [kind] says otherwise). */
+  const request = (changes = {}, kind = 'juvenileName', teamId = 'royal') => ({
+    teamId,
+    teamName: teamId === 'royal' ? 'Royal Unique FC' : 'Gomoa Stars',
+    kind,
+    ...(kind === 'juvenileName' ? OWN : {}),
+    reason: 'Our academy is known as the Colts',
+    status: 'pending',
+    askedBy: teamId === 'royal' ? 'admin1' : 'admin2',
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    ...changes,
+  });
+
+  const ask = (db, changes = {}, kind = 'juvenileName', teamId = 'royal') =>
+    setDoc(doc(db, `${D}/teamChanges/${teamId}_${kind}`), request(changes, kind, teamId));
+
+  const seedChange = (changes = {}, kind = 'juvenileName') =>
+    testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `${D}/teamChanges/royal_${kind}`), {
+        ...request(changes, kind), createdAt: Timestamp.now(), updatedAt: Timestamp.now(),
+      });
+    });
+
+  /** The FA's approve batch: the request, the team and the reservation. */
+  function approve(db, { kind = 'juvenileName', team, reserve = 'royal-unique-colts' } = {}) {
+    const batch = writeBatch(db);
+    batch.update(doc(db, `${D}/teamChanges/royal_${kind}`), {
+      status: 'approved', reviewedBy: 'fa1', reviewedAt: serverTimestamp(), updatedAt: serverTimestamp(),
+    });
+    batch.update(doc(db, `${D}/teams/royal`), { ...team, updatedAt: serverTimestamp() });
+    if (reserve) {
+      batch.set(doc(db, `${D}/teamNames/${reserve}`), { uid: 'admin1', teamId: 'royal', createdAt: serverTimestamp() });
+    }
+    return batch.commit();
+  }
+
+  it('a club in both asks for its juvenile side\'s own name; "Why" is optional', async () => {
+    await assertSucceeds(ask(dbAs('admin1')));
+  });
+
+  it('...and may leave "Why" empty', async () => {
+    await assertSucceeds(ask(dbAs('admin1'), { reason: '' }));
+  });
+
+  it('the request must say how the side plays now, and use a new, free name', async () => {
+    const db = dbAs('admin1');
+    await assertFails(ask(db, { from: 'Royal Unique FC', fromShortName: 'RUFC' }));
+    await assertFails(ask(db, { to: 'Royal Unique FC' }));
+    await assertFails(ask(db, { toShortName: 'RUFC' }));
+    await assertFails(ask(db, { toShortName: 'ruc' }));
+    await assertFails(ask(db, { nameKey: 'royal' }));
+    // Another club's name
+    await assertFails(ask(db, { to: 'Gomoa Stars', nameKey: 'gomoa-stars' }));
+    // "Why" given but too short
+    await assertFails(ask(db, { reason: 'Why' }));
+    // Already "B": nothing to change
+    await assertFails(ask(db, { to: '', toShortName: '', nameKey: null }));
+  });
+
+  it('a club in one competition has no juvenile side name to change', async () => {
+    await assertFails(ask(dbAs('admin2'), {
+      from: 'Gomoa Stars', fromShortName: 'GST', to: 'Gomoa Stars Colts', toShortName: 'GSC',
+      nameKey: 'gomoa-stars-colts',
+    }, 'juvenileName', 'stars'));
+  });
+
+  it('other kinds carry no juvenile short names, and still need a reason', async () => {
+    const db = dbAs('admin1');
+    await assertFails(setDoc(doc(db, `${D}/teamChanges/royal_shortName`), {
+      ...request({ from: 'RUFC', to: 'RUSF', toShortName: 'RUC' }, 'shortName'),
+    }));
+    await assertFails(setDoc(doc(db, `${D}/teamChanges/royal_shortName`), {
+      ...request({ from: 'RUFC', to: 'RUSF', reason: '' }, 'shortName'),
+    }));
+  });
+
+  it('the FA approves: the team gets the name and it is reserved for the club, in one batch', async () => {
+    await seedChange();
+    await assertSucceeds(approve(dbAs('fa1'), {
+      team: { juvenileName: 'Royal Unique Colts', juvenileShortName: 'RUC' },
+    }));
+  });
+
+  it('approving needs the reservation and exactly the asked name', async () => {
+    await seedChange();
+    await assertFails(approve(dbAs('fa1'), {
+      team: { juvenileName: 'Royal Unique Colts', juvenileShortName: 'RUC' }, reserve: null,
+    }));
+    await assertFails(approve(dbAs('fa1'), {
+      team: { juvenileName: 'Royal Colts', juvenileShortName: 'RUC' },
+    }));
+  });
+
+  it('nobody sets a juvenile name on a team without an approved request', async () => {
+    const team = doc(dbAs('fa1'), `${D}/teams/royal`);
+    await assertFails(updateDoc(team, {
+      juvenileName: 'Royal Unique Colts', juvenileShortName: 'RUC', updatedAt: serverTimestamp(),
+    }));
+    await assertFails(updateDoc(doc(dbAs('admin1'), `${D}/teams/royal`), {
+      juvenileName: 'Royal Unique Colts', juvenileShortName: 'RUC', updatedAt: serverTimestamp(),
+    }));
+  });
+
+  it('a club with its own name may go back to "B"', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), `${D}/teams/royal`), {
+        juvenileName: 'Royal Unique Colts', juvenileShortName: 'RUC',
+      });
+    });
+    const back = {
+      from: 'Royal Unique Colts', fromShortName: 'RUC', to: '', toShortName: '', nameKey: null,
+    };
+    await assertSucceeds(ask(dbAs('admin1'), back));
+  });
+
+  it('the FA approves "B": the name is removed from the team', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), `${D}/teams/royal`), {
+        juvenileName: 'Royal Unique Colts', juvenileShortName: 'RUC',
+      });
+    });
+    await seedChange({
+      from: 'Royal Unique Colts', fromShortName: 'RUC', to: '', toShortName: '', nameKey: null,
+    });
+    await assertFails(approve(dbAs('fa1'), { team: { juvenileName: 'Royal Colts' }, reserve: null }));
+    await assertSucceeds(approve(dbAs('fa1'), {
+      team: { juvenileName: deleteField(), juvenileShortName: deleteField() }, reserve: null,
+    }));
+  });
+
+  it('"Add Juvenile" may name the juvenile side ("B" without a name)', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), `${D}/teams/royal`), {
+        categories: ['division'], juvenileKits: null,
+      });
+    });
+    const db = dbAs('admin1');
+    const add = { from: ['division'], to: 'juvenile' };
+    // A name needs its short name and key
+    await assertFails(ask(db, { ...add, juvenileName: 'Royal Unique Colts' }, 'competition'));
+    await assertSucceeds(ask(db, {
+      ...add, juvenileName: 'Royal Unique Colts', juvenileShortName: 'RUC', nameKey: 'royal-unique-colts',
+    }, 'competition'));
+  });
+
+  it('"Add Juvenile" without a name: the side will play as "B"', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), `${D}/teams/royal`), {
+        categories: ['division'], juvenileKits: null,
+      });
+    });
+    await assertSucceeds(ask(dbAs('admin1'), { from: ['division'], to: 'juvenile' }, 'competition'));
+  });
+
+  it('the FA approves "Add Juvenile" with the name, reserved in the same batch', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), `${D}/teams/royal`), {
+        categories: ['division'], juvenileKits: null,
+      });
+    });
+    await seedChange({
+      from: ['division'], to: 'juvenile',
+      juvenileName: 'Royal Unique Colts', juvenileShortName: 'RUC', nameKey: 'royal-unique-colts',
+    }, 'competition');
+    const team = { categories: ['division', 'juvenile'] };
+    // Without the name the team would play as "B": not what was approved
+    await assertFails(approve(dbAs('fa1'), { kind: 'competition', team, reserve: null }));
+    await assertSucceeds(approve(dbAs('fa1'), {
+      kind: 'competition',
+      team: { ...team, juvenileName: 'Royal Unique Colts', juvenileShortName: 'RUC' },
+    }));
+  });
+
+  it('a Juvenile-only club adding Division names no juvenile side', async () => {
+    await assertFails(ask(dbAs('admin2'), {
+      from: ['juvenile'], to: 'division',
+      juvenileName: 'Gomoa Stars Colts', juvenileShortName: 'GSC', nameKey: 'gomoa-stars-colts',
+    }, 'competition', 'stars'));
+  });
+});
+
 describe('FA corrections (2.11a)', () => {
   beforeEach(async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {

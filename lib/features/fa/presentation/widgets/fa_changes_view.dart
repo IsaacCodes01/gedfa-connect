@@ -147,6 +147,10 @@ TextSpan asksText(TeamChange change) {
             text: ' (plays ${competitionsText(change.fromCompetitions)})',
           ),
         ]),
+      TeamChangeKind.juvenileName => TextSpan(children: [
+          const TextSpan(text: 'Juvenile side name → '),
+          TextSpan(text: change.isBackToB ? '"B"' : change.to, style: bold),
+        ]),
     };
 }
 

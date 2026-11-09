@@ -16,6 +16,7 @@ import 'package:gedfa_connect/features/teams/data/team_profile_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/teams/domain/team_change.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/change_status_note.dart';
+import 'package:gedfa_connect/features/teams/presentation/widgets/juvenile_name_picker.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/logo_picker.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/team_logo.dart';
 import 'package:go_router/go_router.dart';
@@ -70,6 +71,18 @@ class _FormState extends ConsumerState<_Form> {
   final _shortName = TextEditingController();
   final _reason = TextEditingController();
 
+  // The juvenile side's name (JSc): its own name, or "B"
+  late final _juvenileName =
+      TextEditingController(text: widget.team.juvenileName ?? '');
+  late final _juvenileShortName =
+      TextEditingController(text: widget.team.juvenileShortName ?? '');
+
+  /// "Juvenile side name": its own name (picked first, mockup JS3b)
+  bool _juvenileOwn = true;
+
+  /// "Add Juvenile": "B" unless the club picks its own name
+  bool _addJuvenileOwn = false;
+
   late TeamChangeKind _kind = _kinds.contains(widget.initialKind)
       ? widget.initialKind!
       : TeamChangeKind.name;
@@ -83,11 +96,27 @@ class _FormState extends ConsumerState<_Form> {
   TeamDetails get _team => widget.team;
   bool get _both => _team.categories.length > 1;
 
-  /// A club already in both competitions has nothing to add.
+  /// A club already in both competitions has nothing to add; only a club
+  /// in both has a juvenile side name (JSc).
   List<TeamChangeKind> get _kinds => [
         for (final kind in TeamChangeKind.values)
-          if (kind != TeamChangeKind.competition || !_both) kind,
+          if (switch (kind) {
+            TeamChangeKind.competition => !_both,
+            TeamChangeKind.juvenileName => _both,
+            _ => true,
+          })
+            kind,
       ];
+
+  /// Adding Juvenile with its own name, or asking for one
+  bool get _sendsJuvenileName =>
+      (_kind == TeamChangeKind.juvenileName && _juvenileOwn) ||
+      (_kind == TeamChangeKind.competition &&
+          _toAdd == Competition.juvenile &&
+          _addJuvenileOwn);
+
+  String get _cleanJuvenileName =>
+      _juvenileName.text.trim().replaceAll(RegExp(r'\s+'), ' ');
 
   /// Division-only adds Juvenile; Juvenile-only adds Division.
   Competition get _toAdd => _team.categories.contains(Competition.division)
@@ -99,6 +128,8 @@ class _FormState extends ConsumerState<_Form> {
     _name.dispose();
     _shortName.dispose();
     _reason.dispose();
+    _juvenileName.dispose();
+    _juvenileShortName.dispose();
     super.dispose();
   }
 
@@ -121,6 +152,9 @@ class _FormState extends ConsumerState<_Form> {
           'Choose the new logo first.',
         TeamChangeKind.competition when !_addCompetition =>
           'Tick "Add ${_toAdd.label}" to send the request.',
+        TeamChangeKind.juvenileName
+            when !_juvenileOwn && !_team.hasOwnJuvenileName =>
+          'Your juvenile sides already play as "B".',
         _ => null,
       };
 
@@ -145,6 +179,8 @@ class _FormState extends ConsumerState<_Form> {
         TeamChangeKind.name => _name.text.trim().replaceAll(RegExp(r'\s+'), ' '),
         TeamChangeKind.shortName => _shortName.text.trim(),
         TeamChangeKind.competition => _toAdd.name,
+        // Its own name, or '' to go back to "B"
+        TeamChangeKind.juvenileName => _juvenileOwn ? _cleanJuvenileName : '',
         // The new logo goes up first; the request keeps its link
         TeamChangeKind.logo => await repository.uploadLogo(
             teamId: widget.teamId,
@@ -160,6 +196,16 @@ class _FormState extends ConsumerState<_Form> {
         reason: _reason.text.trim(),
         askedBy: user.uid,
         askedByName: user.displayName,
+        toShortName: _kind == TeamChangeKind.juvenileName && _juvenileOwn
+            ? _juvenileShortName.text.trim().toUpperCase()
+            : null,
+        juvenileName: _kind == TeamChangeKind.competition && _sendsJuvenileName
+            ? _cleanJuvenileName
+            : null,
+        juvenileShortName:
+            _kind == TeamChangeKind.competition && _sendsJuvenileName
+            ? _juvenileShortName.text.trim().toUpperCase()
+            : null,
       );
       if (!mounted) return;
       AppToast.success(context, "Sent to the FA. You'll see the answer here.");
@@ -239,7 +285,10 @@ class _FormState extends ConsumerState<_Form> {
                       _card(enabled),
                       const SizedBox(height: 18),
                       Text(
-                        'Why? (for the FA) *',
+                        // Optional for a juvenile side name (mockup JS3b)
+                        _kind == TeamChangeKind.juvenileName
+                            ? 'Why? (optional)'
+                            : 'Why? (for the FA) *',
                         style: textTheme.titleSmall
                             ?.copyWith(fontWeight: FontWeight.w600),
                       ),
@@ -255,10 +304,18 @@ class _FormState extends ConsumerState<_Form> {
                           hintText:
                               'e.g. The club merged with Fetteh Stars this season',
                         ),
-                        // Same limits as the security rules (5 to 300)
-                        validator: (value) => (value?.trim().length ?? 0) < 5
-                            ? 'Tell the FA why (at least 5 characters)'
-                            : null,
+                        // Same limits as the security rules (5 to 300;
+                        // empty is fine for a juvenile side name)
+                        validator: (value) {
+                          final length = value?.trim().length ?? 0;
+                          if (length == 0 &&
+                              _kind == TeamChangeKind.juvenileName) {
+                            return null;
+                          }
+                          return length < 5
+                              ? 'Tell the FA why (at least 5 characters)'
+                              : null;
+                        },
                       ),
                     ],
                     const SizedBox(height: 16),
@@ -379,6 +436,47 @@ class _FormState extends ConsumerState<_Form> {
             onChanged: enabled
                 ? (value) => setState(() => _addCompetition = value)
                 : null,
+          ),
+          // Adding Juvenile: how the juvenile sides will be called ("B"
+          // unless the club picks its own name, JSc)
+          if (_toAdd == Competition.juvenile && _addCompetition) ...[
+            const SizedBox(height: 18),
+            JuvenileNamePicker(
+              clubName: _team.teamName,
+              clubShortName: _team.shortName,
+              ownName: _addJuvenileOwn,
+              onOwnNameChanged: (value) =>
+                  setState(() => _addJuvenileOwn = value),
+              name: _juvenileName,
+              shortName: _juvenileShortName,
+              enabled: enabled,
+              logoColor: _team.logoColor,
+              logoUrl: _team.logoUrl,
+            ),
+          ],
+        ],
+      // The juvenile side's name (mockup JS3b)
+      TeamChangeKind.juvenileName => [
+          Text(
+            'Now: ${_team.juvenileSide.name}. The FA approves it; until then '
+            'the old name shows.',
+            style:
+                textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 12),
+          JuvenileNamePicker(
+            compact: true,
+            clubName: _team.teamName,
+            clubShortName: _team.shortName,
+            ownName: _juvenileOwn,
+            onOwnNameChanged: (value) => setState(() => _juvenileOwn = value),
+            name: _juvenileName,
+            shortName: _juvenileShortName,
+            enabled: enabled,
+            logoColor: _team.logoColor,
+            logoUrl: _team.logoUrl,
+            currentName: _team.hasOwnJuvenileName ? _team.juvenileName : null,
+            currentShortName: _team.juvenileShortName,
           ),
         ],
     };

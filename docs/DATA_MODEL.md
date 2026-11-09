@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.25, matches the rules after step JSb, juvenile side names at registration (9 Nov 2026)
+**Status:** v2.26, matches the rules after step JSc1, juvenile side name requests (9 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -262,11 +262,13 @@ A team asks the FA to change its name, short name or logo, or to add the competi
 | ----- | ---- | ----- |
 | `teamId` | string | |
 | `teamName` | string | The team's name when it asked (must match the team) |
-| `kind` | string | `name`, `shortName`, `logo` or `competition` |
+| `kind` | string | `name`, `shortName`, `logo`, `competition` or `juvenileName` (JSc, clubs in both only) |
 | `from` | string? / array | The value now: name, short name, logo link (may be null), or the `categories` list |
 | `to` | string | The new name (2–60), short name (3–4 capitals), logo link, or the competition to add (`division` / `juvenile`, not one the club is in) |
-| `nameKey` | string? | `name` only: the new name's key. Refused if another club holds that reservation |
-| `reason` | string | "Why? (for the FA)", 5–300 characters |
+| `nameKey` | string? | `name`, and a juvenile side's own name (`juvenileName`, or `competition` with `juvenileName`): the name's key, not the team ID. Refused if another club holds that reservation |
+| `fromShortName`, `toShortName` | string | `juvenileName` only: the juvenile side's short name now ("RUF B") and asked for ("RUC"). `from` must be how the side plays now (`sideNamesOf`). `to` = `''` and `toShortName` = `''` = back to "B" (only for a side with its own name) |
+| `juvenileName`, `juvenileShortName` | string? | `competition` adding Juvenile only (JSc): the juvenile side's own name, asked in the same request. Absent = it plays as "B" |
+| `reason` | string | "Why? (for the FA)", 5–300 characters; for `juvenileName` it may be empty (mockup JS3b, "Why (optional)") |
 | `status` | string | `pending` → `approved` or `rejected` |
 | `askedBy`, `askedByName` | string | The team admin's uid and name |
 | `rejectionReason` | string? | FA, 10–500 characters ("Not approve") |
@@ -275,6 +277,7 @@ A team asks the FA to change its name, short name or logo, or to add the competi
 
 - **Ask:** the team's admin only, for its own team, while no request of that kind is pending. Same batch: a `changeRequested` note in the FA's bell. A new logo is uploaded first to `teams/{teamId}/logo-<millis>.jpg`.
 - **Approve (FA):** one batch: the request `approved` + the team's field(s) + the bell note `changeApproved` for the team. A **name** also updates `teamName` on every player of the team (player IDs never change) and reserves the new name in `teamNames`. The rules check that the team really has the new value after the batch.
+- **Juvenile side name (JSc):** approving writes `juvenileName` / `juvenileShortName` on the team (or deletes them for "B") and reserves the own name in `teamNames` (`uid` = the club, `teamId`), in the same batch; "Add Juvenile" with a name does the same with `categories`. The rules check the team has exactly the asked name after the batch.
 - **Reject (FA):** `rejected` with a reason + `changeRefused` for the team. The team page shows the reason (red) for a week; the team may ask again.
 - **Approve all (2.10c):** the app approves a team's waiting changes one after another (oldest first), each in its own batch as above, because the rules allow only one kind of change per team update. A name another club holds is skipped.
 - The FA sees the requests grouped by team (Teams › Changes, one card per team).
@@ -845,6 +848,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 9 Nov 2026 | v2.26 (JSc1, juvenile side names: ask the FA): new change kind `juvenileName` (`from`/`fromShortName` = how the side plays now, `to`/`toShortName` = its own name, or empty = back to "B"; `nameKey`; "Why" optional); "Add Juvenile" (`competition`) may carry `juvenileName` / `juvenileShortName` / `nameKey`. Approval sets or removes the team's juvenile name and reserves the own name in `teamNames`. Rules: `sideNamesOf` moved up (used by teamChanges), `isOwnJuvenileName`, `isApprovedNameKey`. 348 rules tests. |
 | 9 Nov 2026 | v2.25 (JSb, juvenile side names at registration): `teamRequests` gain `juvenileName`, `juvenileShortName`, `juvenileNameKey` (clubs in both only; empty = "B"); the own name is reserved in `teamNames` in the same batch; the FA's approval copies `juvenileName` / `juvenileShortName` to the team (left out for "B") and the rules check they match the request. 334 rules tests. |
 | 9 Nov 2026 | v2.24 (JSa, juvenile side names): `teams` gain optional `juvenileName` and `juvenileShortName` (set in JSb / JSc). A club in both competitions is copied into its juvenile matches as "Royal Unique FC B" / "RUF B", or its own juvenile name; the rules check it (`sideNamesOf`). Rules: the kits of a side are looked up once (`isKitChoice` takes the kits), to stay under the 1000-expression limit. 324 rules tests. |
 | 9 Nov 2026 | v2.23 (3.0f2): no data change. Pages opened from another tab, or from a full-screen page, carry `back=` in their address (where ← goes). 321 rules tests. |

@@ -77,7 +77,10 @@ class TeamChangeRepository {
   }
 
   /// Sends the request and tells the FA, in one batch. [to] is the new
-  /// name, short name, logo link, or the competition to add.
+  /// name, short name, logo link, the competition to add, or the juvenile
+  /// side's own name ('' = back to "B", with [toShortName]).
+  /// [juvenileName] / [juvenileShortName]: "Add Juvenile" with the
+  /// juvenile side's own name (null = "B").
   Future<void> ask({
     required String teamId,
     required TeamDetails team,
@@ -86,8 +89,20 @@ class TeamChangeRepository {
     required String reason,
     required String askedBy,
     String? askedByName,
+    String? toShortName,
+    String? juvenileName,
+    String? juvenileShortName,
   }) async {
-    final nameKey = kind == TeamChangeKind.name ? teamNameKey(to) : null;
+    final ownJuvenile = switch (kind) {
+      TeamChangeKind.juvenileName => to,
+      TeamChangeKind.competition => juvenileName ?? '',
+      _ => '',
+    };
+    final nameKey = kind == TeamChangeKind.name
+        ? teamNameKey(to)
+        : ownJuvenile.isEmpty
+        ? null
+        : teamNameKey(ownJuvenile);
 
     // Checked before sending, so the team gets a clear message (the
     // rules refuse it too). The club's own old names are fine.
@@ -95,7 +110,9 @@ class TeamChangeRepository {
       final reservation =
           await _db.doc(FirestorePaths.teamName(nameKey)).get().timeout(_timeout);
       if (reservation.exists && reservation.data()?['uid'] != team.uid) {
-        throw const TeamNameTakenException();
+        throw kind == TeamChangeKind.name
+            ? const TeamNameTakenException()
+            : const JuvenileNameTakenException();
       }
     }
 
@@ -119,9 +136,19 @@ class TeamChangeRepository {
           TeamChangeKind.shortName => team.shortName,
           TeamChangeKind.logo => team.logoUrl,
           TeamChangeKind.competition => Competition.toList(team.categories),
+          // How the juvenile sides play now ("Royal Unique FC B")
+          TeamChangeKind.juvenileName => team.juvenileSide.name,
         },
         'to': to,
         'nameKey': ?nameKey,
+        if (kind == TeamChangeKind.juvenileName) ...{
+          'fromShortName': team.juvenileSide.shortName,
+          'toShortName': toShortName ?? '',
+        },
+        if (kind == TeamChangeKind.competition && nameKey != null) ...{
+          'juvenileName': juvenileName,
+          'juvenileShortName': juvenileShortName,
+        },
         'reason': reason,
         'status': ApprovalStatus.pending.name,
         'askedBy': askedBy,
@@ -199,6 +226,22 @@ class TeamChangeRepository {
             batch.update(player.reference, {'teamName': teamName});
           }
         }
+      case TeamChangeKind.juvenileName:
+        // Back to "B": the name goes, so the side plays as "<name> B"
+        if (change.isBackToB) {
+          batch.update(teamRef, {
+            'juvenileName': FieldValue.delete(),
+            'juvenileShortName': FieldValue.delete(),
+            'updatedAt': updatedAt,
+          });
+        } else {
+          await _reserveJuvenileName(batch, change, team);
+          batch.update(teamRef, {
+            'juvenileName': change.to,
+            'juvenileShortName': change.toShortName,
+            'updatedAt': updatedAt,
+          });
+        }
       case TeamChangeKind.shortName:
         batch.update(teamRef, {'shortName': change.to, 'updatedAt': updatedAt});
       case TeamChangeKind.logo:
@@ -207,11 +250,18 @@ class TeamChangeRepository {
         final now =
             Competition.fromList(team['categories'] as List<dynamic>?);
         final added = change.competition ?? Competition.juvenile;
+        // "Add Juvenile" with the juvenile side's own name (JSc)
+        final juvenileName = change.juvenileName;
+        if (juvenileName != null) {
+          await _reserveJuvenileName(batch, change, team);
+        }
         batch.update(teamRef, {
           'categories': Competition.toList({...now, added}),
           // A Juvenile-only club's kits are its juvenile kits; they stay
           // as its Division kits too until it edits them.
           if (added == Competition.division) 'juvenileKits': team['kits'],
+          'juvenileName': ?juvenileName,
+          'juvenileShortName': ?change.juvenileShortName,
           'updatedAt': updatedAt,
         });
     }
@@ -224,6 +274,31 @@ class TeamChangeRepository {
       name: change.summary,
     );
     await batch.commit().timeout(_timeout);
+  }
+
+  /// Reserves a juvenile side's own name for the club in [batch]. Read
+  /// BEFORE the batch, so the FA gets a clear message if another club
+  /// took it meanwhile (the rules refuse it too).
+  Future<void> _reserveJuvenileName(
+    WriteBatch batch,
+    TeamChange change,
+    Map<String, dynamic> team,
+  ) async {
+    final requestUid = team['requestUid'] as String?;
+    final key = change.nameKey;
+    if (key == null) return;
+    final ref = _db.doc(FirestorePaths.teamName(key));
+    final reservation = await ref.get().timeout(_timeout);
+    if (reservation.exists && reservation.data()?['uid'] != requestUid) {
+      throw const JuvenileNameTakenException();
+    }
+    if (!reservation.exists) {
+      batch.set(ref, {
+        'uid': requestUid,
+        'teamId': change.teamId,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
   }
 
   /// FA rejects: the team sees [reason] on its team page.

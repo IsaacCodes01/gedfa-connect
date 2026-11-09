@@ -8,7 +8,11 @@ enum TeamChangeKind {
   name('Club name', 'Name change', 'name'),
   shortName('Short name', 'Short name change', 'short name'),
   logo('Logo', 'New logo', 'logo'),
-  competition('Add a competition', 'Add a competition', 'competition');
+  competition('Add a competition', 'Add a competition', 'competition'),
+
+  /// Juvenile side names (JSc): its own name, or back to "B". Clubs in
+  /// both competitions only.
+  juvenileName('Juvenile side name', 'Juvenile side name', 'juvenile side name');
 
   const TeamChangeKind(this.chip, this.title, this.noun);
 
@@ -46,6 +50,10 @@ class TeamChange {
     this.from,
     this.fromCompetitions = const {},
     this.nameKey,
+    this.fromShortName,
+    this.toShortName,
+    this.juvenileName,
+    this.juvenileShortName,
     this.askedByName,
     this.rejectionReason,
     this.createdAt,
@@ -69,8 +77,23 @@ class TeamChange {
   /// add ('division' / 'juvenile')
   final String to;
 
-  /// The new name's reservation key (name changes only)
+  /// The new name's reservation key (name changes, a juvenile side's
+  /// own name)
   final String? nameKey;
+
+  /// [TeamChangeKind.juvenileName]: the juvenile side's short name now
+  /// ("RUF B") and the one asked for ("RUC"; empty when going back to
+  /// "B", [to] is empty too)
+  final String? fromShortName;
+  final String? toShortName;
+
+  /// "Add Juvenile" ([TeamChangeKind.competition]): the juvenile side's
+  /// own name, asked in the same request. Null = it plays as "B".
+  final String? juvenileName;
+  final String? juvenileShortName;
+
+  /// A juvenile side name request going back to "B"
+  bool get isBackToB => kind == TeamChangeKind.juvenileName && to.isEmpty;
 
   /// "Why? (for the FA)"
   final String reason;
@@ -97,6 +120,8 @@ class TeamChange {
         TeamChangeKind.shortName => 'Short name → $to',
         TeamChangeKind.logo => 'New logo',
         TeamChangeKind.competition => 'Add ${competition?.label ?? to}',
+        TeamChangeKind.juvenileName =>
+          isBackToB ? 'Juvenile side name → "B"' : 'Juvenile side name → $to',
       };
 
   /// "name → Gomoa Super Eagles", "short name FR → FRFC": the FA's
@@ -107,6 +132,8 @@ class TeamChange {
         TeamChangeKind.logo => 'new logo',
         TeamChangeKind.competition =>
           'add ${competition?.label ?? to}',
+        TeamChangeKind.juvenileName =>
+          'juvenile side ${from ?? ''} → ${isBackToB ? '"B"' : to}',
       };
 
   factory TeamChange.fromMap(String id, Map<String, dynamic> data) {
@@ -123,6 +150,10 @@ class TeamChange {
           : const <Competition>{},
       to: data['to'] as String? ?? '',
       nameKey: data['nameKey'] as String?,
+      fromShortName: data['fromShortName'] as String?,
+      toShortName: data['toShortName'] as String?,
+      juvenileName: data['juvenileName'] as String?,
+      juvenileShortName: data['juvenileShortName'] as String?,
       reason: data['reason'] as String? ?? '',
       status: ApprovalStatus.fromString(data['status'] as String? ?? ''),
       askedByName: data['askedByName'] as String?,

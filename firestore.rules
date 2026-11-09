@@ -84,6 +84,19 @@ service cloud.firestore {
         return /databases/$(database)/documents/districts/$(districtId)/teamChanges/$(changeId);
       }
 
+      // Juvenile side names: a club in both competitions plays its juvenile
+      // matches under its own juvenile name, or its name with " B"
+      // ("Royal Unique FC B", "RUF B"). Everyone else plays as the club.
+      // The app does the same (side_name.dart).
+      // [name, shortName] in one go: a match save is close to the rules'
+      // limit of 1000 expressions, so this is worked out once per side.
+      function sideNamesOf(team, category) {
+        return category == 'juvenile' && team.get('categories', []).size() == 2
+          ? [team.get('juvenileName', team.name + ' B'),
+             team.get('juvenileShortName', team.get('shortName', '') + ' B')]
+          : [team.name, team.get('shortName', '')];
+      }
+
       // One line of a team's corrections log (2.11a)
       function correctionDoc(teamId, correctionId) {
         return /databases/$(database)/documents/districts/$(districtId)/teams/$(teamId)/corrections/$(correctionId);
@@ -960,14 +973,39 @@ service cloud.firestore {
 
       // What the team sends: the new value, the old one (for the FA's
       // "Now"), and why. Checked against the team as it is now.
+      // A club's own juvenile name (JSc): 2–60 characters and not the
+      // club's name; a 3–4 capital short name that isn't the club's; a
+      // name key that isn't the club's and is free or already this club's.
+      function isOwnJuvenileName(name, shortName, nameKey, team, teamId) {
+        return isText(name, 2, 60)
+          && name.lower() != team.name.lower()
+          && shortName is string
+          && shortName.matches('^[A-Z]{3,4}$')
+          && shortName != team.get('shortName', '')
+          && nameKey is string
+          && nameKey.matches('^[a-z0-9-]{2,60}$')
+          && nameKey != teamId
+          && (!exists(teamNameDoc(nameKey))
+              || get(teamNameDoc(nameKey)).data.uid == team.requestUid);
+      }
+
       function isValidTeamChange(data, changeId) {
         let team = get(teamDoc(data.teamId)).data;
         return data.keys().hasOnly(['teamId', 'teamName', 'kind', 'from', 'to',
                                     'nameKey', 'reason', 'status', 'askedBy',
-                                    'askedByName', 'createdAt', 'updatedAt'])
+                                    'askedByName', 'createdAt', 'updatedAt',
+                                    'fromShortName', 'toShortName',
+                                    'juvenileName', 'juvenileShortName'])
           && changeId == data.teamId + '_' + data.kind
           && data.teamName == team.name
-          && isText(data.reason, 5, 300)
+          // Juvenile fields only on their own kinds
+          && (data.kind == 'juvenileName'
+              || !data.keys().hasAny(['fromShortName', 'toShortName']))
+          && (data.kind == 'competition'
+              || !data.keys().hasAny(['juvenileName', 'juvenileShortName']))
+          // "Why" is optional for a juvenile side's name (mockup JS3b)
+          && (isText(data.get('reason', null), 5, 300)
+              || (data.kind == 'juvenileName' && data.get('reason', null) == ''))
           && isOptionalText(data, 'askedByName', 80)
           && data.askedBy == request.auth.uid
           && data.status == 'pending'
@@ -991,11 +1029,33 @@ service cloud.firestore {
                 && isText(data.to, 10, 2000)
                 && data.to != team.get('logoUrl', null)
                 && data.from == team.get('logoUrl', null))
-              // Add the competition the club is not in yet
+              // Add the competition the club is not in yet. Adding Juvenile
+              // may name the juvenile side too ("B" without one, JSc).
               || (data.kind == 'competition'
                 && data.to in ['division', 'juvenile']
                 && !(data.to in team.categories)
-                && data.from == team.categories));
+                && data.from == team.categories
+                && (data.get('juvenileName', null) == null
+                    ? (data.get('juvenileShortName', null) == null
+                       && data.get('nameKey', null) == null)
+                    : (data.to == 'juvenile'
+                       && isOwnJuvenileName(data.juvenileName,
+                            data.get('juvenileShortName', null),
+                            data.get('nameKey', null), team, data.teamId))))
+              // The juvenile side's name (JSc): its own name, or back to "B"
+              // (to = ''). "From" is how it plays now.
+              || (data.kind == 'juvenileName'
+                && team.get('categories', []).size() == 2
+                && [data.get('from', ''), data.get('fromShortName', '')]
+                     == sideNamesOf(team, 'juvenile')
+                && ((data.to == ''
+                      && data.get('toShortName', '') == ''
+                      && data.get('nameKey', null) == null
+                      && team.get('juvenileName', null) != null)
+                    || ([data.to, data.get('toShortName', null)]
+                          != [team.get('juvenileName', null), team.get('juvenileShortName', null)]
+                      && isOwnJuvenileName(data.to, data.get('toShortName', null),
+                           data.get('nameKey', null), team, data.teamId)))));
       }
 
       // The FA approves: the team really has the new value after the batch
@@ -1007,7 +1067,20 @@ service cloud.firestore {
               && getAfter(teamNameDoc(change.nameKey)).data.uid == team.requestUid)
           || (change.kind == 'shortName' && team.shortName == change.to)
           || (change.kind == 'logo' && team.logoUrl == change.to)
-          || (change.kind == 'competition' && change.to in team.categories);
+          || (change.kind == 'competition'
+              && change.to in team.categories
+              && team.get('juvenileName', null) == change.get('juvenileName', null)
+              && team.get('juvenileShortName', null) == change.get('juvenileShortName', null)
+              && (change.get('nameKey', null) == null
+                  || getAfter(teamNameDoc(change.nameKey)).data.uid == team.requestUid))
+          // JSc: the own name (reserved for the club), or "B" (no name)
+          || (change.kind == 'juvenileName'
+              && (change.to == ''
+                  ? (team.get('juvenileName', null) == null
+                     && team.get('juvenileShortName', null) == null)
+                  : (team.get('juvenileName', null) == change.to
+                     && team.get('juvenileShortName', null) == change.toShortName
+                     && getAfter(teamNameDoc(change.nameKey)).data.uid == team.requestUid)));
       }
 
       match /teamChanges/{changeId} {
@@ -1110,6 +1183,15 @@ service cloud.firestore {
         return req.nameKey == nameKey || req.get('juvenileNameKey', null) == nameKey;
       }
 
+      // The FA approves a change that reserves [nameKey] for the team: a new
+      // club name (2.10b), or a juvenile side's own name (JSc)
+      function isApprovedNameKey(teamId, kind, nameKey) {
+        let change = teamChangeDoc(teamId, kind);
+        return existsAfter(change)
+          && getAfter(change).data.status == 'approved'
+          && getAfter(change).data.get('nameKey', null) == nameKey;
+      }
+
       match /teamNames/{nameKey} {
         allow get: if isSignedIn();
 
@@ -1123,8 +1205,9 @@ service cloud.firestore {
         allow create: if isFaAdmin()
           && request.resource.data.keys().hasOnly(['uid', 'teamId', 'createdAt'])
           && request.resource.data.createdAt == request.time
-          && getAfter(teamChangeDoc(request.resource.data.teamId, 'name')).data.status == 'approved'
-          && getAfter(teamChangeDoc(request.resource.data.teamId, 'name')).data.nameKey == nameKey
+          && (isApprovedNameKey(request.resource.data.teamId, 'name', nameKey)
+              || isApprovedNameKey(request.resource.data.teamId, 'juvenileName', nameKey)
+              || isApprovedNameKey(request.resource.data.teamId, 'competition', nameKey))
           && request.resource.data.uid == get(teamDoc(request.resource.data.teamId)).data.requestUid;
 
         // ...or corrects the spelling of a club's name itself (2.11a)
@@ -1163,19 +1246,6 @@ service cloud.firestore {
           && choice.get('slot', '') in slots
           && kits.get(choice.slot, null) != null
           && choice.get('kit', null) == kits[choice.slot];
-      }
-
-      // Juvenile side names: a club in both competitions plays its juvenile
-      // matches under its own juvenile name, or its name with " B"
-      // ("Royal Unique FC B", "RUF B"). Everyone else plays as the club.
-      // The app does the same (side_name.dart).
-      // [name, shortName] in one go: a match save is close to the rules'
-      // limit of 1000 expressions, so this is worked out once per side.
-      function sideNamesOf(team, category) {
-        return category == 'juvenile' && team.get('categories', []).size() == 2
-          ? [team.get('juvenileName', team.name + ' B'),
-             team.get('juvenileShortName', team.get('shortName', '') + ' B')]
-          : [team.name, team.get('shortName', '')];
       }
 
       // One side of a match: { id, name, shortName, logoUrl, colour }.
@@ -1584,8 +1654,13 @@ service cloud.firestore {
               // Adding a competition: the club is then in both. A
               // Juvenile-only club's kits become its juvenile kits (and stay
               // as its Division kits until it edits them).
+              // JSc: the juvenile side's own name, or back to "B"
+              || (changed.hasAny(['juvenileName', 'juvenileShortName'])
+                && changed.hasOnly(['juvenileName', 'juvenileShortName', 'updatedAt'])
+                && isApprovingChange(teamId, 'juvenileName'))
               || (changed.hasAny(['categories'])
-                && changed.hasOnly(['categories', 'juvenileKits', 'updatedAt'])
+                && changed.hasOnly(['categories', 'juvenileKits', 'juvenileName',
+                                    'juvenileShortName', 'updatedAt'])
                 && isApprovingChange(teamId, 'competition')
                 && after.categories.size() == 2
                 && after.categories.toSet() == before.categories.toSet()

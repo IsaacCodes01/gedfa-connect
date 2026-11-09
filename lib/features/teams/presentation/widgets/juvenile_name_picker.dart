@@ -27,6 +27,9 @@ class JuvenileNamePicker extends StatelessWidget {
     this.logoUrl,
     this.nameError,
     this.onNameChanged,
+    this.compact = false,
+    this.currentName,
+    this.currentShortName,
   });
 
   /// The club's name and short name as typed ("Royal Unique FC", "RUF")
@@ -49,6 +52,15 @@ class JuvenileNamePicker extends StatelessWidget {
   /// Typing in the name field (to clear [nameError])
   final ValueChanged<String>? onNameChanged;
 
+  /// "Ask the FA to change" (mockup JS3b): just the two choices and the
+  /// fields, with shorter texts; no heading, preview or note
+  final bool compact;
+
+  /// The juvenile side's own name now, if it has one: asking for the same
+  /// name and short name again is refused
+  final String? currentName;
+  final String? currentShortName;
+
   String get _club => clubName.trim().isEmpty ? 'Your club' : clubName.trim();
   String get _clubShort => clubShortName.trim().toUpperCase();
 
@@ -67,6 +79,11 @@ class JuvenileNamePicker extends StatelessWidget {
     final text = value?.trim().toUpperCase() ?? '';
     if (!RegExp(r'^[A-Z]{3,4}$').hasMatch(text)) return '3 or 4 letters';
     if (text == _clubShort) return "Not your club's short name ($_clubShort)";
+    if (currentName != null &&
+        teamNameKey(name.text) == teamNameKey(currentName!) &&
+        text == currentShortName?.toUpperCase()) {
+      return "This is your juvenile side's name already";
+    }
     return null;
   }
 
@@ -78,27 +95,29 @@ class JuvenileNamePicker extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Expanded(
-              child: Text(
-                "Your juvenile side's name",
-                style: textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
+        if (!compact) ...[
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Text(
+                  "Your juvenile side's name",
+                  style: textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
-            ),
-            Text(
-              'U13 · U15 · U17',
-              style: textTheme.bodySmall?.copyWith(
-                color: scheme.onSurfaceVariant,
-                fontWeight: FontWeight.w600,
+              Text(
+                'U13 · U15 · U17',
+                style: textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
+            ],
+          ),
+          const SizedBox(height: 10),
+        ],
         RadioGroup<bool>(
           groupValue: ownName,
           onChanged: (value) {
@@ -111,9 +130,10 @@ class JuvenileNamePicker extends StatelessWidget {
                 value: false,
                 selected: !ownName,
                 title: '$_club B',
-                description:
-                    'Your club\'s name with "B". Renamed with the club if it '
-                    'is ever renamed.',
+                description: compact
+                    ? 'Your club\'s name with "B"'
+                    : 'Your club\'s name with "B". Renamed with the club if '
+                          'it is ever renamed.',
                 onTap: enabled ? () => onOwnNameChanged(false) : null,
               ),
               const SizedBox(height: 8),
@@ -121,9 +141,10 @@ class JuvenileNamePicker extends StatelessWidget {
                 value: true,
                 selected: ownName,
                 title: 'Its own name',
-                description:
-                    'A different name and short name, e.g. "Royal Unique '
-                    'Colts".',
+                description: compact
+                    ? 'A different name and short name'
+                    : 'A different name and short name, e.g. "Royal Unique '
+                          'Colts".',
                 onTap: enabled ? () => onOwnNameChanged(true) : null,
               ),
             ],
@@ -157,25 +178,26 @@ class JuvenileNamePicker extends StatelessWidget {
           ),
           const SizedBox(height: 12),
         ],
-        ListenableBuilder(
-          listenable: Listenable.merge([name, shortName]),
-          builder: (context, _) => _Preview(
-            ownName: ownName,
-            title: ownName
-                ? (name.text.trim().isEmpty
-                      ? 'Your juvenile side'
-                      : name.text.trim())
-                : '$_club B',
-            subtitle: ownName
-                ? '${shortName.text.trim().toUpperCase()} · U13, U15 and U17'
-                : 'How your juvenile sides show in fixtures and tables',
-            label: ownName ? shortName.text.trim().toUpperCase() : _clubShort,
-            logoColor: logoColor,
-            logoBytes: logoBytes,
-            logoUrl: logoUrl,
+        if (!compact)
+          ListenableBuilder(
+            listenable: Listenable.merge([name, shortName]),
+            builder: (context, _) => _Preview(
+              ownName: ownName,
+              title: ownName
+                  ? (name.text.trim().isEmpty
+                        ? 'Your juvenile side'
+                        : name.text.trim())
+                  : '$_club B',
+              subtitle: ownName
+                  ? '${shortName.text.trim().toUpperCase()} · U13, U15 and U17'
+                  : 'How your juvenile sides show in fixtures and tables',
+              label: ownName ? shortName.text.trim().toUpperCase() : _clubShort,
+              logoColor: logoColor,
+              logoBytes: logoBytes,
+              logoUrl: logoUrl,
+            ),
           ),
-        ),
-        if (!ownName) ...[
+        if (!ownName && !compact) ...[
           const SizedBox(height: 12),
           InfoBox(
             icon: Icons.info_outline_rounded,
