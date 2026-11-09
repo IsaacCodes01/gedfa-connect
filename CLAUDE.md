@@ -118,7 +118,7 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
   (`notification_details_screen.dart`, `Routes.adminNote` / `Routes.teamNote`) and marks only that note read
   (`readMarks/{uid}.reads`, `ReadMark.isUnread`); icons, targets and button names in `widgets/note_look.dart`.
   Rules changed: Isaac deploys to dev.
-- **3.0f2** done (9 Nov 2026, 157 Dart tests, no rules change): open pages with **`context.open(route)`** and leave
+- **3.0f2** done and **3.0f tested by Isaac** (9 Nov 2026, 157 Dart tests, no rules change): open pages with **`context.open(route)`** and leave
   with **`context.goBack(fallback)`** / **`AppBackButton(fallback:)`** (`core/widgets/back_to_home.dart`), not `context.go`.
   `open` pushes full-screen pages and same-tab pages; otherwise it uses go with `back=` (`Routes.withBack`), and
   `GedfaAppBar` adds ← to it. Never `push` a tab's page from a full-screen page: go_router crashes (Duplicate GlobalKey).
