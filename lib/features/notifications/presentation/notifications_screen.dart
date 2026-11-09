@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gedfa_connect/app/routes.dart';
-import 'package:gedfa_connect/app/theme.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
@@ -13,16 +12,15 @@ import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/features/notifications/data/notifications_repository.dart';
 import 'package:gedfa_connect/features/notifications/domain/announcement.dart';
 import 'package:gedfa_connect/features/notifications/domain/app_notification.dart';
-import 'package:gedfa_connect/features/teams/data/team_repository.dart';
+import 'package:gedfa_connect/features/notifications/presentation/widgets/note_look.dart';
 import 'package:go_router/go_router.dart';
 
 enum _Tab { all, fromFa }
 
-enum _Look { ok, no, fa, team, ref }
-
 /// One line in the list: a grouped notification or an announcement.
 class _Item {
   const _Item({
+    required this.id,
     required this.look,
     required this.title,
     required this.body,
@@ -32,7 +30,8 @@ class _Item {
     this.isAnnouncement = false,
   });
 
-  final _Look look;
+  final String id;
+  final NoteLook look;
   final String title;
   final String body;
   final DateTime? time;
@@ -120,22 +119,29 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       for (final n in notifications) _fromNotification(n),
       for (final a in announcements)
         _Item(
-          look: _Look.fa,
+          id: a.id,
+          look: NoteLook.fa,
           title: a.title,
           body: a.body,
           time: a.createdAt,
           important: a.important,
           isAnnouncement: true,
-          onTap: () => context.push(
-            isFa ? Routes.adminAnnouncement(a.id) : Routes.teamAnnouncement(a.id),
-          ),
+          onTap: () {
+            _markRead(a.id, a.createdAt);
+            context.push(
+              isFa
+                  ? Routes.adminAnnouncement(a.id)
+                  : Routes.teamAnnouncement(a.id),
+            );
+          },
         ),
     ]..sort((a, b) {
         final zero = DateTime.fromMillisecondsSinceEpoch(0);
         return (b.time ?? zero).compareTo(a.time ?? zero);
       });
 
-    bool isNew(_Item i) => mark.isNew(i.time) && !(isFa && i.isAnnouncement);
+    bool isNew(_Item i) =>
+        mark.isUnread(i.id, i.time) && !(isFa && i.isAnnouncement);
     final shown = _tab == _Tab.all
         ? items
         : items.where((i) => i.isAnnouncement).toList();
@@ -229,76 +235,32 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     );
   }
 
-  /// The club account a team was registered with (its FA page's ID).
-  /// Only FA notes use it (teams cannot list teams); watched, so the
-  /// link is right once the teams have loaded.
-  String? _requestUidOf(String teamId) => ref
-      .watch(allTeamsProvider)
-      .value
-      ?.where((t) => t.id == teamId)
-      .firstOrNull
-      ?.requestUid;
+  /// Marks one note or announcement read (3.0f). Best effort: the list
+  /// still opens it if the save fails.
+  void _markRead(String id, DateTime? time) {
+    final uid = ref.read(appUserProvider).value?.uid;
+    final mark = ref.read(readMarkProvider).value;
+    if (uid == null || mark == null || time == null) return;
+    if (!mark.isUnread(id, time)) return;
+    ref
+        .read(notificationsRepositoryProvider)
+        .markRead(uid, mark, id: id, time: time, keep: ref.read(bellIdsProvider))
+        .catchError((_) {});
+  }
 
-  /// Where each kind of notification goes when tapped, and how it looks.
+  /// How a note looks. A tap opens its details (3.0f), which mark it read
+  /// and have the button to where it is about.
   _Item _fromNotification(AppNotification n) {
-    final (look, target) = switch (n.kind) {
-      NotificationKind.playersApproved => (_Look.ok, Routes.team),
-      NotificationKind.playersRejected => (_Look.no, Routes.team),
-      NotificationKind.juvenilePassed => (_Look.ok, Routes.team),
-      NotificationKind.juvenileNotEligible => (_Look.no, Routes.team),
-      NotificationKind.juvenileToCorrect => (_Look.no, Routes.team),
-      NotificationKind.teamApproved => (_Look.team, Routes.team),
-      // One club: its request. Several (grouped): the list of requests.
-      NotificationKind.teamRequest => (
-          _Look.team,
-          n.people == 1 ? Routes.adminRequest(n.teamId) : Routes.admin,
-        ),
-      NotificationKind.playersSubmitted =>
-        (_Look.ok, Routes.adminTeamPlayers(n.teamId)),
-      NotificationKind.playersResubmitted =>
-        (_Look.no, Routes.adminTeamPlayers(n.teamId)),
-      // The FA's team page (2.11b), found by the club's account
-      NotificationKind.teamUpdated => (
-          _Look.fa,
-          switch (_requestUidOf(n.teamId)) {
-            final uid? => Routes.adminRequest(uid),
-            null => Routes.adminTeamPlayers(n.teamId),
-          },
-        ),
-      // Players › Juvenile › that team's children
-      NotificationKind.juvenileSubmitted =>
-        (_Look.fa, Routes.adminTeamJuvenile(n.teamId)),
-      NotificationKind.inviteAccepted => (_Look.ref, Routes.adminPeople),
-      NotificationKind.paymentConfirmed => (_Look.ok, Routes.teamFee),
-      NotificationKind.paymentNotFound => (_Look.no, Routes.teamFee),
-      NotificationKind.feeReminder => (_Look.fa, Routes.teamFee),
-      NotificationKind.paymentSent =>
-        (_Look.team, Routes.adminTeamFee(n.teamId)),
-      NotificationKind.registrationChanged =>
-        (_Look.fa, Routes.adminLeagueSettings),
-      // Change requests (2.10b): Teams › Changes, and the team's page
-      NotificationKind.changeRequested => (_Look.team, Routes.adminChanges),
-      NotificationKind.changeApproved => (_Look.ok, Routes.teamClub),
-      NotificationKind.changeRefused => (_Look.no, Routes.teamClub),
-      NotificationKind.teamCorrected => (_Look.fa, Routes.teamClub),
-      // Ask the team to correct (2.11b): the banner on the Squad tab
-      NotificationKind.correctionAsked => (_Look.no, Routes.team),
-      NotificationKind.correctionDone => (_Look.ok, Routes.team),
-      NotificationKind.correctionSentBack => (_Look.team, Routes.adminChanges),
-      // Suspensions (2.11c): the red banner on the Squad tab
-      NotificationKind.teamSuspended => (_Look.no, Routes.team),
-      NotificationKind.suspensionLifted => (_Look.ok, Routes.team),
-      NotificationKind.fixtureAdded => (_Look.fa, Routes.teamFixtures),
-      NotificationKind.fixtureChanged => (_Look.fa, Routes.teamFixtures),
-      NotificationKind.fixturePostponed => (_Look.no, Routes.teamFixtures),
-      NotificationKind.fixtureCancelled => (_Look.no, Routes.teamFixtures),
-    };
+    final isFa = n.audience == 'fa';
     return _Item(
-      look: look,
+      id: n.id,
+      look: noteTarget(n).look,
       title: n.title,
       body: n.body,
       time: n.updatedAt,
-      onTap: () => context.go(target),
+      onTap: () => context.push(
+        isFa ? Routes.adminNote(n.id) : Routes.teamNote(n.id),
+      ),
     );
   }
 }
@@ -314,34 +276,7 @@ class _ItemCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    final (icon, bg, ink) = switch (item.look) {
-      _Look.ok => (
-          Icons.check_rounded,
-          isDark ? const Color(0xFF123D2B) : AppColors.approvedBg,
-          isDark ? const Color(0xFF7BE3B0) : AppColors.approvedText,
-        ),
-      _Look.no => (
-          Icons.close_rounded,
-          isDark ? const Color(0xFF4A1820) : AppColors.rejectedBg,
-          isDark ? const Color(0xFFFF9DA6) : AppColors.rejectedText,
-        ),
-      _Look.fa => (
-          Icons.campaign_outlined,
-          isDark ? const Color(0xFF1E3A5F) : const Color(0xFFE3EEFA),
-          isDark ? const Color(0xFF9CCBFA) : AppColors.deepBlue,
-        ),
-      _Look.team => (
-          Icons.shield_outlined,
-          isDark ? const Color(0xFF3D3410) : AppColors.pendingBg,
-          isDark ? const Color(0xFFF5D25B) : AppColors.pendingText,
-        ),
-      _Look.ref => (
-          Icons.how_to_reg_outlined,
-          isDark ? const Color(0xFF2A2147) : const Color(0xFFEEE8FF),
-          isDark ? const Color(0xFFC9B8FF) : const Color(0xFF4B2E9E),
-        ),
-    };
+    final (icon, bg, ink) = noteIcon(context, item.look);
 
     final background = unread
         ? (isDark ? const Color(0xFF172C47) : const Color(0xFFF3F8FE))

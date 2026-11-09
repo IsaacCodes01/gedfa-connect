@@ -10,15 +10,34 @@ import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 
 const _timeout = Duration(seconds: 15);
 
-/// When I last opened my notifications, and the pinned announcements I hid.
+/// When I last pressed "Mark all read", the notes I read one by one
+/// (3.0f), and the pinned announcements I hid.
 class ReadMark {
-  const ReadMark({this.seenAt, this.hidden = const []});
+  const ReadMark({this.seenAt, this.reads = const {}, this.hidden = const []});
 
   final DateTime? seenAt;
+
+  /// Note (or announcement) ID → the time it had when I read it.
+  final Map<String, DateTime> reads;
   final List<String> hidden;
 
+  /// Newer than my last "Mark all read".
   bool isNew(DateTime? time) =>
       time != null && (seenAt == null || time.isAfter(seenAt!));
+
+  /// New, and not read on its own since it last changed. A grouped note
+  /// that gets one more name has a newer time, so it is unread again.
+  /// Compared in milliseconds: the web keeps no microseconds.
+  bool isUnread(String id, DateTime? time) {
+    if (!isNew(time)) return false;
+    final read = reads[id];
+    return read == null ||
+        time!.millisecondsSinceEpoch > read.millisecondsSinceEpoch;
+  }
+
+  /// Read on its own before, then changed (shown on the details page).
+  bool changedSinceRead(String id, DateTime? time) =>
+      reads.containsKey(id) && isUnread(id, time);
 }
 
 /// Announcements, notifications and read marks (2.7 – 2.8).
@@ -46,8 +65,15 @@ class NotificationsRepository {
   Stream<ReadMark> watchReadMark(String uid) {
     return _db.doc(FirestorePaths.readMark(uid)).snapshots().map((snapshot) {
       final data = snapshot.data();
+      final reads = data?['reads'];
       return ReadMark(
         seenAt: (data?['notificationsSeenAt'] as Timestamp?)?.toDate(),
+        reads: {
+          if (reads is Map)
+            for (final e in reads.entries)
+              if (e.value is Timestamp)
+                e.key.toString(): (e.value as Timestamp).toDate(),
+        },
         hidden: [
           for (final id in data?['hiddenAnnouncements'] as List<dynamic>? ??
               const [])
@@ -57,10 +83,37 @@ class NotificationsRepository {
     });
   }
 
+  /// Everything is read: the one-by-one reads are not needed any more.
   Future<void> markAllRead(String uid) {
     return _db.doc(FirestorePaths.readMark(uid)).set(
-      {'notificationsSeenAt': FieldValue.serverTimestamp()},
-      SetOptions(merge: true),
+      {
+        'notificationsSeenAt': FieldValue.serverTimestamp(),
+        'reads': <String, Object>{},
+      },
+      SetOptions(mergeFields: ['notificationsSeenAt', 'reads']),
+    ).timeout(_timeout);
+  }
+
+  /// Marks one note (or announcement) read, as it is at [time] (3.0f).
+  /// Only the IDs still in my bell ([keep]) are kept, so the map stays
+  /// small (the rules allow 100).
+  Future<void> markRead(
+    String uid,
+    ReadMark mark, {
+    required String id,
+    required DateTime time,
+    required Set<String> keep,
+  }) {
+    final reads = <String, Object>{
+      for (final e in mark.reads.entries)
+        if (keep.contains(e.key) && e.key != id)
+          e.key: Timestamp.fromDate(e.value),
+      id: Timestamp.fromDate(time),
+    };
+    // mergeFields replaces the whole map (a plain merge would only add)
+    return _db.doc(FirestorePaths.readMark(uid)).set(
+      {'reads': reads},
+      SetOptions(mergeFields: ['reads']),
     ).timeout(_timeout);
   }
 
@@ -230,18 +283,20 @@ final readMarkProvider = StreamProvider<ReadMark>((ref) {
 });
 
 /// The red number on the bell: notifications and announcements newer than
-/// my last "Mark all read".
+/// my last "Mark all read" that I haven't opened since they changed.
 final unreadCountProvider = Provider<int>((ref) {
   final mark = ref.watch(readMarkProvider).value;
   if (mark == null) return 0;
   final notifications = ref.watch(myNotificationsProvider).value ?? const [];
   final announcements = ref.watch(myAnnouncementsProvider).value ?? const [];
   final isFa = ref.watch(myAudienceProvider) == 'fa';
-  return notifications.where((n) => mark.isNew(n.updatedAt)).length +
+  return notifications.where((n) => mark.isUnread(n.id, n.updatedAt)).length +
       // The FA wrote the announcements, so they don't count as news for them
       (isFa
           ? 0
-          : announcements.where((a) => mark.isNew(a.createdAt)).length);
+          : announcements
+              .where((a) => mark.isUnread(a.id, a.createdAt))
+              .length);
 });
 
 /// The newest pinned announcement for me that I haven't hidden.
@@ -252,6 +307,26 @@ final pinnedAnnouncementProvider = Provider<Announcement?>((ref) {
     if (a.pinned && !mark.hidden.contains(a.id)) return a;
   }
   return null;
+});
+
+/// The IDs of the notes and announcements in my bell now: the only reads
+/// worth keeping (3.0f).
+final bellIdsProvider = Provider<Set<String>>((ref) {
+  return {
+    for (final n in ref.watch(myNotificationsProvider).value ?? const [])
+      n.id,
+    for (final a in ref.watch(myAnnouncementsProvider).value ?? const [])
+      a.id,
+  };
+});
+
+/// One of my notes, for its details page (3.0f). Null: not in my bell
+/// (gone, or not mine).
+final myNotificationProvider =
+    Provider.family<AsyncValue<AppNotification?>, String>((ref, id) {
+  return ref.watch(myNotificationsProvider).whenData(
+        (notes) => notes.where((n) => n.id == id).firstOrNull,
+      );
 });
 
 final announcementProvider =

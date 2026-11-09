@@ -36,6 +36,9 @@ class Routes {
           ? '/admin/ask/$teamId'
           : '/admin/ask/$teamId?item=$item';
   static const adminNotifications = '/admin/notifications';
+
+  /// One note's details (3.0f), for the FA and for teams.
+  static String adminNote(String id) => '$adminNotifications/note/$id';
   static const adminAnnouncements = '/admin/more/announcements';
   static const adminNewAnnouncement = '/admin/more/announcements/new';
   static String adminAnnouncement(String id) =>
@@ -107,6 +110,7 @@ class Routes {
   static const teamFixtures = '/team/fixtures';
   static String teamFixtureKits(String id) => '$teamFixtures/kits/$id';
   static const teamNotifications = '/team/notifications';
+  static String teamNote(String id) => '$teamNotifications/note/$id';
   static String teamAnnouncement(String id) =>
       '/team/notifications/announcement/$id';
   static const teamPositions = '/team/positions';

@@ -14,6 +14,7 @@ import 'package:gedfa_connect/features/notifications/presentation/announcement_s
 import 'package:gedfa_connect/features/notifications/presentation/compose_announcement_screen.dart';
 import 'package:gedfa_connect/features/notifications/presentation/fa_announcement_screen.dart';
 import 'package:gedfa_connect/features/notifications/presentation/fa_announcements_screen.dart';
+import 'package:gedfa_connect/features/notifications/presentation/notification_details_screen.dart';
 import 'package:gedfa_connect/features/notifications/presentation/notifications_screen.dart';
 import 'package:gedfa_connect/features/fa/presentation/fa_ask_correction_screen.dart';
 import 'package:gedfa_connect/features/fa/presentation/fa_correct_details_screen.dart';
@@ -180,6 +181,16 @@ final routerProvider = Provider<GoRouter>((ref) {
                     path: 'notifications',
                     parentNavigatorKey: rootNavigatorKey,
                     builder: (_, _) => const NotificationsScreen(),
+                    routes: [
+                      // One note's details (3.0f)
+                      GoRoute(
+                        path: 'note/:id',
+                        parentNavigatorKey: rootNavigatorKey,
+                        builder: (_, state) => NotificationDetailsScreen(
+                          id: state.pathParameters['id']!,
+                        ),
+                      ),
+                    ],
                   ),
                   // Opens full-screen, above the tabs.
                   GoRoute(
@@ -448,6 +459,13 @@ final routerProvider = Provider<GoRouter>((ref) {
                     parentNavigatorKey: rootNavigatorKey,
                     builder: (_, _) => const NotificationsScreen(),
                     routes: [
+                      GoRoute(
+                        path: 'note/:id',
+                        parentNavigatorKey: rootNavigatorKey,
+                        builder: (_, state) => NotificationDetailsScreen(
+                          id: state.pathParameters['id']!,
+                        ),
+                      ),
                       GoRoute(
                         path: 'announcement/:id',
                         parentNavigatorKey: rootNavigatorKey,

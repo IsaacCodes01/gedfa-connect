@@ -502,12 +502,16 @@ service cloud.firestore {
                 && isFaAdmin()));
       }
 
-      // readMarks/{uid}: when I last opened my notifications, and the
-      // pinned announcements I hid. Mine only.
+      // readMarks/{uid}: when I last pressed "Mark all read", the notes I
+      // read one by one (reads: note ID → its time when read, 3.0f; at most
+      // 100, the bell shows 60 notes and 40 announcements), and the pinned
+      // announcements I hid. Mine only.
       match /readMarks/{uid} {
         allow get: if isOwner(uid);
         allow create, update: if isOwner(uid)
-          && request.resource.data.keys().hasOnly(['notificationsSeenAt', 'hiddenAnnouncements'])
+          && request.resource.data.keys().hasOnly(['notificationsSeenAt', 'reads', 'hiddenAnnouncements'])
+          && request.resource.data.get('reads', {}) is map
+          && request.resource.data.get('reads', {}).size() <= 100
           && (request.resource.data.get('notificationsSeenAt', null) == null
               || request.resource.data.notificationsSeenAt is timestamp)
           && request.resource.data.get('hiddenAnnouncements', []) is list

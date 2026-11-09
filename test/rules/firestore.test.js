@@ -2901,6 +2901,35 @@ describe('Read marks', () => {
     await assertFails(getDoc(doc(dbAs('admin2'), `${D}/readMarks/admin1`)));
     await assertFails(setDoc(doc(dbAs('admin2'), `${D}/readMarks/admin1`), { notificationsSeenAt: serverTimestamp() }));
   });
+
+  it('I can mark one note read, as it was when I read it (3.0f)', async () => {
+    const mine = doc(dbAs('admin1'), `${D}/readMarks/admin1`);
+    const read = Timestamp.fromDate(new Date('2026-11-09T10:42:00Z'));
+    await assertSucceeds(setDoc(mine, { notificationsSeenAt: serverTimestamp() }));
+    await assertSucceeds(setDoc(mine,
+      { reads: { 'team-royal_playersApproved_royal_2026-11-09': read } }, { mergeFields: ['reads'] }));
+    // "Mark all read" empties them again
+    await assertSucceeds(setDoc(mine, { notificationsSeenAt: serverTimestamp(), reads: {} },
+      { mergeFields: ['notificationsSeenAt', 'reads'] }));
+  });
+
+  it('nobody else can mark my notes read', async () => {
+    const read = Timestamp.fromDate(new Date('2026-11-09T10:42:00Z'));
+    await assertFails(setDoc(doc(dbAs('admin2'), `${D}/readMarks/admin1`), { reads: { n1: read } }));
+    await assertFails(setDoc(doc(dbAs('fa1'), `${D}/readMarks/admin1`), { reads: { n1: read } }));
+  });
+
+  it('reads must be a map of at most 100 notes, and nothing else is saved', async () => {
+    const mine = doc(dbAs('admin1'), `${D}/readMarks/admin1`);
+    const read = Timestamp.fromDate(new Date('2026-11-09T10:42:00Z'));
+    const many = {};
+    for (let i = 0; i < 101; i++) many[`n${i}`] = read;
+    await assertFails(setDoc(mine, { reads: many }));
+    await assertFails(setDoc(mine, { reads: ['n1'] }));
+    await assertFails(setDoc(mine, { reads: { n1: read }, unreadCount: 0 }));
+    delete many.n100;
+    await assertSucceeds(setDoc(mine, { reads: many }));
+  });
 });
 
 // ---------- Fixtures (3.0a) ----------

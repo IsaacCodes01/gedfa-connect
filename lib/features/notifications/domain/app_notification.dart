@@ -49,6 +49,7 @@ enum NotificationKind {
 class AppNotification {
   const AppNotification({
     required this.id,
+    this.audience = '',
     required this.kind,
     required this.teamId,
     required this.teamName,
@@ -58,6 +59,7 @@ class AppNotification {
   });
 
   final String id;
+  final String audience; // 'fa' or 'team:<teamId>'
   final NotificationKind kind;
   final String teamId;
   final String teamName;
@@ -146,77 +148,120 @@ class AppNotification {
           people == 1 ? 'Match cancelled' : '$people matches cancelled',
       };
 
-  String get body => switch (kind) {
-        NotificationKind.playersApproved =>
-          '$namesText. They can now be picked on team sheets.',
-        NotificationKind.playersRejected =>
-          '$namesText. Open Squad › Rejected to read the reasons and correct '
-              'them.',
-        NotificationKind.juvenilePassed =>
-          '$namesText. Passed at screening, with their player IDs.',
-        NotificationKind.juvenileNotEligible =>
-          '$namesText. The reasons are on each player in Squad › Juvenile.',
-        NotificationKind.juvenileToCorrect =>
-          '$namesText. Open Squad › Juvenile to read what to fix, then send '
-              'them again for screening.',
-        NotificationKind.teamApproved =>
-          'Welcome to the league. You can now add your Division players.',
-        NotificationKind.teamRequest => people == 1
-            ? 'Sent by the club. Open it in Teams to review.'
-            : '$namesText. Open Teams to review them.',
-        NotificationKind.playersSubmitted =>
-          '$namesText. Waiting for your review in Players.',
-        NotificationKind.playersResubmitted =>
-          '$namesText. Waiting for your review in Players.',
-        NotificationKind.juvenileSubmitted =>
-          '$namesText. Waiting for the screening day; see Players › '
-              'Juvenile.',
-        NotificationKind.teamUpdated =>
-          'Changed: $namesText. Saved straight away (no approval needed).',
-        NotificationKind.inviteAccepted => '$namesText.',
-        NotificationKind.paymentConfirmed =>
-          '$namesText. See More › Season fee.',
-        NotificationKind.paymentNotFound =>
-          '$namesText. Check the details and send it again in More › '
-              'Season fee.',
-        // The latest balance the FA sent today
-        NotificationKind.feeReminder =>
-          '${names.lastOrNull ?? 'Part of the fee'} left to pay. Pay to '
-              "GEDFA's MoMo and add the payment in More › Season fee.",
-        NotificationKind.paymentSent =>
-          '$namesText. Confirm it in More › Season fees.',
-        NotificationKind.registrationChanged =>
-          '$namesText. See More › League settings.',
-        NotificationKind.changeRequested =>
-          '$namesText. Open Teams › Changes to decide.',
-        NotificationKind.changeApproved =>
-          '$namesText. It is used everywhere from now on.',
-        NotificationKind.changeRefused =>
-          "$namesText. Open More › Team profile to read the FA's reason.",
-        NotificationKind.teamCorrected =>
-          '$namesText. See More › Team profile.',
-        NotificationKind.correctionAsked =>
-          "To correct: ${names.lastOrNull ?? ''}. Read the FA's message on "
-              'your Squad tab.',
-        NotificationKind.correctionDone =>
-          '${names.lastOrNull ?? 'Your correction'}: all good.',
-        NotificationKind.correctionSentBack =>
-          '${names.lastOrNull ?? ''}. Check it in Teams › Changes.',
-        NotificationKind.teamSuspended =>
-          '"${names.lastOrNull ?? ''}" Contact the FA.',
-        NotificationKind.suspensionLifted =>
-          '${names.lastOrNull ?? ''}. You can add and edit players again.',
-        NotificationKind.fixtureAdded => '$namesText. See Fixtures.',
-        NotificationKind.fixtureChanged => '$namesText. See Fixtures.',
-        NotificationKind.fixturePostponed => '$namesText. See Fixtures.',
-        NotificationKind.fixtureCancelled => '$namesText. See Fixtures.',
-      };
+  /// The short text in the bell's list ("Kojo Arthur, Nana Ofori and 2
+  /// more. They can now be picked…").
+  String get body => _text(namesText);
+
+  /// The details page (3.0f): the text without the names when they are
+  /// listed one per line under it ([listsNames]), else the whole text.
+  String get detailText => _text(listsNames ? null : namesText);
+
+  /// Whether the names are a list of players / clubs / changes that the
+  /// details page shows in full, one per line.
+  bool get listsNames {
+    if (names.isEmpty) return false;
+    return switch (kind) {
+      NotificationKind.teamRequest => people > 1,
+      NotificationKind.teamApproved ||
+      NotificationKind.feeReminder ||
+      NotificationKind.correctionAsked ||
+      NotificationKind.correctionDone ||
+      NotificationKind.correctionSentBack ||
+      NotificationKind.teamSuspended ||
+      NotificationKind.suspensionLifted => false,
+      _ => true,
+    };
+  }
+
+  /// "From GEDFA" on a team's notes; on the FA's, the team that did it.
+  String get sender {
+    if (audience != 'fa') return 'GEDFA';
+    return switch (kind) {
+      NotificationKind.teamRequest when people > 1 => '$people clubs',
+      NotificationKind.inviteAccepted ||
+      NotificationKind.registrationChanged => 'GEDFA',
+      _ => teamName.isEmpty ? 'GEDFA' : teamName,
+    };
+  }
+
+  /// [names] null: leave the names out (the details page lists them).
+  String _text(String? names) {
+    String withNames(String rest) => names == null
+        ? rest
+        : rest.isEmpty
+            ? '$names.'
+            : '$names. $rest';
+    return switch (kind) {
+      NotificationKind.playersApproved =>
+        withNames('They can now be picked on team sheets.'),
+      NotificationKind.playersRejected => withNames(
+          'Open Squad › Rejected to read the reasons and correct them.'),
+      NotificationKind.juvenilePassed =>
+        withNames('Passed at screening, with their player IDs.'),
+      NotificationKind.juvenileNotEligible => withNames(
+          'The reasons are on each player in Squad › Juvenile.'),
+      NotificationKind.juvenileToCorrect => withNames(
+          'Open Squad › Juvenile to read what to fix, then send them again '
+          'for screening.'),
+      NotificationKind.teamApproved =>
+        'Welcome to the league. You can now add your Division players.',
+      NotificationKind.teamRequest => people == 1
+          ? 'Sent by the club. Open it in Teams to review.'
+          : withNames('Open Teams to review them.'),
+      NotificationKind.playersSubmitted =>
+        withNames('Waiting for your review in Players.'),
+      NotificationKind.playersResubmitted =>
+        withNames('Waiting for your review in Players.'),
+      NotificationKind.juvenileSubmitted => withNames(
+          'Waiting for the screening day; see Players › Juvenile.'),
+      NotificationKind.teamUpdated => names == null
+          ? 'Saved straight away (no approval needed). Changed:'
+          : 'Changed: $names. Saved straight away (no approval needed).',
+      NotificationKind.inviteAccepted => withNames(''),
+      NotificationKind.paymentConfirmed =>
+        withNames('See More › Season fee.'),
+      NotificationKind.paymentNotFound => withNames(
+          'Check the details and send it again in More › Season fee.'),
+      // The latest balance the FA sent today
+      NotificationKind.feeReminder =>
+        '${this.names.lastOrNull ?? 'Part of the fee'} left to pay. Pay to '
+            "GEDFA's MoMo and add the payment in More › Season fee.",
+      NotificationKind.paymentSent =>
+        withNames('Confirm it in More › Season fees.'),
+      NotificationKind.registrationChanged =>
+        withNames('See More › League settings.'),
+      NotificationKind.changeRequested =>
+        withNames('Open Teams › Changes to decide.'),
+      NotificationKind.changeApproved =>
+        withNames('It is used everywhere from now on.'),
+      NotificationKind.changeRefused =>
+        withNames("Open More › Team profile to read the FA's reason."),
+      NotificationKind.teamCorrected =>
+        withNames('See More › Team profile.'),
+      NotificationKind.correctionAsked =>
+        "To correct: ${this.names.lastOrNull ?? ''}. Read the FA's message "
+            'on your Squad tab.',
+      NotificationKind.correctionDone =>
+        '${this.names.lastOrNull ?? 'Your correction'}: all good.',
+      NotificationKind.correctionSentBack =>
+        '${this.names.lastOrNull ?? ''}. Check it in Teams › Changes.',
+      NotificationKind.teamSuspended =>
+        '"${this.names.lastOrNull ?? ''}" Contact the FA.',
+      NotificationKind.suspensionLifted =>
+        '${this.names.lastOrNull ?? ''}. You can add and edit players again.',
+      NotificationKind.fixtureAdded => withNames('See Fixtures.'),
+      NotificationKind.fixtureChanged => withNames('See Fixtures.'),
+      NotificationKind.fixturePostponed => withNames('See Fixtures.'),
+      NotificationKind.fixtureCancelled => withNames('See Fixtures.'),
+    };
+  }
 
   static AppNotification? fromMap(String id, Map<String, dynamic> data) {
     final kind = NotificationKind.fromString(data['kind'] as String?);
     if (kind == null) return null;
     return AppNotification(
       id: id,
+      audience: data['audience'] as String? ?? '',
       kind: kind,
       teamId: data['teamId'] as String? ?? '',
       teamName: data['teamName'] as String? ?? '',

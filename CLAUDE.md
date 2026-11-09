@@ -19,7 +19,7 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
    - test steps he can do himself in the app
 5. **Before every commit**, run (and show the result):
    - `flutter analyze` → must be **0 issues**
-   - `cd test/rules && npm test` → **all** rules tests pass (318 after 3.0c1d)
+   - `cd test/rules && npm test` → **all** rules tests pass (321 after 3.0f1)
    - `flutter test` → all Dart tests pass (layout smoke tests and the kit check)
 6. **Commit after each step** with a clear message, e.g.
    `feat(teams): change requests for name, short name, logo and competitions; 250 rules tests; docs v2.12`
@@ -114,6 +114,10 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
   (FA only, one per league, `done` ticked in the same batch as each match, deleted with the last notes);
   `startPostpone` + `finishPostpone`; Competitions shows a stopped one with Finish (C13). Rules changed: Isaac deploys
   to dev. Next: **the back arrow**, then juvenile side names, then 3.0c2.
+- **3.0f1** done (9 Nov 2026, 321 rules tests, 152 Dart tests): a tap opens Notification details
+  (`notification_details_screen.dart`, `Routes.adminNote` / `Routes.teamNote`) and marks only that note read
+  (`readMarks/{uid}.reads`, `ReadMark.isUnread`); icons, targets and button names in `widgets/note_look.dart`.
+  The details button still uses `context.go` (3.0f2 changes it). Rules changed: Isaac deploys to dev. Next: **3.0f2** Back.
 - **Plan agreed 9 Nov 2026 (deadline Thu 12 Nov, 12:30 pm; Isaac's prompts in that conversation):** next, in order:
   1. **3.0f Notifications and Back** (mockup `3.0f-notifications-and-back.html`, N1–N3, **approved**): a tap marks only
      that note read (reads kept per note in `readMarks/{uid}`: note ID → the `updatedAt` read; a grouped note with a newer

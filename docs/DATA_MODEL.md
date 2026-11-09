@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.22, matches the rules after step 3.0c1d (9 Nov 2026)
+**Status:** v2.23, matches the rules after step 3.0f1 (9 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -525,7 +525,9 @@ Readable and writable only by FA admins. Created with `next: 2` by the very firs
 
 ### 2.10 `readMarks/{uid}` — my bell
 
-`notificationsSeenAt` (Mark all read) and `hiddenAnnouncements` (pinned cards I closed, up to 30). Mine only.
+`notificationsSeenAt` (Mark all read), `reads` (3.0f: the notes and announcements I opened one by one, note ID → its `updatedAt` / `createdAt` when I read it; at most 100, only the IDs still in my bell are kept, emptied by Mark all read) and `hiddenAnnouncements` (pinned cards I closed, up to 30). Mine only.
+
+A note is **unread** when it is newer than `notificationsSeenAt` and newer than its own `reads` time (compared in milliseconds: the web keeps no microseconds). A grouped note that gets one more name has a newer `updatedAt`, so it is unread again.
 
 ### 2.11 `payments/{id}` — season fee payments (2.13c)
 
@@ -833,6 +835,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 9 Nov 2026 | v2.23 (3.0f1): `readMarks/{uid}` gains `reads` (map, at most 100): a tap marks only that note read; Notification details page. Owner-only, as before. 321 rules tests. |
 | 9 Nov 2026 | v2.22 (3.0c1d): new `postponeJobs/{competitionId}` (FA only): a league's postpone is saved before any match moves and ticked off in the same batch as each match, so a stopped one is finished later and nothing moves twice; deleted with the last notes. 318 rules tests. |
 | 9 Nov 2026 | v2.21.1 (3.0c1c): no new field or rule. Postpone a league (every match not played yet moves by the same days) or a Gala (its days move); the clubs get a `fixturePostponed` note with the reason. 314 rules tests. |
 | 8 Nov 2026 | v2.21 (3.0c1b): the FA changes a cup before the draw and deletes one at any time; new `cups/{id}/history`. GEDFA's cup answers (4) in Section 7 (delete, postpone, Pot 1 byes, juvenile "B", Gala sheets 20 minutes before). 310 rules tests. |
