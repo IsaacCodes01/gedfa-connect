@@ -470,8 +470,8 @@ A single document, edited in FA › More › League settings. Missing fields use
 | `teamRegistrationOpen`   | boolean | `true`         | any FA admin      | Closed: no new team requests (rules). Existing requests can still be edited |
 | `playerRegistrationOpen` | boolean | `true`         | any FA admin      | Closed: no new players (rules). Rejected players can still be corrected |
 | `maxSquadSize`           | number  | 30 (11–40)     | any FA admin      | Per competition |
-| `matchdaySquad`          | number  | 16 (11–23)     | any FA admin      | Phase 3 |
-| `matchdaySubs`           | number  | 5 (0–12)       | any FA admin      | Phase 3 |
+| `matchdaySquad`          | number  | 18 (11–23)     | any FA admin      | Phase 3: 11 starters + 7 on the bench (Isaac, 9 Nov 2026) |
+| `matchdaySubs`           | number  | 5 (0–12)       | any FA admin      | Substitutions allowed in a match (match report) |
 | `minPlayers`             | number  | 7 (7–11)       | any FA admin      | Team sheet red until reached (Phase 3) |
 | `season`                 | string  | `2026-27`      | **chairman**      | A new season starts a new fee for every team |
 | `fee`                    | number  | 1000           | **chairman**      | GH₵ per team per season; the rules cap payments at it |
@@ -797,6 +797,10 @@ Feed rules: never include dates of birth; player photos only if agreed with GEDF
 **GFA colts guidelines 2023/24 (found online, 7 Nov 2026):** U13 players may play for U15 and U15 players for U17; in a U17 match at most 1 U13 player and 5 U15 players. Match length U17 2 × 45, U15 2 × 40, U13 2 × 25 minutes. Not stated: how many U13 players in a U15 match (asked GEDFA).
 
 **Answered by GEDFA via Isaac (8 Nov 2026), cups (4):** the FA can **delete** a cup at any time (even after the draw) and everything goes, nothing is kept. The FA can **postpone** a cup or Gala to a new date, and even the **start of a league** (every matchday not played yet moves by the same number of days); the clubs are told, with the reason. In a seeded cup the **Pot 1 clubs get the byes first** in a first round. **Juvenile side names:** "**B**" is added when a club keeps the same name; the juvenile side gets its own short name only when it gets a new name; a club already in both competitions asks the FA (like a name change), and the name shows everywhere after approval. **Gala team sheets: 20 minutes before kick-off.** Only "Cup" takes a plural ("Cups and Gala").
+
+**Answered by Isaac (9 Nov 2026), match day:** a team sheet has **18** players, 11 starters and **7** substitutes (`matchdaySquad` 18; `matchdaySubs` stays the substitutions allowed in a match, 5). Team officials on the sheet: up to 7 of the club's registered officials, team manager and head coach required. **No QR code** on the official sheet. The commissioner can be an FA official (an FA admin account) or a referee. **Player suspensions:** the FA suspends a player by hand for a number of matches, with a reason; automatic suspensions from cards come in Phase 5. **Protest fee: GH₵ 500**, editable in League settings like the season fee and MoMo number (the protest answer time and the public holidays are still to be confirmed by GEDFA).
+
+**Answered by Isaac (9 Nov 2026), Phases 4 and 5:** tie-breakers stay as GEDFA said (27 Oct): the English Premier League order, 3 points a win and 1 a draw, then goal difference, goals scored, then head-to-head. The FA appoints the referees for each matchday, and referees use the app (their own dashboard). The Firebase project is on the pay-as-you-go plan, so Cloud Functions can send phone notifications and fee reminders.
 
 **Answered by Isaac (9 Nov 2026):** when a Gala is postponed **before its draw**, the clubs in it still get the note (they plan around its dates).
 

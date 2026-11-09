@@ -8,7 +8,7 @@ class LeagueSettings {
     this.teamRegistrationOpen = true,
     this.playerRegistrationOpen = true,
     this.maxSquadSize = 30,
-    this.matchdaySquad = 16,
+    this.matchdaySquad = 18,
     this.matchdaySubs = 5,
     this.minPlayers = 7,
     this.season = Season.defaultSeason,
@@ -25,7 +25,8 @@ class LeagueSettings {
   /// Most players per competition (squad).
   final int maxSquadSize;
 
-  /// Starting 11 + substitutes on a team sheet (Phase 3).
+  /// Starting 11 + substitutes on a team sheet (Phase 3): 18, so 7 on the
+  /// bench (Isaac, 9 Nov 2026).
   final int matchdaySquad;
 
   /// Substitutions allowed in a match.
@@ -52,7 +53,7 @@ class LeagueSettings {
     'playerRegistrationOpen': 'Player registration',
     'maxSquadSize': 'Squad size',
     'matchdaySquad': 'Matchday squad',
-    'matchdaySubs': 'Substitutes',
+    'matchdaySubs': 'Substitutions allowed',
     'minPlayers': 'Fewest players to start',
     'season': 'Season',
     'fee': 'Affiliation fee',

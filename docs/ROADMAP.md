@@ -242,7 +242,7 @@ Mockup `3.0-fixtures-and-sheet.html` (approved 8 Nov 2026).
   - [x] **Match details** (F5, F6), done early at Isaac's request: stadium-night header (pitch lines, gold floodlight glow), crests, kick-off, countdown; Match info (date, kick-off, ground with Directions to Google Maps, competition and matchday, match length and play-up rule, team sheets due, status and reason); What changed (the match history); kits (outfield and goalkeeper); team sheets; officials (Phase 4). Tapping any match opens it, for the FA and teams; the FA manages the match from its ⋯ button. 87 Dart tests *(done 8 Nov 2026)*
   - [ ] The next matchday card: countdown and matches sliding every 5 seconds, on Home and Fixtures, Division and Juvenile (D1, J1)
 - [ ] 3.0e **Posters**: one match or a matchday, square or tall, three styles, GEDFA logo (transparent PNG), Save to photos and Share (P1–P4)
-- [ ] 3.1 Team sheet builder: approved players only (16 / 5 / 7 from settings), captain, vice-captain, goalkeeper, GFA play-up limits
+- [ ] 3.1 Team sheet builder: approved players only (18 = 11 + 7 on the bench, 7 at least, from settings), captain, vice-captain, goalkeeper, GFA play-up limits
 - [ ] 3.2 Submit and lock 1 hour before kick-off; the FA and the referee see it; the opponent sees it at lock time (V2)
 - [ ] 3.3 The paper sheet as a PDF: the team's real kits top-left, captain's signature, QR code to check it (V1)
 - [ ] 3.4 Formation on a pitch (optional)

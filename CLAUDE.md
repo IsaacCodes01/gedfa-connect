@@ -114,11 +114,33 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
   (FA only, one per league, `done` ticked in the same batch as each match, deleted with the last notes);
   `startPostpone` + `finishPostpone`; Competitions shows a stopped one with Finish (C13). Rules changed: Isaac deploys
   to dev. Next: **the back arrow**, then juvenile side names, then 3.0c2.
+- **Plan agreed 9 Nov 2026 (deadline Thu 12 Nov, 12:30 pm; Isaac's prompts in that conversation):** next, in order:
+  1. **3.0f Notifications and Back** (mockup `3.0f-notifications-and-back.html`, N1–N3, **approved**): a tap marks only
+     that note read (reads kept per note in `readMarks/{uid}`: note ID → the `updatedAt` read; a grouped note with a newer
+     `updatedAt` is unread again; Mark all read keeps working; owner-only rules with tests) and opens Notification details
+     (icon, title, "From GEDFA" or the team, time, full text with every name, "Status: Read", bottom button named after the
+     target: "Open Squad", "Review players"…). Back: pages, details and editors use `context.push`; only bottom-tab switches
+     use `context.go`; ← pops, or goes to its tab's main screen; the phone's Back = ←. Audit all ~77 `context.go` in lib/
+     and list the ones changed.
+  2. Juvenile side names (mockup first). 3. **Team admin dashboard** (Home tab: next match, sheet due, squad ready, fee,
+     notes; mockup first).
+  4. Match day, one step at a time, mockups MS1–MS4 to make first: **3.1** team sheet builder (18 = 11 + 7 subs from
+     `settings/league.matchdaySquad`, at least `minPlayers` 7; up to 7 team officials, manager and head coach required;
+     captain, vice; no suspended players; 1 U13 and 5 U15 in a U17 match), with a public squad list
+     `squads/{teamId}_{category}` written by the FA in the same batch as every approval / eligibility / player suspension
+     (the rules check the sheet's IDs against it: 1 lookup; FA suspends players by hand), **3.2** lock 1 h before kick-off
+     in the rules, visibility (team + FA, then opponent and appointed officials), **3.5** appoint match officials (referee,
+     2 assistants, 4th, commissioner = FA admin or referee; fixture `officials` map; bell notes) + **referee dashboard**,
+     **3.3** official sheet + PDF (`pdf` / `printing`, **no QR code**), **3.6** player check (commissioner only).
+  5. Shared sending and loading states (M1, M2; part of the UI/UX refresh), light refresh (icon, splash).
+  6. Phase 4 (referee reports, protests: fee GH₵ 500 in League settings, chairman-editable; answer time and public
+     holidays: GEDFA), Phase 5 (Premier League tie-breakers), Thursday: push notifications (Blaze is on), prod setup.
+  Parked until after Phase 5: cups 3.0c2–c5, next matchday card, posters, formation, Season records.
 - **Then:** **3.0c** competitions and cups (mockups C1–C4 in `3.0-fixtures-and-sheet.html`:
   the FA picks draw rules, one or two legs; random draw; knockout with byes or groups then knockout;
   live draw; bracket; a juvenile cup per age group). Then the rest of 3.0d (next matchday card, D1, J1)
   and 3.0e posters (`assets/images/gedfa_logo.png`, transparent, not committed yet). Rules changed in 3.0b
-  (`fixtureDrafts`): Isaac deploys to dev. (mockup `3.0-fixtures-and-sheet.html`), then **Phase 3** team sheets (16 / 5 / 7 from settings, GFA play-up limits, kit in the top-left corner),
+  (`fixtureDrafts`): Isaac deploys to dev. (mockup `3.0-fixtures-and-sheet.html`), then **Phase 3** team sheets (18 = 11 + 7 subs, minimum 7, from settings, GFA play-up limits, kit in the top-left corner),
   then the **UI/UX refresh with motion and animations** and the "before the pilot" list (push
   notifications, 3-day fee reminders, prod setup), then the pilot, a second refresh from feedback, Phase 4.
 - **The refresh (after Phase 3, before the pilot):** our own app icon (`flutter_launcher_icons`), splash
