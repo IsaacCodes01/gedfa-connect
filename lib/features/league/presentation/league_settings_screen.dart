@@ -13,6 +13,7 @@ import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/features/league/data/league_settings_repository.dart';
 import 'package:gedfa_connect/features/league/domain/league_settings.dart';
+import 'package:gedfa_connect/features/players/data/player_repository.dart';
 import 'package:gedfa_connect/features/settings/presentation/widgets/settings_widgets.dart';
 
 /// Board L1: FA › More › League settings. Registration switches (any FA
@@ -258,6 +259,16 @@ class _LeagueSettingsScreenState extends ConsumerState<LeagueSettingsScreen> {
                           ],
                         ),
                         const SizedBox(height: 18),
+                        const SectionTitle('Team sheets'),
+                        const TileGroup(children: [_SquadListsTile()]),
+                        const _Hint(
+                          'Each team has a list of its approved players for '
+                          'every competition and age group. Team sheets are '
+                          'checked against it. Approvals keep it up to date; '
+                          'Repair adds players approved before the lists '
+                          'existed. It is safe to run again.',
+                        ),
+                        const SizedBox(height: 18),
                         const SectionTitle('Recent changes'),
                         const _History(),
                       ],
@@ -280,6 +291,55 @@ class _LeagueSettingsScreenState extends ConsumerState<LeagueSettingsScreen> {
           );
         },
       ),
+    );
+  }
+}
+
+/// Squad lists (3.1a1): Repair puts every approved player on their list.
+class _SquadListsTile extends ConsumerStatefulWidget {
+  const _SquadListsTile();
+
+  @override
+  ConsumerState<_SquadListsTile> createState() => _SquadListsTileState();
+}
+
+class _SquadListsTileState extends ConsumerState<_SquadListsTile> {
+  bool _busy = false;
+
+  Future<void> _repair() async {
+    setState(() => _busy = true);
+    try {
+      final fixed =
+          await ref.read(playerRepositoryProvider).repairSquadLists();
+      if (!mounted) return;
+      AppToast.success(
+        context,
+        fixed == 0
+            ? 'All squad lists are up to date.'
+            : 'Squad lists repaired: $fixed '
+                '${fixed == 1 ? 'player' : 'players'} fixed.',
+      );
+    } catch (error) {
+      if (mounted) AppToast.error(context, appErrorMessage(error));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      title: const Text(
+        'Squad lists',
+        style: TextStyle(fontWeight: FontWeight.w600),
+      ),
+      subtitle: const Text('Approved players, for team sheets'),
+      trailing: _busy
+          ? const SizedBox.square(
+              dimension: 22,
+              child: CircularProgressIndicator(strokeWidth: 2.5),
+            )
+          : TextButton(onPressed: _repair, child: const Text('Repair')),
     );
   }
 }

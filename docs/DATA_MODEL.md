@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.27.8, matches the rules after step JSc2, renamed teams in matches (9 Nov 2026); Isaac's team sheet builder answers (10 Nov 2026)
+**Status:** v2.28, matches the rules after step 3.1a1, squad lists for team sheets (10 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -431,6 +431,25 @@ Kept by the team, **no FA approval**, never part of the registration. Private: t
 
 `captainId`, `viceCaptainId` (player IDs or null), `updatedAt`. One document per competition, so there is only ever one captain and one vice-captain; both must be players of that team and competition, never the same player. The team sheet (Phase 3) fills them in and can change them for one match.
 
+### 2.4d `squads/{teamId}_{group}` — squad lists for team sheets (3.1a1)
+
+The IDs of a team's **approved** players, one list per competition: `group` is `division`, or a juvenile age group (`U13`, `U15`, `U17`), e.g. `squads/royal_division`, `squads/royal_U15`. Team sheets (3.1) are checked against it: a sheet has up to 18 players and the rules may look at only 10 to 20 documents per save, so one list = **one lookup** instead of 18.
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `teamId` | string | Never changes |
+| `group` | string | `division` / `U13` / `U15` / `U17`; never changes. The document ID is `{teamId}_{group}` |
+| `players` | map | Player ID → `true`, every approved player of that team and group |
+| `changed` | string | The one player added or taken off by the last write |
+| `updatedAt` | timestamp | Server time |
+
+- **One player per write**, named in `changed`. The rules keep the list exact:
+  - **FA approval** (`approve`) and **screening pass** (`passJuvenile`): the player must be on the list of the group they end in after the same transaction (a child moved up goes on the older group's list). The app reads the list first and adds the player only if missing.
+  - **Team edit** that sends an approved player back to pending: the player must leave their list in the same batch (the app reads the list first; a player approved before the lists existed may not be on one).
+  - The FA may add an approved player (repair) or take off a player who is not approved. Nobody else writes it.
+- Read: the team (its own lists; a missing list may be looked for) and the FA.
+- **Repair** (FA › More › League settings › Team sheets › Squad lists › Repair, `PlayerRepository.repairSquadLists`): adds every approved player missing from their list and takes off anyone no longer approved. Needed once for players approved before 10 Nov 2026; safe to run again.
+
 ### 2.4a Player ID (`playerCode`)
 
 **Format:** `GE` + two-digit year of first approval + `-` + four-digit running number. Example: `GE26-0042`.
@@ -709,7 +728,7 @@ These changes always happen together in **one batch** (all succeed or none do):
 | ------------------------------------- | --------------------------------------------------------------------------------------------- |
 | Add player                            | create`players/{id}` + create `teams/{teamId}/jerseys/{category}-{no}` + create `playerKeys/{key}` |
 | Change jersey number                  | update player + delete old jersey doc + create new jersey doc                                 |
-| Correct name or DOB                   | update player (back to`pending`) + delete old player key + create new player key            |
+| Correct name or DOB                   | update player (back to`pending`) + delete old player key + create new player key + take an approved player off their squad list (3.1a1) |
 | Remove player *(later)*               | delete player + delete jersey doc + delete player key                                         |
 | Submit team request                   | create`teamRequests/{uid}` + create `teamNames/{nameKey}`                                 |
 | Rename team while pending or rejected | update request + delete old`teamNames` doc + create new one                                 |
@@ -719,9 +738,9 @@ These changes always happen together in **one batch** (all succeed or none do):
 | Not approve a change (FA)             | update the request (`rejected`, `rejectionReason`) + team notification `changeRefused`         |
 | Approve team request (FA)             | update request (`status: approved`, `teamId`, `reviewedBy`, `reviewedAt`) + create `teams/{teamId}` + create `users/{uid}` (`role: teamAdmin`) |
 | Reject team request (FA)              | update request only (`status: rejected`, `rejectionReason`, review fields)                    |
-| Approve player (FA) — **transaction** | read player (must be pending) + read counter → update player (`approved`, `playerCode`, `approvedBy`, `approvedAt`) + set / update counter (`next + 1`). A player who already has an ID keeps it and the counter is not touched |
+| Approve player (FA) — **transaction** | read player (must be pending) + read the squad list + read counter → update player (`approved`, `playerCode`, `approvedBy`, `approvedAt`) + set / update counter (`next + 1`) + add the player to `squads/{teamId}_division` (3.1a1). A player who already has an ID keeps it and the counter is not touched |
 | Reject player (FA)                    | update player only (`status: rejected`, `rejectionReason`, `reviewedBy`, `reviewedAt`)        |
-| Pass a child at screening (FA) — **transaction** | read the child (must be pending) + the new jersey doc if moving up + the juvenile counter → update player (`approved`, `GJ…` ID, `ageGroup`) + move the jersey reservation if moving up + counter `next + 1` + team notification |
+| Pass a child at screening (FA) — **transaction** | read the child (must be pending) + the new jersey doc if moving up + the squad list of the group they end in + the juvenile counter → update player (`approved`, `GJ…` ID, `ageGroup`) + move the jersey reservation if moving up + counter `next + 1` + add the child to `squads/{teamId}_{ageGroup}` (3.1a1) + team notification |
 | Child not eligible (FA)               | update player (`rejected`, `notEligible: true`, reason) + team notification                    |
 | Save a screening day (FA)             | create `announcements/{id}` (`to: juvenile`) + create `screeningDays/{id}` pointing to it      |
 | Cancel a screening day (FA)           | delete the day + delete its announcement + create a "Screening cancelled" announcement        |
@@ -859,6 +878,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 10 Nov 2026 | v2.28: new `squads/{teamId}_{group}` (3.1a1): the IDs of a team's approved players per competition / age group, one player per write (`changed`). The FA's approval and screening pass must add the player in the same transaction; a team edit that sends an approved player back to pending must take them off; FA Repair in League settings. 369 rules tests. |
 | 10 Nov 2026 | v2.27.8: no data change yet. Isaac's team sheet builder answers in Section 7 (one Save button, bench only with 11 starting, captain starts, any starter in goal, cup sheets 1 hour before; shirt numbers for one match approved, the registered number kept as the usual number). |
 | 10 Nov 2026 | v2.27.7: no data change. Isaac: when a team uses the head-injury substitute the other team gets one extra too; a goalkeeper in the starting 11 is required. |
 | 10 Nov 2026 | v2.27.6: no data change. Isaac: the extra substitute is for head injuries only, in every competition; any number of goalkeepers, the bench never more than 7. |

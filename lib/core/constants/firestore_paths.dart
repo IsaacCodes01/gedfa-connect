@@ -66,6 +66,12 @@ class FirestorePaths {
 
   static String playerKey(String key) => '$district/playerKeys/$key';
 
+  /// Approved player IDs of one squad (3.1a1), e.g. `squads/royal_division`
+  /// or `squads/royal_U15`. Team sheets are checked against it.
+  static const squads = '$district/squads';
+  static String squad(String teamId, String group) =>
+      '$district/squads/${teamId}_$group';
+
   /// Football details the team keeps up to date (2.3d).
   static const playerProfiles = '$district/playerProfiles';
   static String playerProfile(String playerId) =>

@@ -10,6 +10,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import assert from 'node:assert/strict';
 import { before, after, beforeEach, describe, it } from 'node:test';
 
 import {
@@ -1371,8 +1372,11 @@ async function seedCounter(next) {
  * Approves a player the way the app does: the player and the counter
  * in one go. [counter] is 'create', 'update' or 'none'.
  */
-function approvePlayer(db, playerId, { by = 'fa1', code, next, counter = 'update' } = {}) {
+function approvePlayer(db, playerId, {
+  by = 'fa1', code, next, counter = 'update', squad = 'royal_division',
+} = {}) {
   const batch = writeBatch(db);
+  if (squad) addToSquad(batch, db, squad, playerId);
   batch.update(doc(db, `${D}/players/${playerId}`), {
     status: 'approved',
     ...(code === undefined ? {} : { playerCode: code }),
@@ -1385,6 +1389,17 @@ function approvePlayer(db, playerId, { by = 'fa1', code, next, counter = 'update
   if (counter === 'create') batch.set(doc(db, COUNTER), { next });
   if (counter === 'update') batch.update(doc(db, COUNTER), { next });
   return batch.commit();
+}
+
+/**
+ * Puts [playerId] on the squad list [squadId] ('royal_division',
+ * 'royal_U13'…) the way the app does: one player per write (3.1a1).
+ */
+function addToSquad(batch, db, squadId, playerId) {
+  const [teamId, group] = squadId.split('_');
+  batch.set(doc(db, `${D}/squads/${squadId}`), {
+    teamId, group, players: { [playerId]: true }, changed: playerId, updatedAt: serverTimestamp(),
+  }, { merge: true });
 }
 
 /** Rejects a pending player with a reason. */
@@ -2030,8 +2045,10 @@ const JCOUNTER = `${D}/settings/juvenileCounter`;
  */
 function passJuvenile(db, playerId, {
   code, next, group = 'U13', from = 'U13', jersey = 9, counter = 'create', day = 'day1',
+  squad = `royal_${group}`,
 } = {}) {
   const batch = writeBatch(db);
+  if (squad) addToSquad(batch, db, squad, playerId);
   batch.update(doc(db, `${D}/players/${playerId}`), {
     status: 'approved',
     screeningDayId: day,
@@ -4091,5 +4108,136 @@ describe('Finish a stopped postpone: postponeJobs (3.0c1d)', () => {
     }, { merge: true });
     batch.delete(doc(db, JOB));
     await assertSucceeds(batch.commit());
+  });
+});
+
+// ---------- Squad lists (3.1a1) ----------
+
+describe('Squad lists (3.1a1)', () => {
+  const list = (db, id = 'royal_division') => doc(db, `${D}/squads/${id}`);
+  /** royal_division already holds p1 (approved), with the rules off. */
+  async function seedList(players = { p1: true }) {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(list(context.firestore()), {
+        teamId: 'royal', group: 'division', players, changed: 'p1', updatedAt: Timestamp.now(),
+      });
+    });
+  }
+  /** The team edits approved p1's name: p1 goes back to pending. */
+  function sendBackP1(db, { removeFromList = true } = {}) {
+    const batch = writeBatch(db);
+    batch.update(doc(db, `${D}/players/p1`), {
+      fullName: 'Kwame Asante Jnr', fullNameLower: 'kwame asante jnr',
+      status: 'pending', updatedAt: serverTimestamp(),
+    });
+    if (removeFromList) {
+      batch.update(list(db), {
+        'players.p1': deleteField(), changed: 'p1', updatedAt: serverTimestamp(),
+      });
+    }
+    return batch.commit();
+  }
+
+  it('approving a player puts them on the squad list', async () => {
+    await seedCounter(2);
+    await assertSucceeds(approvePlayer(dbAs('fa1'), 'p3', { code: `GE${YY}-0002`, next: 3 }));
+    const snap = await getDoc(list(dbAs('admin1')));
+    assert(snap.data().players.p3 === true);
+  });
+
+  it('an approval without the squad list is refused', async () => {
+    await seedCounter(2);
+    await assertFails(approvePlayer(dbAs('fa1'), 'p3', { code: `GE${YY}-0002`, next: 3, squad: null }));
+  });
+
+  it("the player can't go on another team's list or the wrong competition", async () => {
+    await seedCounter(2);
+    await assertFails(approvePlayer(dbAs('fa1'), 'p3', { code: `GE${YY}-0002`, next: 3, squad: 'stars_division' }));
+    await assertFails(approvePlayer(dbAs('fa1'), 'p3', { code: `GE${YY}-0002`, next: 3, squad: 'royal_U17' }));
+  });
+
+  it('the FA can add a player approved before (repairing the list)', async () => {
+    const db = dbAs('fa1');
+    const batch = writeBatch(db);
+    addToSquad(batch, db, 'royal_division', 'p1');
+    await assertSucceeds(batch.commit());
+  });
+
+  it('a pending player cannot be put on the list', async () => {
+    const db = dbAs('fa1');
+    const batch = writeBatch(db);
+    addToSquad(batch, db, 'royal_division', 'p3');
+    await assertFails(batch.commit());
+  });
+
+  it('only one player per write, and the write names them', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), `${D}/players/p3`), { status: 'approved' });
+    });
+    await assertFails(setDoc(list(dbAs('fa1')), {
+      teamId: 'royal', group: 'division', players: { p1: true, p3: true }, changed: 'p1', updatedAt: serverTimestamp(),
+    }));
+    await assertFails(setDoc(list(dbAs('fa1')), {
+      teamId: 'royal', group: 'division', players: { p1: true }, changed: 'p3', updatedAt: serverTimestamp(),
+    }));
+  });
+
+  it('a team admin cannot add a player to their own list', async () => {
+    const db = dbAs('admin1');
+    const batch = writeBatch(db);
+    addToSquad(batch, db, 'royal_division', 'p1');
+    await assertFails(batch.commit());
+  });
+
+  it('the team reads its own list; another team cannot', async () => {
+    await seedList();
+    await assertSucceeds(getDoc(list(dbAs('admin1'))));
+    await assertFails(getDoc(list(dbAs('admin2'))));
+    await assertFails(getDoc(list(dbAs('newbie'))));
+  });
+
+  it('a team may look for a list that does not exist yet', async () => {
+    await assertSucceeds(getDoc(list(dbAs('admin1'), 'royal_U15')));
+  });
+
+  it('an approved player sent back to pending leaves the list in the same batch', async () => {
+    await seedList();
+    await assertSucceeds(sendBackP1(dbAs('admin1')));
+  });
+
+  it('sending a listed player back to pending without taking them off is refused', async () => {
+    await seedList();
+    await assertFails(sendBackP1(dbAs('admin1'), { removeFromList: false }));
+  });
+
+  it('a team cannot take an approved player off the list', async () => {
+    await seedList();
+    await assertFails(updateDoc(list(dbAs('admin1')), {
+      'players.p1': deleteField(), changed: 'p1', updatedAt: serverTimestamp(),
+    }));
+  });
+
+  it("another team cannot touch the team's list", async () => {
+    await seedList();
+    const db = dbAs('admin2');
+    await assertFails(updateDoc(list(db), {
+      'players.p1': deleteField(), changed: 'p1', updatedAt: serverTimestamp(),
+    }));
+  });
+
+  it('a child passed at screening goes on the list of the age group they end in', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `${D}/teams/royal`),
+        { name: 'Royal Unique FC', categories: ['division', 'juvenile'] });
+    });
+    await seedDay('day1', 1);
+    await addPlayer(dbAs('admin1'), 'j1', juvenileData()); // U13, #9
+    await assertFails(passJuvenile(dbAs('fa1'), 'j1', {
+      code: `GJ${YY}-0001`, next: 2, group: 'U15', squad: 'royal_U13',
+    }));
+    await assertFails(passJuvenile(dbAs('fa1'), 'j1', { code: `GJ${YY}-0001`, next: 2, squad: null }));
+    await assertSucceeds(passJuvenile(dbAs('fa1'), 'j1', {
+      code: `GJ${YY}-0001`, next: 2, group: 'U15',
+    }));
   });
 });

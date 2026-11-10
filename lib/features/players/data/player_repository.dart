@@ -11,6 +11,7 @@ import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/core/constants/approval_status.dart';
 import 'package:gedfa_connect/features/notifications/data/notification_writer.dart';
 import 'package:gedfa_connect/features/notifications/domain/app_notification.dart';
+import 'package:gedfa_connect/features/players/data/squad_list.dart';
 import 'package:gedfa_connect/features/players/domain/age_group.dart';
 import 'package:gedfa_connect/features/players/domain/player.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
@@ -337,6 +338,19 @@ class PlayerRepository {
         );
     await check();
 
+    // An approved player going back to pending leaves their squad list in
+    // the same batch (3.1a1; the rules insist). Read it first: a player
+    // approved before the lists existed may not be on one.
+    final squad = before.isApproved && !keepApproved
+        ? squadRef(
+            _db,
+            before.teamId,
+            squadGroupFor(before.category.name, before.ageGroup?.label),
+          )
+        : null;
+    final leavesSquad = squad != null &&
+        isOnSquad(await squad.get().timeout(_timeout), before.id);
+
     final urls = newPhoto == null
         ? null
         : await _uploadPhoto(
@@ -395,6 +409,8 @@ class PlayerRepository {
       );
     }
 
+    if (leavesSquad) batch.update(squad, squadRemoval(before.id));
+
     if (jerseyChanged) {
       batch
         ..delete(_jerseyRef(before))
@@ -448,6 +464,15 @@ class PlayerRepository {
         throw const PlayerNotPendingException();
       }
 
+      // The squad list the player goes on (3.1a1), read before any write
+      final teamId = data['teamId'] as String? ?? '';
+      final group = squadGroupFor(
+        data['category'] as String? ?? '',
+        data['ageGroup'] as String?,
+      );
+      final squad = squadRef(_db, teamId, group);
+      final onSquad = isOnSquad(await tx.get(squad), playerId);
+
       var code = data['playerCode'] as String?;
       if (code == null) {
         final counter = await tx.get(_counterRef);
@@ -478,6 +503,13 @@ class PlayerRepository {
         'changes': FieldValue.delete(), // reviewed
         'updatedAt': FieldValue.serverTimestamp(),
       });
+      if (!onSquad) {
+        tx.set(
+          squad,
+          squadAddition(teamId, group, playerId),
+          SetOptions(merge: true),
+        );
+      }
       return code;
     }).timeout(_timeout);
   }
@@ -592,6 +624,10 @@ class PlayerRepository {
         throw MoveUpJerseyTakenException(child.jerseyNo, group.label);
       }
 
+      // The child goes on the list of the age group they end in (3.1a1)
+      final squad = squadRef(_db, child.teamId, group.label);
+      final onSquad = isOnSquad(await tx.get(squad), child.id);
+
       var code = child.playerCode;
       DocumentSnapshot<Map<String, dynamic>>? counter;
       if (code == null) {
@@ -640,8 +676,64 @@ class PlayerRepository {
         'changes': FieldValue.delete(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
+      if (!onSquad) {
+        tx.set(
+          squad,
+          squadAddition(child.teamId, group.label, child.id),
+          SetOptions(merge: true),
+        );
+      }
       return code;
     }).timeout(_timeout);
+  }
+
+  // ---------- Squad lists (3.1a1) ----------
+
+  /// FA: puts every approved player on their squad list, and takes off
+  /// anyone on a list who is no longer approved. Needed once for players
+  /// approved before the lists existed (10 Nov 2026); safe to run again.
+  /// One write per player (the rules allow one at a time).
+  /// Returns how many it fixed.
+  Future<int> repairSquadLists() async {
+    final players = await _players
+        .where('status', isEqualTo: ApprovalStatus.approved.name)
+        .get()
+        .timeout(_timeout);
+    final lists =
+        await _db.collection(FirestorePaths.squads).get().timeout(_timeout);
+    final onList = {
+      for (final list in lists.docs)
+        list.id: ((list.data()['players'] as Map?)?.keys ?? const [])
+            .whereType<String>()
+            .toSet(),
+    };
+
+    var fixed = 0;
+    final approvedIds = <String>{};
+    for (final player in players.docs) {
+      approvedIds.add(player.id);
+      final data = player.data();
+      final teamId = data['teamId'] as String? ?? '';
+      final group = squadGroupFor(
+        data['category'] as String? ?? '',
+        data['ageGroup'] as String?,
+      );
+      if (onList['${teamId}_$group']?.contains(player.id) ?? false) continue;
+      await squadRef(_db, teamId, group)
+          .set(squadAddition(teamId, group, player.id), SetOptions(merge: true))
+          .timeout(_timeout);
+      fixed++;
+    }
+    for (final list in onList.entries) {
+      for (final id in list.value.difference(approvedIds)) {
+        await _db
+            .doc('${FirestorePaths.squads}/${list.key}')
+            .update(squadRemoval(id))
+            .timeout(_timeout);
+        fixed++;
+      }
+    }
+    return fixed;
   }
 
   /// FA, on the screening day: "Not eligible for Juvenile" with a

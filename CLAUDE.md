@@ -176,6 +176,10 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
   1–99, no two the same), the registered `jerseyNo` stays as the usual number; cup sheets 1 h before (Gala 20 min).
   Build **3.1a** Players step + Save (`teamSheets`, `squads` list at approval), then 3.1b roles and numbers, 3.1c check and
   sheet lines, 3.1d juvenile play-up, 3.1e player suspensions.
+- **3.1a1** done (10 Nov 2026, 369 rules tests, 234 Dart tests): `squads/{teamId}_{group}` (`division` / `U13` / `U15` / `U17`,
+  `players` map ID → true, `changed` = the one player of each write); `approve` / `passJuvenile` add in the transaction, a team edit
+  back to pending removes in the batch (`players/data/squad_list.dart`); FA Repair in League settings (`repairSquadLists`).
+  Rules changed: Isaac deploys to dev, then presses Repair once. Next: **3.1a2** Players step and Save.
 - Calendar backdrop (`_CalendarBackdrop` in `match_calendar_card.dart`): GEDFA logo as a one-colour watermark (its letters are white,
   so tint it with `color` + `BlendMode.srcIn`). `assets/images/gedfa_logo.png` is now committed.
 - **Plan agreed 9 Nov 2026 (deadline Thu 12 Nov, 12:30 pm; Isaac's prompts in that conversation):** next, in order:

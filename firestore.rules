@@ -2097,20 +2097,95 @@ service cloud.firestore {
           && after.reviewedAt == request.time;
       }
 
+      // ---------- squads/{teamId}_{group} (3.1a1) ----------
+      // The IDs of a team's APPROVED players, one list per competition:
+      // 'division', or a juvenile age group ('U13', 'U15', 'U17'). Team
+      // sheets (3.1) check their players against it with ONE lookup
+      // instead of one per player (the rules allow only 10 to 20).
+      // `changed` names the one player added or taken off by each write.
+      function squadGroupOf(player) {
+        return player.category == 'juvenile' ? player.ageGroup : 'division';
+      }
+
+      function squadDoc(teamId, group) {
+        return /databases/$(database)/documents/districts/$(districtId)/squads/$(teamId + '_' + group);
+      }
+
+      // After this write, the player is on their squad list
+      function inSquadAfter(player, playerId) {
+        let path = squadDoc(player.teamId, squadGroupOf(player));
+        return existsAfter(path)
+          && getAfter(path).data.players.get(playerId, false) == true;
+      }
+
+      // After this write, the player is NOT on the list they were on
+      function outOfSquadAfter(player, playerId) {
+        let path = squadDoc(player.teamId, squadGroupOf(player));
+        return !existsAfter(path)
+          || getAfter(path).data.players.get(playerId, false) != true;
+      }
+
+      // The FA adds exactly one player, approved in this write (or before:
+      // repairing a list), of this team and this competition or age group.
+      function isSquadAdd(squadId) {
+        let after = request.resource.data;
+        let before = resource == null ? {} : resource.data.players;
+        let player = getAfter(playerDoc(after.changed)).data;
+        return after.keys().hasOnly(['teamId', 'group', 'players', 'changed', 'updatedAt'])
+          && squadId == after.teamId + '_' + after.group
+          && (resource == null
+              || (after.teamId == resource.data.teamId && after.group == resource.data.group))
+          && after.players is map
+          && after.players.diff(before).affectedKeys().hasOnly([after.changed])
+          && after.players.diff(before).addedKeys().size() == 1
+          && after.players[after.changed] == true
+          && after.updatedAt == request.time
+          && player.status == 'approved'
+          && player.teamId == after.teamId
+          && squadGroupOf(player) == after.group;
+      }
+
+      // Exactly one player taken off, who is no longer approved after this
+      // write (the team sent them back to pending by editing them).
+      function isSquadRemoval() {
+        let after = request.resource.data;
+        let player = getAfter(playerDoc(after.changed)).data;
+        return after.diff(resource.data).affectedKeys().hasOnly(['players', 'changed', 'updatedAt'])
+          && after.players is map
+          && resource.data.players.diff(after.players).affectedKeys().hasOnly([after.changed])
+          && resource.data.players.diff(after.players).addedKeys().size() == 1
+          && after.updatedAt == request.time
+          && player.status != 'approved'
+          && player.teamId == resource.data.teamId;
+      }
+
+      match /squads/{squadId} {
+        // (a list not made yet doesn't exist: a team admin may look, and
+        // finds nothing)
+        allow read: if isFaAdmin()
+          || (resource == null && isTeamAdmin())
+          || isTeamAdminOf(resource.data.teamId);
+        allow create, update: if isFaAdmin() && isSquadAdd(squadId);
+        allow update: if (isFaAdmin() || isTeamAdminOf(resource.data.teamId))
+          && isSquadRemoval();
+      }
+
       // ---------- players/{playerId} ----------
       match /players/{playerId} {
         allow read: if isTeamAdminOf(resource.data.teamId) || isFaAdmin();
 
         // The FA approves or rejects a pending Division player, and
-        // screens a pending juvenile player (2.14c).
+        // screens a pending juvenile player (2.14c). An approved player goes
+        // on their squad list in the same write (3.1a1).
         allow update: if isFaAdmin()
           && resource.data.status == 'pending'
           && request.resource.data.updatedAt == request.time
           && ((resource.data.category == 'division'
-                && (isPlayerApproval() || isPlayerRejection()))
+                && ((isPlayerApproval() && inSquadAfter(request.resource.data, playerId))
+                    || isPlayerRejection()))
               || (resource.data.category == 'juvenile'
-                && (isJuvenilePass(playerId) || isJuvenileNotEligible()
-                    || isJuvenileSendBack())));
+                && ((isJuvenilePass(playerId) && inSquadAfter(request.resource.data, playerId))
+                    || isJuvenileNotEligible() || isJuvenileSendBack())));
 
         // The FA approves a new club name (2.10b): the copy of the team
         // name on every player follows, in the same batch. Nothing else.
@@ -2156,6 +2231,11 @@ service cloud.firestore {
                 .hasAny(['reviewedAt', 'reviewedBy'])
           && request.resource.data.createdAt == resource.data.createdAt
           && request.resource.data.updatedAt == request.time
+          // An approved player sent back to pending leaves the squad list
+          // in the same batch (3.1a1)
+          && (resource.data.status != 'approved'
+              || request.resource.data.status == 'approved'
+              || outOfSquadAfter(resource.data, playerId))
           && (request.resource.data.status == 'pending'
               || (resource.data.status == 'approved'
                   && request.resource.data.status == 'approved'
