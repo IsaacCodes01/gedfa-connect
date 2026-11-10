@@ -9,6 +9,7 @@ import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/auth/presentation/login_screen.dart';
 import 'package:gedfa_connect/features/dashboard/presentation/fa_dashboard_screen.dart';
+import 'package:gedfa_connect/features/dashboard/presentation/team_dashboard_screen.dart';
 import 'package:gedfa_connect/features/home/presentation/placeholder_home.dart';
 import 'package:gedfa_connect/features/notifications/presentation/announcement_screen.dart';
 import 'package:gedfa_connect/features/notifications/presentation/compose_announcement_screen.dart';
@@ -448,7 +449,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
-      // Team admin area: a shell with tabs (Squad, Positions, More).
+      // Team admin area: a shell with tabs (Home, Squad, Fixtures,
+      // Profiles, More).
       StatefulShellRoute.indexedStack(
         builder: (_, state, navigationShell) => AppShell(
           navigationShell: navigationShell,
@@ -457,7 +459,16 @@ final routerProvider = Provider<GoRouter>((ref) {
           openedFromHome: Routes.backOf(state.uri) != null,
         ),
         branches: [
-          // Tab 0: Squad
+          // Tab 0: Home (TDa)
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: Routes.teamHome,
+                builder: (_, _) => const TeamDashboardScreen(),
+              ),
+            ],
+          ),
+          // Tab 1: Squad
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -515,7 +526,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
-          // Tab 1: Fixtures (3.0a)
+          // Tab 2: Fixtures (3.0a)
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -540,7 +551,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
-          // Tab 2: Positions (who can play where)
+          // Tab 3: Positions (who can play where)
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -568,7 +579,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
-          // Tab 3: More (Settings)
+          // Tab 4: More (Settings)
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -688,7 +699,7 @@ String? _redirect(Ref ref, String location) {
   //    The FA lands on Home (the dashboard, 2.12a), not on Teams.
   final (area, landing) = switch (profile.role) {
     UserRole.faAdmin => (Routes.admin, Routes.adminHome),
-    UserRole.teamAdmin => (Routes.team, Routes.team),
+    UserRole.teamAdmin => (Routes.team, Routes.teamHome),
     UserRole.referee => (Routes.referee, Routes.referee),
     null => (Routes.welcome, Routes.welcome),
   };

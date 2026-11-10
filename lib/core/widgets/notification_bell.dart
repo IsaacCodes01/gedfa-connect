@@ -31,7 +31,7 @@ class BellBackButton extends ConsumerWidget {
         context.go(origin);
       } else {
         final isFa = ref.read(myAudienceProvider) == 'fa';
-        context.go(isFa ? Routes.adminHome : Routes.team);
+        context.go(isFa ? Routes.adminHome : Routes.teamHome);
       }
     }
 

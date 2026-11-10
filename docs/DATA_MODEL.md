@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.27.1, matches the rules after step JSc2, renamed teams in matches (9 Nov 2026); GEDFA's juvenile age group answers (10 Nov 2026)
+**Status:** v2.27.2, matches the rules after step JSc2, renamed teams in matches (9 Nov 2026); GEDFA's juvenile age group answers (10 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -822,6 +822,8 @@ Feed rules: never include dates of birth; player photos only if agreed with GEDF
 
 **Answered by GEDFA via Isaac (10 Nov 2026), juvenile age groups:** a club enters one, two or all three juvenile age groups (U13, U15, U17), according to the sides it really has. It can add or drop an age group only **before the season is published**, never after. The juvenile fee is the same whether the club enters one, two or three age groups, and the FA can change it in League settings. A club **cannot** register children in an age group it has not entered (play up only inside the groups it entered). Planned for step JA: `teamRequests` / `teams` gain `juvenileAgeGroups` (1 to 3 of `U13`, `U15`, `U17`), Make the season puts a club only in the age groups it entered, and the rules refuse a juvenile player in another age group.
 
+**Answered by GEDFA via Isaac (10 Nov 2026), fees:** the **Juvenile affiliation fee is separate from the Division one**. A club pays one Juvenile fee whatever the number of age groups it enters; a club in both competitions pays the Division fee too. There is also a **referee fee**, for the Division and for the Juvenile league. Every fee (affiliation and referee) can be paid in instalments, like the affiliation fee today, and its amount is set in League settings. Planned as its own payments step (after JA): today `settings/league.fee` and `fees/{season}_{uid}` hold one affiliation fee per club.
+
 **Decided by Isaac (10 Nov 2026), team dashboard (mockup `td-team-dashboard.html`):** a team is match-ready with the matchday squad (`settings/league.matchdaySquad`, 18) of approved players, per competition and per juvenile age group; with fewer than that but at least `minPlayers` (7) it can still play. Teams land on a new Home tab (Home · Squad · Fixtures · Profiles · More). A club in both competitions gets a Division | Juvenile switch on Home and Fixtures (matches only), and a month calendar (opponent crests on match days; League, Cup, Gala) on Home and in Fixtures. The team sheet line comes in 3.1.
 
 **Answered by Isaac (9 Nov 2026):** when a Gala is postponed **before its draw**, the clubs in it still get the note (they plan around its dates).
@@ -831,7 +833,6 @@ Still open:
 
 - Juvenile: coach per age group? Welfare or child-safety officer required?
 - Juvenile: age cut-off date per age group, per season
-- Separate registration fees for Division and Juvenile?
 - Registration window; adding players mid-season
 - One team admin or several per team
 - Player transfers between teams during a season
@@ -854,7 +855,8 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
-| 10 Nov 2026 | v2.27.1: no data change yet. GEDFA's answers on juvenile age groups (a club picks 1 to 3, only before the season is published; same fee; no children outside its groups) and the team dashboard decisions in Section 7; `juvenileAgeGroups` planned for step JA. |
+| 10 Nov 2026 | v2.27.2 (TDa, team Home): no data or rules change. The team's Home reads what the team app already streams (team, players, fixtures, fee, correction request, screening days); the Division / Juvenile choice is kept on the phone only (shared preferences), not in Firestore. 355 rules tests. |
+| 10 Nov 2026 | v2.27.1: no data change yet. GEDFA's answers on juvenile age groups (a club picks 1 to 3, only before the season is published; same fee; no children outside its groups) and the team dashboard decisions in Section 7; `juvenileAgeGroups` planned for step JA. Fees: a separate Juvenile affiliation fee (one, whatever the age groups) and a referee fee for each competition, all in instalments (payments step after JA). |
 | 9 Nov 2026 | v2.27 (JSc2, renamed teams in matches): `fixtures` gain `previousNames` (team ID → `{ name, until }`). New FA rule `isRenamingMatch`: only a side's `name` / `shortName` change, to the team's names now (`sideNamesOf`), with the old name in `previousNames` (a short name alone: none); played, postponed and cancelled matches too. The normal change rule checks `previousNames` first (1000-expression limit). The app renames 6 matches per save right after the FA approves a new name, short name or juvenile side name; Finish renaming on the team's page carries on. 355 rules tests. |
 | 9 Nov 2026 | v2.26 (JSc1, juvenile side names: ask the FA): new change kind `juvenileName` (`from`/`fromShortName` = how the side plays now, `to`/`toShortName` = its own name, or empty = back to "B"; `nameKey`; "Why" optional); "Add Juvenile" (`competition`) may carry `juvenileName` / `juvenileShortName` / `nameKey`. Approval sets or removes the team's juvenile name and reserves the own name in `teamNames`. Rules: `sideNamesOf` moved up (used by teamChanges), `isOwnJuvenileName`, `isApprovedNameKey`. 348 rules tests. |
 | 9 Nov 2026 | v2.25 (JSb, juvenile side names at registration): `teamRequests` gain `juvenileName`, `juvenileShortName`, `juvenileNameKey` (clubs in both only; empty = "B"); the own name is reserved in `teamNames` in the same batch; the FA's approval copies `juvenileName` / `juvenileShortName` to the team (left out for "B") and the rules check they match the request. 334 rules tests. |

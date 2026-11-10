@@ -66,7 +66,10 @@ enum AccentTone {
   gold(Color(0xFFFFF4C2), Color(0xFF8A6A00), Color(0xFF3A3110),
       Color(0xFFFCD116)),
   red(Color(0xFFFDE7EA), Color(0xFFB3122A), Color(0xFF3D1820),
-      Color(0xFFFF8A94));
+      Color(0xFFFF8A94)),
+  // Nothing to do now (no match yet; waiting on the FA): the track colour
+  grey(Color(0xFFE6EDF5), Color(0xFF4A5A70), Color(0xFF1B2F4B),
+      Color(0xFF9FB0C4));
 
   const AccentTone(this._bg, this._fg, this._darkBg, this._darkFg);
 

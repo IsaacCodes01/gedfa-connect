@@ -12,11 +12,34 @@ import 'package:gedfa_connect/features/league/data/league_settings_repository.da
 /// The top of the FA dashboard (2.12a): a deep blue gradient with the
 /// greeting, today's date, the season, whether registration is open, the
 /// bell, and the Ghana stripe underneath. It scrolls away with the page.
+///
+/// The team's Home (TDa) uses it too, with its own [label], the club's
+/// [crest] beside the greeting, a [subtitle] ("Royal Unique FC · Tue
+/// 10 Nov") and its own [tags].
 class DashboardHeader extends ConsumerWidget {
-  const DashboardHeader({super.key, required this.wide});
+  const DashboardHeader({
+    super.key,
+    required this.wide,
+    this.label = 'GEDFA CONNECT · FA',
+    this.crest,
+    this.subtitle,
+    this.tags,
+  });
 
   /// Tablet or laptop: more room and a bigger greeting.
   final bool wide;
+
+  /// The small line at the top.
+  final String label;
+
+  /// Optional: the club's crest, left of the greeting.
+  final Widget? crest;
+
+  /// Under the greeting. Default: today's date in full.
+  final String? subtitle;
+
+  /// Default: the FA's (season, team and player registration).
+  final List<HeaderTag>? tags;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -79,7 +102,7 @@ class DashboardHeader extends ConsumerWidget {
                         children: [
                           Expanded(
                             child: Text(
-                              'GEDFA CONNECT · FA',
+                              label,
                               style: TextStyle(
                                 color: Colors.white.withValues(alpha: 0.85),
                                 fontSize: 12.5,
@@ -101,51 +124,39 @@ class DashboardHeader extends ConsumerWidget {
                           ),
                         ],
                       ),
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: Text(
-                          _greeting(now, name),
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: wide ? 28 : 23,
-                            fontWeight: FontWeight.w700,
-                            height: 1.2,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        formatLongDate(now),
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.8),
-                          fontSize: 13,
-                        ),
+                      _Greeting(
+                        crest: crest,
+                        greeting: _greeting(now, name),
+                        subtitle: subtitle ?? formatLongDate(now),
+                        wide: wide,
                       ),
                       const SizedBox(height: 14),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
-                        children: [
-                          _Tag(
-                            icon: Icons.emoji_events_outlined,
-                            label:
-                                'Season ${Season.label(settings?.season ?? Season.current)}',
-                          ),
-                          if (settings != null) ...[
-                            _Tag(
-                              open: settings.teamRegistrationOpen,
-                              label: settings.teamRegistrationOpen
-                                  ? 'Teams open'
-                                  : 'Teams closed',
-                            ),
-                            _Tag(
-                              open: settings.playerRegistrationOpen,
-                              label: settings.playerRegistrationOpen
-                                  ? 'Players open'
-                                  : 'Players closed',
-                            ),
-                          ],
-                        ],
+                        children:
+                            tags ??
+                            [
+                              HeaderTag(
+                                icon: Icons.emoji_events_outlined,
+                                label:
+                                    'Season ${Season.label(settings?.season ?? Season.current)}',
+                              ),
+                              if (settings != null) ...[
+                                HeaderTag(
+                                  open: settings.teamRegistrationOpen,
+                                  label: settings.teamRegistrationOpen
+                                      ? 'Teams open'
+                                      : 'Teams closed',
+                                ),
+                                HeaderTag(
+                                  open: settings.playerRegistrationOpen,
+                                  label: settings.playerRegistrationOpen
+                                      ? 'Players open'
+                                      : 'Players closed',
+                                ),
+                              ],
+                            ],
                       ),
                     ],
                   ),
@@ -171,15 +182,81 @@ class DashboardHeader extends ConsumerWidget {
   }
 }
 
+/// "Good morning, Isaac" and the line under it, with the club's crest on
+/// the left when there is one (the team's Home).
+class _Greeting extends StatelessWidget {
+  const _Greeting({
+    required this.crest,
+    required this.greeting,
+    required this.subtitle,
+    required this.wide,
+  });
+
+  final Widget? crest;
+  final String greeting;
+  final String subtitle;
+  final bool wide;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            greeting,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: crest == null ? (wide ? 28 : 23) : (wide ? 26 : 21),
+              fontWeight: FontWeight.w700,
+              height: 1.2,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.8),
+              fontSize: 13,
+            ),
+          ),
+        ],
+      ),
+    );
+    if (crest == null) return text;
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Row(
+        children: [
+          DecoratedBox(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.5),
+                width: 2,
+              ),
+            ),
+            child: crest,
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: text),
+        ],
+      ),
+    );
+  }
+}
+
 /// A see-through pill in the header: an icon, or a green (open) or red
-/// (closed) dot, then the text.
-class _Tag extends StatelessWidget {
-  const _Tag({required this.label, this.icon, this.open});
+/// (closed) dot, or just the text.
+class HeaderTag extends StatelessWidget {
+  const HeaderTag({super.key, required this.label, this.icon, this.open});
 
   final String label;
   final IconData? icon;
 
-  /// Registration tags only: true = green dot, false = red dot.
+  /// true = green dot, false = red dot (registration, team status); with
+  /// no [icon] and no [open], only the text.
   final bool? open;
 
   @override
@@ -197,7 +274,7 @@ class _Tag extends StatelessWidget {
         children: [
           if (icon != null)
             Icon(icon, size: 16, color: Colors.white)
-          else
+          else if (open != null)
             Container(
               width: 8,
               height: 8,
@@ -212,13 +289,18 @@ class _Tag extends StatelessWidget {
                 ],
               ),
             ),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
+          if (icon != null || open != null) const SizedBox(width: 6),
+          // A long tag on a small phone ends in "…" (TDa)
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],

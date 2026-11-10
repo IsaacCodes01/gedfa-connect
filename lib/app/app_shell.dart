@@ -28,6 +28,12 @@ class ShellDestination {
 /// The team admin's tabs. Add Feed here (and a branch in the router) when
 /// that screen exists.
 final teamDestinations = [
+  // Home (TDa) comes first, like the FA's
+  const ShellDestination(
+    icon: Icons.home_outlined,
+    selectedIcon: Icons.home_rounded,
+    label: 'Home',
+  ),
   const ShellDestination(
     icon: Icons.groups_outlined,
     selectedIcon: Icons.groups_rounded,
