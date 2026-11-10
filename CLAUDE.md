@@ -170,7 +170,12 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
 - **3.1 answers** (Isaac, 10 Nov 2026, in `DATA_MODEL.md` Section 7): 18 = 11 + 7 on the bench, 5 may come on; any number of
   goalkeepers, the bench never more than 7; juvenile the same with play-up limits. One extra substitute for a **head injury only**
   (concussion), in every competition, not counted in the 5; the other team then gets one extra too. A goalkeeper in the 11 is required.
-  **Draw the 3.1 mockups in a new conversation.**
+- **3.1 mockup approved** (10 Nov 2026, `docs/mockups/3.1-team-sheet.html`, MS1–MS7, MS4b–MS4c; answers in `DATA_MODEL.md`
+  Section 7): one Save button, editable until the lock (3.2); bench only when 11 start; injured players with a warning; captain
+  starts; any starter in goal (never changes the registered position); **shirt numbers for this match** on the sheet (`numbers`,
+  1–99, no two the same), the registered `jerseyNo` stays as the usual number; cup sheets 1 h before (Gala 20 min).
+  Build **3.1a** Players step + Save (`teamSheets`, `squads` list at approval), then 3.1b roles and numbers, 3.1c check and
+  sheet lines, 3.1d juvenile play-up, 3.1e player suspensions.
 - Calendar backdrop (`_CalendarBackdrop` in `match_calendar_card.dart`): GEDFA logo as a one-colour watermark (its letters are white,
   so tint it with `color` + `BlendMode.srcIn`). `assets/images/gedfa_logo.png` is now committed.
 - **Plan agreed 9 Nov 2026 (deadline Thu 12 Nov, 12:30 pm; Isaac's prompts in that conversation):** next, in order:

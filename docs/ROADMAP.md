@@ -254,7 +254,12 @@ Mockup `3.0-fixtures-and-sheet.html` (approved 8 Nov 2026).
 - [ ] **JA Juvenile age groups** (GEDFA, 10 Nov 2026; mockup first): a club enters 1, 2 or 3 age groups (`juvenileAgeGroups`) at registration and by a change request the FA approves, only before the season is published; Make the season uses them; no children outside its groups (rules and tests); same juvenile fee
 - [ ] **JF Fees by competition** (GEDFA, 10 Nov 2026; mockup first): a Division and a Juvenile affiliation fee (one Juvenile fee whatever the age groups; a club in both pays both) and a referee fee for each competition, amounts in League settings, every fee paid in instalments; the team's Season fee and the FA's Fees screen show each one
 - [ ] 3.0e **Posters**: one match or a matchday, square or tall, three styles, GEDFA logo (transparent PNG), Save to photos and Share (P1–P4)
-- [ ] 3.1 Team sheet builder: approved players only (18 = 11 + 7 on the bench, 7 at least, from settings), captain, vice-captain, goalkeeper, GFA play-up limits
+- [ ] 3.1 Team sheet builder: approved players only (18 = 11 + 7 on the bench, 7 at least, from settings), captain, vice-captain, goalkeeper, GFA play-up limits (mockup `3.1-team-sheet.html`)
+  - [ ] 3.1a Players step and Save (`teamSheets`, the `squads` list written at approval, rules and tests)
+  - [ ] 3.1b Roles and numbers (captain, vice-captain, goalkeeper, shirt numbers for this match, team officials)
+  - [ ] 3.1c Check step and the team sheet lines (Home, Needs you, Match details, Fixtures), laptop layout
+  - [ ] 3.1d Juvenile play-up limits (1 U13 and 5 U15 in a U17 match)
+  - [ ] 3.1e Player suspensions by the FA (a number of matches, a reason); suspended players can't be picked
 - [ ] 3.2 Submit and lock 1 hour before kick-off; the FA and the referee see it; the opponent sees it at lock time (V2)
 - [ ] 3.3 The paper sheet as a PDF: the team's real kits top-left, captain's signature, QR code to check it (V1)
 - [ ] 3.4 Formation on a pitch (optional)
@@ -354,6 +359,7 @@ Work backwards from the GEDFA season start date to decide what the pilot must co
 | 12 Oct 2026 | Renamed to GEDFA Connect; dev/prod projects created |
 | 13 Oct 2026 | Phase 0 complete; added 0.8 design foundation, 1.0 emulators, 1.1a toasts/connectivity/responsive; invite-only roles (2.6); FA announcements (2.7); new Phase 5.5 League feed; navigation, connectivity and responsive standards; pre-pilot checklist |
 | 17 Oct 2026 | 1.1b, 1.2, 1.3 done; new 1.3b Competitions (Division / Juvenile, one registration per club); 1.4 split into Division first, Juvenile after GEDFA answers |
+| 10 Nov 2026 | 3.1 mockup drawn (`3.1-team-sheet.html`, MS1–MS7, MS4b–MS4c). Isaac: one Save button, editable until the lock; bench only with 11 starting; injured players with a warning; captain starts; any starter in goal; player suspensions as 3.1e; cup sheets 1 hour before (Gala 20 min); order 3.1a–3.1e agreed. Shirt numbers: clubs lack 30 jerseys, so a number for this match on the sheet, the registered number kept as the usual one (approved) |
 | 10 Nov 2026 | Isaac, for 3.1: the other team gets one extra substitute too; a goalkeeper in the starting 11 is required |
 | 10 Nov 2026 | Isaac, for 3.1: the extra substitute is for head injuries only, in every competition; any number of goalkeepers, the bench never more than 7 |
 | 10 Nov 2026 | Calendar style (Isaac): a soft blue wash, the Ghana stripe on top and the GEDFA logo as a faint one-colour watermark (ink 6% light, white 9% dark) behind the days; `assets/images/gedfa_logo.png` committed (transparent, also for the posters). 229 Dart tests |
