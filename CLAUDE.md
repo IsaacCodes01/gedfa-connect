@@ -169,7 +169,7 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
   `sharedPreferencesProvider` overridden. **Next (Isaac): 3.1 team sheet builder, mockup MS1 first**, then JA, JF, the rest in order.
 - **3.1 answers** (Isaac, 10 Nov 2026, in `DATA_MODEL.md` Section 7): 18 = 11 + 7 on the bench, 5 may come on; any number of
   goalkeepers, the bench never more than 7; juvenile the same with play-up limits. One extra substitute for a **head injury only**
-  (concussion), in every competition, not counted in the 5. Open: does the other team get one too (the Laws say yes)?
+  (concussion), in every competition, not counted in the 5; the other team then gets one extra too. A goalkeeper in the 11 is required.
   **Draw the 3.1 mockups in a new conversation.**
 - Calendar backdrop (`_CalendarBackdrop` in `match_calendar_card.dart`): GEDFA logo as a one-colour watermark (its letters are white,
   so tint it with `color` + `BlendMode.srcIn`). `assets/images/gedfa_logo.png` is now committed.

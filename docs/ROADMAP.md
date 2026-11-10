@@ -354,6 +354,7 @@ Work backwards from the GEDFA season start date to decide what the pilot must co
 | 12 Oct 2026 | Renamed to GEDFA Connect; dev/prod projects created |
 | 13 Oct 2026 | Phase 0 complete; added 0.8 design foundation, 1.0 emulators, 1.1a toasts/connectivity/responsive; invite-only roles (2.6); FA announcements (2.7); new Phase 5.5 League feed; navigation, connectivity and responsive standards; pre-pilot checklist |
 | 17 Oct 2026 | 1.1b, 1.2, 1.3 done; new 1.3b Competitions (Division / Juvenile, one registration per club); 1.4 split into Division first, Juvenile after GEDFA answers |
+| 10 Nov 2026 | Isaac, for 3.1: the other team gets one extra substitute too; a goalkeeper in the starting 11 is required |
 | 10 Nov 2026 | Isaac, for 3.1: the extra substitute is for head injuries only, in every competition; any number of goalkeepers, the bench never more than 7 |
 | 10 Nov 2026 | Calendar style (Isaac): a soft blue wash, the Ghana stripe on top and the GEDFA logo as a faint one-colour watermark (ink 6% light, white 9% dark) behind the days; `assets/images/gedfa_logo.png` committed (transparent, also for the posters). 229 Dart tests |
 | 10 Nov 2026 | Isaac, for 3.1: 7 on the bench and 5 may come on; a second goalkeeper on the bench; juvenile the same (play-up limits). Asked of GEDFA: an extra substitute for an injury (the Laws allow one only for a concussion, if the competition opts in, and the other team gets one too). The 3.1 mockups are drawn in the next conversation |
