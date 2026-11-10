@@ -151,6 +151,10 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
 - **Next (new conversation, Isaac 9 Nov 2026): dashboards for teams AND referees** (the FA's is 2.12), so everyone on the
   app has a summary of what they need to know and the app feels attractive. Mockups first, one step at a time.
   A spelling correction (2.11a) stays as built: its matches wait for Finish renaming (with the pill).
+- **Team dashboard mockup approved** (10 Nov 2026, `docs/mockups/td-team-dashboard.html`, TD1–TD4, TF1–TF2): build **TDa** (Home tab,
+  header, Division | Juvenile switch, Next match, Coming up, Needs you), then **TDb** (tiles, fee, Waiting on the FA, From GEDFA, laptop),
+  **TDc** (switch and month calendar on Fixtures, calendar on Home), then **JA** juvenile age groups (GEDFA: 1 to 3, only before the season
+  is published; mockup first). Referee Home (RD1) comes with 3.5. Match-ready = 18, can play from 7.
 - **Plan agreed 9 Nov 2026 (deadline Thu 12 Nov, 12:30 pm; Isaac's prompts in that conversation):** next, in order:
   1. **3.0f Notifications and Back** (mockup `3.0f-notifications-and-back.html`, N1–N3, **approved**): a tap marks only
      that note read (reads kept per note in `readMarks/{uid}`: note ID → the `updatedAt` read; a grouped note with a newer
