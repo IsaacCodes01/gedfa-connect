@@ -1,3 +1,5 @@
+import 'package:gedfa_connect/app/theme_mode_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -184,9 +186,13 @@ Future<void> _pump(
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
+  // The team's Division | Juvenile switch is kept on the phone (TDc)
+  SharedPreferences.setMockInitialValues({});
+  final prefs = await SharedPreferences.getInstance();
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
         seasonFixturesProvider.overrideWith((ref) => Stream.value(_fixtures)),
         myFixturesProvider.overrideWith((ref) => Stream.value(_fixtures)),
         appUserProvider.overrideWith(
@@ -279,6 +285,14 @@ void main() {
         await _pump(tester, const TeamFixturesScreen(), Size(width, 2400), brightness);
         expect(find.text('Next match'), findsOneWidget);
         expect(find.textContaining('Team sheet due'), findsOneWidget);
+      });
+
+      testWidgets('team Fixtures tab, Calendar (TDc), $width wide, $brightness', (tester) async {
+        await _pump(tester, const TeamFixturesScreen(), Size(width, 2400), brightness);
+        await tester.tap(find.text('Calendar'));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        expect(find.byTooltip('Next month'), findsOneWidget);
       });
     }
   }

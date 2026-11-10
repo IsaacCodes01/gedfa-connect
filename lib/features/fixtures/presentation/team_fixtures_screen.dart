@@ -13,7 +13,14 @@ import 'package:gedfa_connect/core/widgets/notification_bell.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/features/dashboard/presentation/widgets/dashboard_card.dart';
+import 'package:gedfa_connect/features/dashboard/data/team_home_providers.dart';
+import 'package:gedfa_connect/features/dashboard/domain/team_home.dart';
+import 'package:gedfa_connect/features/dashboard/presentation/widgets/team_home_widgets.dart';
+import 'package:gedfa_connect/features/fixtures/data/cup_repository.dart';
 import 'package:gedfa_connect/features/fixtures/data/fixture_repository.dart';
+import 'package:gedfa_connect/features/fixtures/domain/match_calendar.dart';
+import 'package:gedfa_connect/features/fixtures/presentation/widgets/match_calendar_card.dart';
+import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/fixtures/domain/fixture.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/widgets/fixture_row.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
@@ -22,6 +29,10 @@ import 'package:go_router/go_router.dart';
 /// Team: the Fixtures tab (3.0a, mockup F4). The next match in a blue card
 /// with "Team sheet due in …", then what's coming, postponed, played and
 /// cancelled. Tap a match for its details (F5, F6).
+///
+/// TDc (mockup TF1, TF2): a club in both competitions picks Division or
+/// Juvenile (and an age group) with the same switch as Home, so the two
+/// are never mixed; List | Calendar shows the month calendar instead.
 class TeamFixturesScreen extends ConsumerStatefulWidget {
   const TeamFixturesScreen({super.key});
 
@@ -32,6 +43,9 @@ class TeamFixturesScreen extends ConsumerStatefulWidget {
 class _TeamFixturesScreenState extends ConsumerState<TeamFixturesScreen> {
   // Moves matches from "coming up" to "played" and the countdown on
   late final Timer _clock;
+
+  /// List (false) or Calendar (true), TDc
+  bool _calendar = false;
 
   @override
   void initState() {
@@ -52,6 +66,7 @@ class _TeamFixturesScreenState extends ConsumerState<TeamFixturesScreen> {
     final teamId = ref.watch(appUserProvider).value?.teamId ?? '';
     final team = ref.watch(myTeamProvider).value;
     final fixturesAsync = ref.watch(myFixturesProvider);
+    final view = ref.watch(matchViewProvider);
     final now = DateTime.now();
 
     return Scaffold(
@@ -68,7 +83,15 @@ class _TeamFixturesScreenState extends ConsumerState<TeamFixturesScreen> {
           message: appErrorMessage(error),
           onRetry: () => ref.invalidate(myFixturesProvider),
         ),
-        data: (all) {
+        data: (everything) {
+          // TDc: only the competition (and age group) on the switch
+          final all = team == null
+              ? everything
+              : view.filter(everything, team.categories);
+          final groups = juvenileGroupsOf(everything);
+          final shown = team == null
+              ? Competition.division
+              : view.shownFor(team.categories);
           // Still on (kicked off less than 2 hours ago) counts as coming
           final coming = [
             for (final f in all)
@@ -81,7 +104,7 @@ class _TeamFixturesScreenState extends ConsumerState<TeamFixturesScreen> {
           final postponed = all.where((f) => f.isPostponed).toList();
           final cancelled = all.where((f) => f.isCancelled).toList();
 
-          if (all.isEmpty) {
+          if (everything.isEmpty) {
             return const EmptyView(
               icon: Icons.calendar_month_outlined,
               title: 'No matches yet',
@@ -102,11 +125,83 @@ class _TeamFixturesScreenState extends ConsumerState<TeamFixturesScreen> {
           }
 
           final next = coming.firstOrNull;
+          int count(Competition c) =>
+              everything.where((f) => f.category == c && !f.isCancelled).length;
+          String matches(int n) => n == 1 ? '1 match' : '$n matches';
+
+          final controls = <Widget>[
+            if (team != null && team.hasBoth) ...[
+              MatchSwitch(
+                selected: shown,
+                divisionNote: matches(count(Competition.division)),
+                juvenileNote: [
+                  matches(count(Competition.juvenile)),
+                  for (final g in groups) g.label,
+                ].join(' · '),
+                onChanged: ref.read(matchViewProvider.notifier).setCompetition,
+              ),
+              if (shown == Competition.juvenile)
+                AgeGroupChips(
+                  groups: groups,
+                  selected: view.ageGroup,
+                  onChanged: ref.read(matchViewProvider.notifier).setAgeGroup,
+                ),
+              const SizedBox(height: 10),
+            ],
+            Align(
+              alignment: Alignment.centerLeft,
+              child: SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment(
+                    value: false,
+                    icon: Icon(Icons.view_list_rounded),
+                    label: Text('List'),
+                  ),
+                  ButtonSegment(
+                    value: true,
+                    icon: Icon(Icons.calendar_month_rounded),
+                    label: Text('Calendar'),
+                  ),
+                ],
+                selected: {_calendar},
+                showSelectedIcon: false,
+                onSelectionChanged: (v) => setState(() => _calendar = v.first),
+              ),
+            ),
+            const SizedBox(height: 14),
+          ];
+
+          if (_calendar) {
+            return ResponsiveCenter(
+              maxWidth: 720,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(14, 14, 14, 24),
+                children: [
+                  ...controls,
+                  MatchCalendarCard(
+                    key: ValueKey('${shown.name}-${view.ageGroup?.label}'),
+                    fixtures: all,
+                    teamId: teamId,
+                    cups: {
+                      for (final c
+                          in ref.watch(seasonCupsProvider).value ?? const [])
+                        c.id: c,
+                    },
+                    startMonth: startMonth(next, now),
+                    onOpen: (f) => context.push(Routes.teamMatch(f.id)),
+                  ),
+                ],
+              ),
+            );
+          }
+
           return ResponsiveCenter(
             maxWidth: 720,
             child: ListView(
               padding: const EdgeInsets.fromLTRB(14, 14, 14, 24),
               children: [
+                ...controls,
+                if (all.isEmpty) NoMatchCard(anyMatches: everything.isNotEmpty),
                 if (next != null) ...[
                   DashboardSectionTitle(
                     title: 'Next match',
@@ -130,7 +225,9 @@ class _TeamFixturesScreenState extends ConsumerState<TeamFixturesScreen> {
                 ],
                 if (postponed.isNotEmpty) ...[
                   const DashboardSectionTitle(title: 'Postponed'),
-                  FixtureListCard(children: [for (final f in postponed) row(f)]),
+                  FixtureListCard(
+                    children: [for (final f in postponed) row(f)],
+                  ),
                 ],
                 if (played.isNotEmpty) ...[
                   const DashboardSectionTitle(
@@ -141,7 +238,9 @@ class _TeamFixturesScreenState extends ConsumerState<TeamFixturesScreen> {
                 ],
                 if (cancelled.isNotEmpty) ...[
                   const DashboardSectionTitle(title: 'Cancelled'),
-                  FixtureListCard(children: [for (final f in cancelled) row(f)]),
+                  FixtureListCard(
+                    children: [for (final f in cancelled) row(f)],
+                  ),
                 ],
               ],
             ),
@@ -188,8 +287,9 @@ class NextMatchCard extends StatelessWidget {
         ),
       );
       return Row(
-        mainAxisAlignment:
-            end ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: end
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         children: end
             ? [name, const SizedBox(width: 8), FixtureCrest(side: s)]
             : [FixtureCrest(side: s), const SizedBox(width: 8), name],
@@ -377,7 +477,8 @@ class _DueBox extends StatelessWidget {
                           ),
                         ),
                         TextSpan(
-                          text: '\n${formatShortDate(due)}, '
+                          text:
+                              '\n${formatShortDate(due)}, '
                               '${formatTime(due)}, 1 hour before kick-off',
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.8),

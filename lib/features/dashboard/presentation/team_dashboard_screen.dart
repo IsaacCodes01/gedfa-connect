@@ -23,7 +23,10 @@ import 'package:gedfa_connect/features/dashboard/presentation/widgets/dashboard_
 import 'package:gedfa_connect/features/dashboard/presentation/widgets/dashboard_header.dart';
 import 'package:gedfa_connect/features/dashboard/presentation/widgets/team_home_widgets.dart';
 import 'package:gedfa_connect/features/fa/presentation/widgets/suspension_widgets.dart';
+import 'package:gedfa_connect/features/fixtures/data/cup_repository.dart';
 import 'package:gedfa_connect/features/fixtures/data/fixture_repository.dart';
+import 'package:gedfa_connect/features/fixtures/domain/match_calendar.dart';
+import 'package:gedfa_connect/features/fixtures/presentation/widgets/match_calendar_card.dart';
 import 'package:gedfa_connect/features/fixtures/domain/fixture.dart';
 import 'package:gedfa_connect/features/league/data/league_settings_repository.dart';
 import 'package:gedfa_connect/features/payments/data/payment_repository.dart';
@@ -153,6 +156,29 @@ class _TeamDashboardScreenState extends ConsumerState<TeamDashboardScreen> {
     final next = upcoming.next;
     final needs = _needRows(team, groups);
     final waiting = _waitingRows(team);
+    final shownMatches = view.filter(fixtures, team.categories);
+
+    // TDc: the month calendar (phone: under Coming up; laptop: on the
+    // right). A new switch choice opens it again on its next match.
+    final calendar = [
+      DashboardSectionTitle(
+        title: 'Match calendar',
+        trailing: 'Fixtures ›',
+        onTap: () => context.open(Routes.teamFixtures),
+        top: wide ? 26 : 20,
+      ),
+      MatchCalendarCard(
+        key: ValueKey('${shown.name}-${view.ageGroup?.label}'),
+        fixtures: shownMatches,
+        teamId: team.id,
+        cups: {
+          for (final c in ref.watch(seasonCupsProvider).value ?? const [])
+            c.id: c,
+        },
+        startMonth: startMonth(next, now),
+        onOpen: (f) => context.open(Routes.teamMatch(f.id)),
+      ),
+    ];
 
     final matches = <Widget>[
       if (team.hasBoth) ...[
@@ -196,6 +222,7 @@ class _TeamDashboardScreenState extends ConsumerState<TeamDashboardScreen> {
           onTap: (f) => context.open(Routes.teamMatch(f.id)),
         ),
       ],
+      if (!wide) ...calendar,
       DashboardSectionTitle(
         title: 'Needs you',
         trailing: needs.isEmpty ? null : '${needs.length} to do',
@@ -218,6 +245,7 @@ class _TeamDashboardScreenState extends ConsumerState<TeamDashboardScreen> {
 
     final fee = _feeCard(team);
     final side = <Widget>[
+      if (wide) ...calendar,
       if (fee != null) ...[
         DashboardSectionTitle(
           title: 'Season fee',

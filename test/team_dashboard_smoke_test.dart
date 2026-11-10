@@ -7,6 +7,7 @@ import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/auth/domain/app_user.dart';
 import 'package:gedfa_connect/features/dashboard/presentation/team_dashboard_screen.dart';
+import 'package:gedfa_connect/features/fixtures/data/cup_repository.dart';
 import 'package:gedfa_connect/features/fixtures/data/fixture_repository.dart';
 import 'package:gedfa_connect/features/fixtures/domain/fixture.dart';
 import 'package:gedfa_connect/features/league/data/league_settings_repository.dart';
@@ -197,6 +198,7 @@ Future<void> _pump(
           ),
         ),
         myNotificationsProvider.overrideWith((ref) => Stream.value([])),
+        seasonCupsProvider.overrideWith((ref) => Stream.value([])),
         upcomingScreeningsProvider.overrideWith((ref) => Stream.value([])),
         unreadCountProvider.overrideWithValue(3),
         myAudienceProvider.overrideWithValue('team'),
@@ -248,6 +250,8 @@ void main() {
         expect(find.text('1 player'), findsOneWidget);
         expect(find.text('From GEDFA'), findsOneWidget);
         expect(find.text('Coming later'), findsOneWidget);
+        // TDc
+        expect(find.text('Match calendar'), findsOneWidget);
       });
     }
 

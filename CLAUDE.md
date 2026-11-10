@@ -161,7 +161,10 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
   `DashboardHeader` takes `label`, `crest`, `subtitle`, `tags` (`HeaderTag`). `AccentTone.grey` added.
 - **TDb** done (10 Nov 2026, 355 rules tests, 218 Dart tests): tiles, fee, Waiting on the FA, From GEDFA, Coming later, laptop
   (`widgets/team_home_cards.dart`; FA's `GlanceTile` takes `onTap` / `valueText`, `ComingLater` takes `items`). `dart format` on
-  `theme.dart` reflows the whole file: don't. Next: **TDc**, then the 3.1 team sheet mockup (Isaac wants team sheets soon).
+  `theme.dart` reflows the whole file: don't.
+- **TDc** done, **team dashboard finished** (10 Nov 2026, 355 rules tests, 229 Dart tests): Fixtures tab has the same switch
+  (`matchViewProvider`) and List | Calendar; `MatchCalendarCard` on Fixtures and Home. Tests that build a team screen need
+  `sharedPreferencesProvider` overridden. **Next (Isaac): 3.1 team sheet builder, mockup MS1 first**, then JA, JF, the rest in order.
 - **Plan agreed 9 Nov 2026 (deadline Thu 12 Nov, 12:30 pm; Isaac's prompts in that conversation):** next, in order:
   1. **3.0f Notifications and Back** (mockup `3.0f-notifications-and-back.html`, N1–N3, **approved**): a tap marks only
      that note read (reads kept per note in `readMarks/{uid}`: note ID → the `updatedAt` read; a grouped note with a newer
