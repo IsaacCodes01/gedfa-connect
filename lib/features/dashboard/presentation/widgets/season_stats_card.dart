@@ -187,11 +187,14 @@ class SeasonStatsCard extends StatelessWidget {
 /// Coming later (2.12b): dashed boxes for what Phase 4 brings. Real tiles
 /// replace them when those screens exist.
 class ComingLater extends StatelessWidget {
-  const ComingLater({super.key, required this.wide});
+  const ComingLater({super.key, required this.wide, this.items = faItems});
 
   final bool wide;
 
-  static const _items = [
+  /// Four boxes: icon, title, detail. The team's Home has its own (TDb).
+  final List<(IconData, String, String)> items;
+
+  static const faItems = [
     (Icons.calendar_month_outlined, 'Fixtures', 'Match days and venues'),
     (Icons.sports_outlined, 'Referee appointments', 'Officials for each match'),
     (Icons.style_outlined, 'Yellow and red cards', 'From match reports'),
@@ -254,12 +257,12 @@ class ComingLater extends StatelessWidget {
       ],
     );
 
-    if (wide) return row(_items);
+    if (wide) return row(items);
     return Column(
       children: [
-        row(_items.sublist(0, 2)),
+        row(items.sublist(0, 2)),
         const SizedBox(height: 10),
-        row(_items.sublist(2)),
+        row(items.sublist(2)),
       ],
     );
   }

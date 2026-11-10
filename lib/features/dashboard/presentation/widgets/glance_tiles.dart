@@ -22,7 +22,7 @@ class GlanceTiles extends StatelessWidget {
     final feePercent = s.due == 0 ? 0 : (s.collected * 100 / s.due).round();
 
     final tiles = [
-      _Tile(
+      GlanceTile(
         icon: Icons.shield_rounded,
         tone: AccentTone.blue,
         value: s.teams,
@@ -32,7 +32,7 @@ class GlanceTiles extends StatelessWidget {
             '${s.suspended} suspended',
         route: Routes.admin,
       ),
-      _Tile(
+      GlanceTile(
         icon: Icons.groups_rounded,
         tone: AccentTone.green,
         value: s.approved,
@@ -43,7 +43,7 @@ class GlanceTiles extends StatelessWidget {
             : null,
         route: Routes.adminPlayers,
       ),
-      _Tile(
+      GlanceTile(
         icon: Icons.account_balance_wallet_rounded,
         tone: AccentTone.gold,
         value: s.collected,
@@ -57,7 +57,7 @@ class GlanceTiles extends StatelessWidget {
                   '${s.owing} ${s.owing == 1 ? 'team' : 'teams'} owing',
         route: Routes.adminFees,
       ),
-      _Tile(
+      GlanceTile(
         icon: Icons.fact_check_rounded,
         tone: AccentTone.violet,
         value: s.squadsReady,
@@ -93,14 +93,19 @@ class GlanceTiles extends StatelessWidget {
   }
 }
 
-class _Tile extends StatelessWidget {
-  const _Tile({
+/// One tile (2.12b), also on the team's Home (TDb). [route] opens with
+/// `from=home` (the FA); [onTap] instead does whatever it is given.
+class GlanceTile extends StatelessWidget {
+  const GlanceTile({
+    super.key,
     required this.icon,
     required this.tone,
     required this.value,
     required this.label,
     required this.detail,
-    required this.route,
+    this.route = '',
+    this.onTap,
+    this.valueText,
     this.prefix,
     this.suffix,
     this.chip,
@@ -114,6 +119,10 @@ class _Tile extends StatelessWidget {
   final String label;
   final String detail;
   final String route;
+  final VoidCallback? onTap;
+
+  /// Instead of the counting number, e.g. "—" (not in Juvenile).
+  final String? valueText;
 
   /// Small grey text before ("GH₵") or after ("of 18") the number.
   final String? prefix;
@@ -138,11 +147,13 @@ class _Tile extends StatelessWidget {
 
     return Semantics(
       button: true,
-      label: '$label: ${prefix ?? ''} $value ${suffix ?? ''}. $detail',
+      label:
+          '$label: ${prefix ?? ''} ${valueText ?? value} ${suffix ?? ''}. '
+          '$detail',
       excludeSemantics: true,
       child: DashboardCard(
         padding: const EdgeInsets.all(14),
-        onTap: () => context.go(Routes.fromHome(route)),
+        onTap: onTap ?? () => context.go(Routes.fromHome(route)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -194,16 +205,26 @@ class _Tile extends StatelessWidget {
                   textBaseline: TextBaseline.alphabetic,
                   children: [
                     if (prefix != null) Text('${prefix!} ', style: small),
-                    CountUpText(
-                      value,
-                      format: _thousands,
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.5,
-                        height: 1,
+                    if (valueText != null)
+                      Text(
+                        valueText!,
+                        style: const TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w700,
+                          height: 1,
+                        ),
+                      )
+                    else
+                      CountUpText(
+                        value,
+                        format: _thousands,
+                        style: const TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.5,
+                          height: 1,
+                        ),
                       ),
-                    ),
                     if (suffix != null) Text(' ${suffix!}', style: small),
                   ],
                 ),

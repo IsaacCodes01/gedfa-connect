@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.27.2, matches the rules after step JSc2, renamed teams in matches (9 Nov 2026); GEDFA's juvenile age group answers (10 Nov 2026)
+**Status:** v2.27.3, matches the rules after step JSc2, renamed teams in matches (9 Nov 2026); GEDFA's juvenile age group answers (10 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -855,6 +855,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 10 Nov 2026 | v2.27.3 (TDb, team Home): no data or rules change. Squad tiles, fee, Waiting on the FA and From GEDFA read the team's players, fixtures, `fees`, `payments`, `teamChanges`, `correctionRequests`, announcements and notes, all already readable by the team. 355 rules tests. |
 | 10 Nov 2026 | v2.27.2 (TDa, team Home): no data or rules change. The team's Home reads what the team app already streams (team, players, fixtures, fee, correction request, screening days); the Division / Juvenile choice is kept on the phone only (shared preferences), not in Firestore. 355 rules tests. |
 | 10 Nov 2026 | v2.27.1: no data change yet. GEDFA's answers on juvenile age groups (a club picks 1 to 3, only before the season is published; same fee; no children outside its groups) and the team dashboard decisions in Section 7; `juvenileAgeGroups` planned for step JA. Fees: a separate Juvenile affiliation fee (one, whatever the age groups) and a referee fee for each competition, all in instalments (payments step after JA). |
 | 9 Nov 2026 | v2.27 (JSc2, renamed teams in matches): `fixtures` gain `previousNames` (team ID → `{ name, until }`). New FA rule `isRenamingMatch`: only a side's `name` / `shortName` change, to the team's names now (`sideNamesOf`), with the old name in `previousNames` (a short name alone: none); played, postponed and cancelled matches too. The normal change rule checks `previousNames` first (1000-expression limit). The app renames 6 matches per save right after the FA approves a new name, short name or juvenile side name; Finish renaming on the team's page carries on. 355 rules tests. |

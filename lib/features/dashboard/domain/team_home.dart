@@ -243,3 +243,87 @@ TeamNeed? _squadNeed(
         readiness: r,
         urgent: !r.canPlay,
       );
+
+/// Squad at a glance (TDb): the numbers on the four tiles.
+class SquadGlance {
+  const SquadGlance({
+    required this.division,
+    required this.divisionApproved,
+    required this.divisionWaiting,
+    required this.divisionSentBack,
+    required this.juvenileByGroup,
+    required this.matches,
+    required this.played,
+  });
+
+  /// Every Division player on the list (counts against the 30).
+  final int division;
+  final int divisionApproved;
+  final int divisionWaiting;
+  final int divisionSentBack;
+
+  /// Juvenile players (any status) per age group.
+  final Map<AgeGroup, int> juvenileByGroup;
+
+  /// Matches this season (not cancelled), and how many are played.
+  final int matches;
+  final int played;
+
+  int get juvenile => juvenileByGroup.values.fold(0, (a, b) => a + b);
+
+  static SquadGlance of(
+    List<Player> players,
+    List<Fixture> fixtures,
+    DateTime now,
+  ) {
+    final division = players.where((p) => p.category == Competition.division);
+    final live = fixtures.where((f) => !f.isCancelled);
+    return SquadGlance(
+      division: division.length,
+      divisionApproved: division.where((p) => p.isApproved).length,
+      divisionWaiting: division
+          .where((p) => p.status == ApprovalStatus.pending)
+          .length,
+      divisionSentBack: division
+          .where((p) => p.status == ApprovalStatus.rejected)
+          .length,
+      juvenileByGroup: {
+        for (final g in AgeGroup.values)
+          g: players.where((p) => p.isJuvenile && p.ageGroup == g).length,
+      },
+      matches: live.length,
+      played: live.where((f) => f.isPlayed(now)).length,
+    );
+  }
+}
+
+/// The squad on the Match-ready tile: the Division for a club in it,
+/// otherwise the juvenile age group with the fewest approved players
+/// (the one the club must work on first).
+({SquadReadiness readiness, AgeGroup? group}) matchReadyTile({
+  required Set<Competition> categories,
+  required List<Player> players,
+  required List<AgeGroup> juvenileGroups,
+  required int matchdaySquad,
+  required int minPlayers,
+}) {
+  SquadReadiness of(Iterable<Player> squad) => SquadReadiness(
+    approved: squad.where((p) => p.isApproved).length,
+    full: matchdaySquad,
+    minimum: minPlayers,
+  );
+  if (categories.contains(Competition.division) || juvenileGroups.isEmpty) {
+    return (
+      readiness: of(players.where((p) => p.category == Competition.division)),
+      group: null,
+    );
+  }
+  final byGroup = [
+    for (final g in juvenileGroups)
+      (
+        readiness: of(players.where((p) => p.isJuvenile && p.ageGroup == g)),
+        group: g,
+      ),
+  ]..sort((a, b) => a.readiness.approved.compareTo(b.readiness.approved));
+  return (readiness: byGroup.first.readiness, group: byGroup.first.group);
+}

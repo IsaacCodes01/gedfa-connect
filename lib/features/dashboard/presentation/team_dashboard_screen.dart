@@ -6,6 +6,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gedfa_connect/app/routes.dart';
 import 'package:gedfa_connect/app/theme.dart';
 import 'package:gedfa_connect/core/constants/season.dart';
+import 'package:gedfa_connect/core/constants/approval_status.dart';
+import 'package:gedfa_connect/features/dashboard/presentation/widgets/season_stats_card.dart';
+import 'package:gedfa_connect/features/dashboard/presentation/widgets/team_home_cards.dart';
+import 'package:gedfa_connect/features/notifications/data/notifications_repository.dart';
+import 'package:gedfa_connect/features/payments/domain/payment.dart';
+import 'package:gedfa_connect/features/teams/data/team_change_repository.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/core/utils/initials.dart';
@@ -146,15 +152,136 @@ class _TeamDashboardScreenState extends ConsumerState<TeamDashboardScreen> {
 
     final next = upcoming.next;
     final needs = _needRows(team, groups);
+    final waiting = _waitingRows(team);
+
+    final matches = <Widget>[
+      if (team.hasBoth) ...[
+        MatchSwitch(
+          selected: shown,
+          divisionNote: matchCount(matchesIn(Competition.division)),
+          juvenileNote: [
+            matchCount(matchesIn(Competition.juvenile)),
+            for (final g in groups) g.label,
+          ].join(' · '),
+          onChanged: ref.read(matchViewProvider.notifier).setCompetition,
+        ),
+        if (shown == Competition.juvenile)
+          AgeGroupChips(
+            groups: groups,
+            selected: view.ageGroup,
+            onChanged: ref.read(matchViewProvider.notifier).setAgeGroup,
+          ),
+      ],
+      DashboardSectionTitle(
+        title: 'Next match',
+        trailing: 'All fixtures ›',
+        onTap: () => context.open(Routes.teamFixtures),
+        top: team.hasBoth ? 18 : (wide ? 26 : 2),
+      ),
+      if (next == null)
+        NoMatchCard(anyMatches: fixtures.isNotEmpty)
+      else
+        HomeNextMatchCard(
+          fixture: next,
+          teamId: team.id,
+          now: now,
+          onDetails: () => context.open(Routes.teamMatch(next.id)),
+          onKits: () => context.open(Routes.teamFixtureKits(next.id)),
+        ),
+      if (upcoming.comingUp.isNotEmpty) ...[
+        const SizedBox(height: 10),
+        ComingUpCard(
+          fixtures: upcoming.comingUp,
+          teamId: team.id,
+          onTap: (f) => context.open(Routes.teamMatch(f.id)),
+        ),
+      ],
+      DashboardSectionTitle(
+        title: 'Needs you',
+        trailing: needs.isEmpty ? null : '${needs.length} to do',
+      ),
+      if (needs.isEmpty)
+        const TeamCaughtUpCard()
+      else
+        TeamNeedsCard(rows: needs),
+    ];
+
+    final glance = [
+      DashboardSectionTitle(
+        title: 'Squad at a glance',
+        trailing: 'Squad ›',
+        onTap: () => context.open(Routes.team),
+        top: wide ? 2 : 20,
+      ),
+      _tiles(team, groups, fixtures, next?.kickoffAt, wide),
+    ];
+
+    final fee = _feeCard(team);
+    final side = <Widget>[
+      if (fee != null) ...[
+        DashboardSectionTitle(
+          title: 'Season fee',
+          trailing: 'Season fee ›',
+          onTap: () => context.open(Routes.teamFee),
+          top: wide ? 26 : 20,
+        ),
+        fee,
+      ],
+      if (waiting.isNotEmpty) ...[
+        DashboardSectionTitle(
+          title: 'Waiting on the FA',
+          trailing: '${waiting.length} sent',
+        ),
+        TeamNeedsCard(rows: waiting),
+      ],
+      const DashboardSectionTitle(title: 'From GEDFA'),
+      _fromGedfa(),
+    ];
+
+    final later = [
+      const DashboardSectionTitle(
+        title: 'Coming later',
+        trailing: 'After match reports',
+      ),
+      ComingLater(wide: wide, items: teamComingLater),
+      const _LiveNote(),
+    ];
+
+    final List<Widget> content = wide
+        ? [
+            ...glance,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 6,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: matches,
+                  ),
+                ),
+                const SizedBox(width: 18),
+                Expanded(
+                  flex: 5,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: side,
+                  ),
+                ),
+              ],
+            ),
+            ...later,
+          ]
+        : [...matches, ...glance, ...side, ...later];
 
     return ListView(
       padding: EdgeInsets.zero,
       children: [
         header,
         Align(
-          alignment: Alignment.topCenter,
+          alignment: wide ? Alignment.topLeft : Alignment.topCenter,
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 720),
+            constraints: const BoxConstraints(maxWidth: 1100),
             child: Padding(
               padding: wide
                   ? const EdgeInsets.fromLTRB(28, 22, 28, 30)
@@ -174,60 +301,7 @@ class _TeamDashboardScreenState extends ConsumerState<TeamDashboardScreen> {
                             'the chairman lifts it.',
                       ),
                     ),
-                  if (team.hasBoth) ...[
-                    MatchSwitch(
-                      selected: shown,
-                      divisionNote: matchCount(matchesIn(Competition.division)),
-                      juvenileNote: [
-                        matchCount(matchesIn(Competition.juvenile)),
-                        for (final g in groups) g.label,
-                      ].join(' · '),
-                      onChanged: ref
-                          .read(matchViewProvider.notifier)
-                          .setCompetition,
-                    ),
-                    if (shown == Competition.juvenile)
-                      AgeGroupChips(
-                        groups: groups,
-                        selected: view.ageGroup,
-                        onChanged: ref
-                            .read(matchViewProvider.notifier)
-                            .setAgeGroup,
-                      ),
-                  ],
-                  DashboardSectionTitle(
-                    title: 'Next match',
-                    trailing: 'All fixtures ›',
-                    onTap: () => context.open(Routes.teamFixtures),
-                    top: team.hasBoth || suspension != null ? 18 : 2,
-                  ),
-                  if (next == null)
-                    NoMatchCard(anyMatches: fixtures.isNotEmpty)
-                  else
-                    HomeNextMatchCard(
-                      fixture: next,
-                      teamId: team.id,
-                      now: now,
-                      onDetails: () => context.open(Routes.teamMatch(next.id)),
-                      onKits: () =>
-                          context.open(Routes.teamFixtureKits(next.id)),
-                    ),
-                  if (upcoming.comingUp.isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    ComingUpCard(
-                      fixtures: upcoming.comingUp,
-                      teamId: team.id,
-                      onTap: (f) => context.open(Routes.teamMatch(f.id)),
-                    ),
-                  ],
-                  DashboardSectionTitle(
-                    title: 'Needs you',
-                    trailing: needs.isEmpty ? null : '${needs.length} to do',
-                  ),
-                  if (needs.isEmpty)
-                    const TeamCaughtUpCard()
-                  else
-                    TeamNeedsCard(rows: needs),
+                  ...content,
                 ],
               ),
             ),
@@ -235,6 +309,152 @@ class _TeamDashboardScreenState extends ConsumerState<TeamDashboardScreen> {
         ),
       ],
     );
+  }
+
+  /// Squad at a glance (TDb).
+  Widget _tiles(
+    Team team,
+    List<AgeGroup> groups,
+    List<Fixture> fixtures,
+    DateTime? nextKickoff,
+    bool wide,
+  ) {
+    final players = ref.watch(teamPlayersProvider).value ?? const [];
+    final settings = ref.watch(leagueSettingsProvider).value;
+    final ready = matchReadyTile(
+      categories: team.categories,
+      players: players,
+      juvenileGroups: groups,
+      matchdaySquad: settings?.matchdaySquad ?? 18,
+      minPlayers: settings?.minPlayers ?? 7,
+    );
+    return TeamGlanceTiles(
+      glance: SquadGlance.of(players, fixtures, DateTime.now()),
+      ready: ready.readiness,
+      readyGroup: ready.group,
+      maxSquad: settings?.maxSquadSize ?? 30,
+      inDivision: team.categories.contains(Competition.division),
+      inJuvenile: team.categories.contains(Competition.juvenile),
+      juvenileGroups: groups,
+      nextKickoff: nextKickoff,
+      wide: wide,
+      onSquad: () => context.open(Routes.team),
+      onJuvenile: () => context.open(Routes.teamClub),
+      onFixtures: () => context.open(Routes.teamFixtures),
+    );
+  }
+
+  /// Season fee (TDb); none before the fee loads or without a club account.
+  Widget? _feeCard(Team team) {
+    final uid = team.requestUid;
+    if (uid == null) return null;
+    final summary = ref.watch(feeSummaryProvider(uid)).value;
+    if (summary == null) return null;
+    final payments = ref.watch(clubPaymentsProvider(uid)).value ?? const [];
+    return TeamFeeCard(
+      summary: summary,
+      waiting: [
+        for (final p in payments)
+          if (p.status == PaymentStatus.waiting) p,
+      ],
+      onAdd: () => context.open(Routes.teamAddPayment),
+      onHistory: () => context.open(Routes.teamFee),
+    );
+  }
+
+  /// From GEDFA (TDb): the pinned announcement and the unread notes.
+  Widget _fromGedfa() {
+    final pinned = ref.watch(pinnedAnnouncementProvider);
+    final mark = ref.watch(readMarkProvider).value;
+    final notes = ref.watch(myNotificationsProvider).value ?? const [];
+    final latest = mark == null
+        ? null
+        : notes.where((n) => mark.isUnread(n.id, n.updatedAt)).firstOrNull;
+    return FromGedfaCard(
+      pinned: pinned,
+      unread: ref.watch(unreadCountProvider),
+      latestUnread: latest?.title,
+      onPinned: () => context.open(Routes.teamAnnouncement(pinned!.id)),
+      onBell: () => context.open(Routes.teamNotifications),
+    );
+  }
+
+  /// Waiting on the FA (TDb): what the team sent that the FA hasn't
+  /// answered yet. Grey: nothing to do but wait.
+  List<TeamNeedRow> _waitingRows(Team team) {
+    final players = ref.watch(teamPlayersProvider).value ?? const [];
+    final changes = ref.watch(myTeamChangesProvider).value ?? const [];
+    final correction = ref.watch(myCorrectionRequestProvider).value;
+    final screeningPlanned =
+        ref.watch(upcomingScreeningsProvider).value?.isNotEmpty ?? false;
+    final uid = team.requestUid;
+    final payments = uid == null
+        ? const <Payment>[]
+        : ref.watch(clubPaymentsProvider(uid)).value ?? const <Payment>[];
+
+    final divisionWaiting = players
+        .where((p) => !p.isJuvenile && p.status == ApprovalStatus.pending)
+        .length;
+    final children = players.where((p) => p.isWaitingForScreening).length;
+
+    TeamNeedRow row(IconData icon, String label, String detail, String route) =>
+        TeamNeedRow(
+          icon: icon,
+          tone: AccentTone.grey,
+          label: label,
+          detail: detail,
+          onTap: () => context.open(route),
+        );
+
+    return [
+      if (divisionWaiting > 0)
+        row(
+          Icons.person_search_rounded,
+          divisionWaiting == 1 ? '1 player' : '$divisionWaiting players',
+          'The FA checks each one',
+          Routes.team,
+        ),
+      // With a screening day planned, they are in Needs you instead
+      if (children > 0 && !screeningPlanned)
+        row(
+          Icons.child_care_rounded,
+          children == 1 ? '1 child' : '$children children',
+          'Waiting for the FA to plan a screening day',
+          Routes.team,
+        ),
+      for (final c in changes)
+        if (c.isPending)
+          row(
+            Icons.edit_rounded,
+            c.summary,
+            c.createdAt == null
+                ? 'Asked the FA'
+                : 'Asked ${formatDayMonth(c.createdAt!)}',
+            Routes.teamClub,
+          ),
+      for (final p in payments)
+        if (p.status == PaymentStatus.waiting)
+          row(
+            Icons.receipt_long_rounded,
+            p.amount == null ? 'Payment' : 'Payment ${cedis(p.amount!)}',
+            [
+              p.method.label,
+              if (p.createdAt case final at?) formatDayMonth(at),
+            ].join(' · '),
+            Routes.teamFee,
+          ),
+      if (correction?.status == CorrectionStatus.sentBack)
+        row(
+          Icons.assignment_return_rounded,
+          'Your correction',
+          [
+            if (correction!.sentBackAt case final at?)
+              'Sent back ${formatDayMonth(at)}',
+            'the FA checks it',
+          ].join(' · '),
+          Routes.team,
+        ),
+    ];
   }
 
   /// "Needs you" in words, from [teamNeeds].
@@ -342,5 +562,33 @@ class _TeamDashboardScreenState extends ConsumerState<TeamDashboardScreen> {
                 'play · full squad is ${r.full}',
             onTap: () => context.open(Routes.team),
           );
+  }
+}
+
+/// The line at the bottom: the numbers change by themselves.
+class _LiveNote extends StatelessWidget {
+  const _LiveNote();
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    return Padding(
+      padding: const EdgeInsets.only(top: 18),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.bolt_rounded, size: 15, color: muted),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              'Live · updates by itself',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 11.5, color: muted),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

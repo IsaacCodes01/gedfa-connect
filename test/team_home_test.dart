@@ -311,4 +311,63 @@ void main() {
       expect(needs.last.urgent, isTrue);
     });
   });
+
+  group('Squad at a glance (TDb)', () {
+    test('counts the Division by status, juvenile by age group, matches', () {
+      final glance = SquadGlance.of(
+        [
+          _player(),
+          _player(),
+          _player(status: ApprovalStatus.pending),
+          _player(status: ApprovalStatus.rejected),
+          _player(category: Competition.juvenile, ageGroup: AgeGroup.u15),
+        ],
+        [
+          _match('played', DateTime(2026, 11, 7, 15)),
+          _match('next', DateTime(2026, 11, 14, 15)),
+          _match(
+            'off',
+            DateTime(2026, 11, 21),
+            status: FixtureStatus.cancelled,
+          ),
+        ],
+        now,
+      );
+      expect(glance.division, 4);
+      expect(glance.divisionApproved, 2);
+      expect(glance.divisionWaiting, 1);
+      expect(glance.divisionSentBack, 1);
+      expect(glance.juvenileByGroup[AgeGroup.u15], 1);
+      expect(glance.juvenile, 1);
+      expect(glance.matches, 2);
+      expect(glance.played, 1);
+    });
+
+    test('Match-ready: the Division, or the weakest juvenile age group', () {
+      final players = [
+        for (var i = 0; i < 12; i++)
+          _player(category: Competition.juvenile, ageGroup: AgeGroup.u13),
+        for (var i = 0; i < 5; i++)
+          _player(category: Competition.juvenile, ageGroup: AgeGroup.u17),
+      ];
+      final juvenileOnly = matchReadyTile(
+        categories: {Competition.juvenile},
+        players: players,
+        juvenileGroups: const [AgeGroup.u13, AgeGroup.u17],
+        matchdaySquad: 18,
+        minPlayers: 7,
+      );
+      expect(juvenileOnly.group, AgeGroup.u17);
+      expect(juvenileOnly.readiness.canPlay, isFalse);
+      final both = matchReadyTile(
+        categories: {Competition.division, Competition.juvenile},
+        players: players,
+        juvenileGroups: AgeGroup.values,
+        matchdaySquad: 18,
+        minPlayers: 7,
+      );
+      expect(both.group, isNull);
+      expect(both.readiness.approved, 0);
+    });
+  });
 }
