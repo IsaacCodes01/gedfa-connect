@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
+import 'package:gedfa_connect/core/widgets/flag_stripe.dart';
 import 'package:gedfa_connect/features/dashboard/presentation/widgets/dashboard_card.dart';
 import 'package:gedfa_connect/features/dashboard/presentation/widgets/team_home_widgets.dart';
 import 'package:gedfa_connect/features/fixtures/domain/cup.dart';
@@ -212,88 +213,100 @@ class _MatchCalendarCardState extends State<MatchCalendarCard> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         DashboardCard(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
+          child: _CalendarBackdrop(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  arrow(Icons.chevron_left_rounded, 'Month before', -1),
-                  Expanded(
-                    child: Text(
-                      monthTitle(_month),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  arrow(Icons.chevron_right_rounded, 'Next month', 1),
-                ],
-              ),
-              const SizedBox(height: 10),
-              ExcludeSemantics(
-                child: Row(
-                  children: [
-                    for (final w in const ['M', 'T', 'W', 'T', 'F', 'S', 'S'])
+                  Row(
+                    children: [
+                      arrow(Icons.chevron_left_rounded, 'Month before', -1),
                       Expanded(
                         child: Text(
-                          w,
+                          monthTitle(_month),
                           textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 10.5,
+                          style: const TextStyle(
+                            fontSize: 14.5,
                             fontWeight: FontWeight.w700,
-                            color: muted,
                           ),
                         ),
                       ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 4),
-              ...rows,
-              if (byDay.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4, bottom: 2),
-                  child: Text(
-                    'No matches this month',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 12, color: muted),
+                      arrow(Icons.chevron_right_rounded, 'Next month', 1),
+                    ],
                   ),
-                ),
-              const SizedBox(height: 6),
-              Divider(height: 1, color: dashboardBorder(context)),
-              const SizedBox(height: 8),
-              ExcludeSemantics(
-                child: Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 14,
-                  runSpacing: 4,
-                  children: [
-                    for (final k in MatchKind.values)
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 12,
-                            height: 4,
-                            decoration: BoxDecoration(
-                              color: matchKindColour(k),
-                              borderRadius: BorderRadius.circular(99),
+                  const SizedBox(height: 10),
+                  ExcludeSemantics(
+                    child: Row(
+                      children: [
+                        for (final w in const [
+                          'M',
+                          'T',
+                          'W',
+                          'T',
+                          'F',
+                          'S',
+                          'S',
+                        ])
+                          Expanded(
+                            child: Text(
+                              w,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                color: muted,
+                              ),
                             ),
                           ),
-                          const SizedBox(width: 5),
-                          Text(
-                            k.label,
-                            style: TextStyle(fontSize: 11, color: muted),
-                          ),
-                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  ...rows,
+                  if (byDay.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4, bottom: 2),
+                      child: Text(
+                        'No matches this month',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 12, color: muted),
                       ),
-                  ],
-                ),
+                    ),
+                  const SizedBox(height: 6),
+                  Divider(height: 1, color: dashboardBorder(context)),
+                  const SizedBox(height: 8),
+                  ExcludeSemantics(
+                    child: Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 14,
+                      runSpacing: 4,
+                      children: [
+                        for (final k in MatchKind.values)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 12,
+                                height: 4,
+                                decoration: BoxDecoration(
+                                  color: matchKindColour(k),
+                                  borderRadius: BorderRadius.circular(99),
+                                ),
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                k.label,
+                                style: TextStyle(fontSize: 11, color: muted),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
         if (picked != null) ...[
@@ -308,6 +321,70 @@ class _MatchCalendarCardState extends State<MatchCalendarCard> {
           ),
         ],
       ],
+    );
+  }
+}
+
+/// The calendar's background (Isaac, 10 Nov 2026): a soft blue wash, the
+/// Ghana stripe along the top, and the GEDFA logo as a faint one-colour
+/// watermark behind the days (dark ink in light mode, pale in dark mode),
+/// so it shows in both and never competes with the clubs' crests.
+class _CalendarBackdrop extends StatelessWidget {
+  const _CalendarBackdrop({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    scheme.primary.withValues(alpha: isDark ? 0.14 : 0.07),
+                    scheme.surface.withValues(alpha: 0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Positioned.fill(
+            top: 56,
+            bottom: 40,
+            child: ExcludeSemantics(
+              child: Center(
+                child: FractionallySizedBox(
+                  widthFactor: 0.82,
+                  child: Opacity(
+                    opacity: isDark ? 0.09 : 0.06,
+                    child: Image.asset(
+                      'assets/images/gedfa_logo.png',
+                      color: isDark ? Colors.white : scheme.onSurface,
+                      colorBlendMode: BlendMode.srcIn,
+                      fit: BoxFit.contain,
+                      // No logo (a test without assets): just the wash
+                      errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [const FlagStripe(height: 3), child],
+          ),
+        ],
+      ),
     );
   }
 }

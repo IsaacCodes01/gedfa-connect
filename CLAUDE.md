@@ -170,6 +170,8 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
 - **3.1 answers** (Isaac, 10 Nov 2026, in `DATA_MODEL.md` Section 7): 18 = 11 + 7 on the bench, 5 may come on; a goalkeeper in the 11
   and a second one on the bench; juvenile the same with play-up limits. Open with GEDFA: the extra injury / concussion substitute
   (IFAB: concussion only, opt-in, one per team, the opponent gets one too); draw it as an option. **Draw the 3.1 mockups in a new conversation.**
+- Calendar backdrop (`_CalendarBackdrop` in `match_calendar_card.dart`): GEDFA logo as a one-colour watermark (its letters are white,
+  so tint it with `color` + `BlendMode.srcIn`). `assets/images/gedfa_logo.png` is now committed.
 - **Plan agreed 9 Nov 2026 (deadline Thu 12 Nov, 12:30 pm; Isaac's prompts in that conversation):** next, in order:
   1. **3.0f Notifications and Back** (mockup `3.0f-notifications-and-back.html`, N1–N3, **approved**): a tap marks only
      that note read (reads kept per note in `readMarks/{uid}`: note ID → the `updatedAt` read; a grouped note with a newer
