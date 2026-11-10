@@ -73,6 +73,8 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
 - App: `flutter run -d chrome` (quit with `q`). After the laptop sleeps, if saves say
   "taking too long", restart the emulators and the app first.
 - Port 8080 busy: `netstat -ano | findstr :8080` then `taskkill /PID <pid> /F`.
+- After a step, make sure no flutter test / analyze run is left running. If one was stopped
+  partway, end its dart processes before finishing.
 
 ## Where we left off (7 Nov 2026)
 
@@ -165,6 +167,9 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
 - **TDc** done, **team dashboard finished** (10 Nov 2026, 355 rules tests, 229 Dart tests): Fixtures tab has the same switch
   (`matchViewProvider`) and List | Calendar; `MatchCalendarCard` on Fixtures and Home. Tests that build a team screen need
   `sharedPreferencesProvider` overridden. **Next (Isaac): 3.1 team sheet builder, mockup MS1 first**, then JA, JF, the rest in order.
+- **3.1 answers** (Isaac, 10 Nov 2026, in `DATA_MODEL.md` Section 7): 18 = 11 + 7 on the bench, 5 may come on; a goalkeeper in the 11
+  and a second one on the bench; juvenile the same with play-up limits. Open with GEDFA: the extra injury / concussion substitute
+  (IFAB: concussion only, opt-in, one per team, the opponent gets one too); draw it as an option. **Draw the 3.1 mockups in a new conversation.**
 - **Plan agreed 9 Nov 2026 (deadline Thu 12 Nov, 12:30 pm; Isaac's prompts in that conversation):** next, in order:
   1. **3.0f Notifications and Back** (mockup `3.0f-notifications-and-back.html`, N1–N3, **approved**): a tap marks only
      that note read (reads kept per note in `readMarks/{uid}`: note ID → the `updatedAt` read; a grouped note with a newer
@@ -175,7 +180,7 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
      and list the ones changed.
   2. Juvenile side names (mockup first). 3. **Team admin dashboard** (Home tab: next match, sheet due, squad ready, fee,
      notes; mockup first).
-  4. Match day, one step at a time, mockups MS1–MS4 to make first: **3.1** team sheet builder (18 = 11 + 7 subs from
+  3. Match day, one step at a time, mockups MS1–MS4 to make first: **3.1** team sheet builder (18 = 11 + 7 subs from
      `settings/league.matchdaySquad`, at least `minPlayers` 7; up to 7 team officials, manager and head coach required;
      captain, vice; no suspended players; 1 U13 and 5 U15 in a U17 match), with a public squad list
      `squads/{teamId}_{category}` written by the FA in the same batch as every approval / eligibility / player suspension
@@ -183,10 +188,10 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
      in the rules, visibility (team + FA, then opponent and appointed officials), **3.5** appoint match officials (referee,
      2 assistants, 4th, commissioner = FA admin or referee; fixture `officials` map; bell notes) + **referee dashboard**,
      **3.3** official sheet + PDF (`pdf` / `printing`, **no QR code**), **3.6** player check (commissioner only).
-  5. Shared sending and loading states (M1, M2; part of the UI/UX refresh), light refresh (icon, splash).
-  6. Phase 4 (referee reports, protests: fee GH₵ 500 in League settings, chairman-editable; answer time and public
+  4. Shared sending and loading states (M1, M2; part of the UI/UX refresh), light refresh (icon, splash).
+  5. Phase 4 (referee reports, protests: fee GH₵ 500 in League settings, chairman-editable; answer time and public
      holidays: GEDFA), Phase 5 (Premier League tie-breakers), Thursday: push notifications (Blaze is on), prod setup.
-  Parked until after Phase 5: cups 3.0c2–c5, next matchday card, posters, formation, Season records.
+     Parked until after Phase 5: cups 3.0c2–c5, next matchday card, posters, formation, Season records.
 - **Then:** **3.0c** competitions and cups (mockups C1–C4 in `3.0-fixtures-and-sheet.html`:
   the FA picks draw rules, one or two legs; random draw; knockout with byes or groups then knockout;
   live draw; bracket; a juvenile cup per age group). Then the rest of 3.0d (next matchday card, D1, J1)
