@@ -2170,6 +2170,77 @@ service cloud.firestore {
           && isSquadRemoval();
       }
 
+      // ---------- teamSheets/{fixtureId}_{teamId} (3.1a2) ----------
+      // A team's sheet for one match: up to 11 starting and, once 11
+      // start, up to 7 on the bench (18 at most, League settings). Every
+      // player must be on the team's squad list (approved), checked with
+      // one lookup per list. Saved again and again until it locks 1 hour
+      // before kick-off.
+
+      // The IDs on a squad list ([] when the list doesn't exist yet)
+      function squadIds(teamId, group) {
+        return exists(squadDoc(teamId, group))
+          ? get(squadDoc(teamId, group)).data.players.keys() : [];
+      }
+
+      // The players a team may pick for a match: its Division list, or
+      // the match's age group and the younger ones (playing up)
+      function pickableIds(teamId, fixture) {
+        let group = fixture.get('ageGroup', '');
+        return fixture.category == 'division'
+          ? squadIds(teamId, 'division')
+          : (group == 'U13'
+              ? squadIds(teamId, 'U13')
+              : (group == 'U15'
+                  ? squadIds(teamId, 'U13').concat(squadIds(teamId, 'U15'))
+                  : squadIds(teamId, 'U13').concat(squadIds(teamId, 'U15'))
+                      .concat(squadIds(teamId, 'U17'))));
+      }
+
+      function isValidTeamSheet(sheetId, sheet) {
+        let fixture = get(fixtureDoc(sheet.fixtureId)).data;
+        let starters = sheet.starters;
+        let bench = sheet.bench;
+        let picked = starters.concat(bench);
+        return sheet.keys().hasOnly(['fixtureId', 'teamId', 'category', 'ageGroup',
+                                     'starters', 'bench', 'savedBy', 'savedAt'])
+          && sheet.keys().hasAll(['fixtureId', 'teamId', 'category',
+                                  'starters', 'bench', 'savedBy', 'savedAt'])
+          && sheetId == sheet.fixtureId + '_' + sheet.teamId
+          && isTeamAdminOf(sheet.teamId)
+          && !isSuspended(sheet.teamId)
+          // The match: scheduled, ours, not locked yet (1 hour before)
+          && fixture.status == 'scheduled'
+          && fixture.teamIds.hasAny([sheet.teamId])
+          && fixture.kickoffAt != null
+          && request.time + duration.value(1, 'h') < fixture.kickoffAt
+          && sheet.category == fixture.category
+          && sheet.get('ageGroup', null) == fixture.get('ageGroup', null)
+          // 7 to 11 starting; a bench only with 11 starting; 18 at most
+          && starters is list && bench is list
+          && starters.size() >= leagueValue('minPlayers', 7)
+          && starters.size() <= 11
+          && bench.size() <= 7
+          && (bench.size() == 0 || starters.size() == 11)
+          && picked.size() <= leagueValue('matchdaySquad', 18)
+          && picked.toSet().size() == picked.size()
+          // Approved players of this team and competition only
+          && pickableIds(sheet.teamId, fixture).hasAll(picked)
+          && sheet.savedBy == request.auth.uid
+          && sheet.savedAt == request.time;
+      }
+
+      match /teamSheets/{sheetId} {
+        // The team and the FA (the opponent and officials after the lock: 3.2).
+        // A sheet not made yet doesn't exist: a team admin may look.
+        allow read: if isFaAdmin()
+          || (resource == null && isTeamAdmin())
+          || isTeamAdminOf(resource.data.teamId);
+        allow create: if isValidTeamSheet(sheetId, request.resource.data);
+        allow update: if isValidTeamSheet(sheetId, request.resource.data)
+          && request.resource.data.teamId == resource.data.teamId;
+      }
+
       // ---------- players/{playerId} ----------
       match /players/{playerId} {
         allow read: if isTeamAdminOf(resource.data.teamId) || isFaAdmin();

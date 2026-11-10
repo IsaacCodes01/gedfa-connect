@@ -32,6 +32,7 @@ import 'package:gedfa_connect/features/fixtures/presentation/fa_fixtures_screen.
 import 'package:gedfa_connect/features/fixtures/presentation/fixture_form_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/fixture_kits_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/match_details_screen.dart';
+import 'package:gedfa_connect/features/team_sheets/presentation/team_sheet_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/season_draft_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/season_setup_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/team_fixtures_screen.dart';
@@ -544,6 +545,13 @@ final routerProvider = Provider<GoRouter>((ref) {
                     path: 'match/:id',
                     parentNavigatorKey: rootNavigatorKey,
                     builder: (_, state) => MatchDetailsScreen(
+                      fixtureId: state.pathParameters['id']!,
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'sheet/:id',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (_, state) => TeamSheetScreen(
                       fixtureId: state.pathParameters['id']!,
                     ),
                   ),

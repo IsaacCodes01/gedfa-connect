@@ -179,7 +179,11 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
 - **3.1a1** done (10 Nov 2026, 369 rules tests, 234 Dart tests): `squads/{teamId}_{group}` (`division` / `U13` / `U15` / `U17`,
   `players` map ID → true, `changed` = the one player of each write); `approve` / `passJuvenile` add in the transaction, a team edit
   back to pending removes in the batch (`players/data/squad_list.dart`); FA Repair in League settings (`repairSquadLists`).
-  Rules changed: Isaac deploys to dev, then presses Repair once. Next: **3.1a2** Players step and Save.
+  Rules changed: Isaac deploys to dev, then presses Repair once. Repair shows only in debug builds (`kDebugMode`, Isaac).
+- **3.1a2** done (10 Nov 2026, 387 rules tests, 252 Dart tests): `teamSheets/{fixtureId}_{teamId}` (`starters`, `bench`,
+  `savedBy`, `savedAt`); rules `isValidTeamSheet` (lock `now + 1 h < kickoffAt`, squad lists via `pickableIds`);
+  `features/team_sheets/` (`sheet_picks.dart` = taps and checks, `team_sheet_screen.dart` = MS2, `Routes.teamSheet`);
+  Match details › Team sheets has Make team sheet / Change. Rules changed: Isaac deploys to dev. Next: **3.1b** roles and numbers.
 - Calendar backdrop (`_CalendarBackdrop` in `match_calendar_card.dart`): GEDFA logo as a one-colour watermark (its letters are white,
   so tint it with `color` + `BlendMode.srcIn`). `assets/images/gedfa_logo.png` is now committed.
 - **Plan agreed 9 Nov 2026 (deadline Thu 12 Nov, 12:30 pm; Isaac's prompts in that conversation):** next, in order:

@@ -55,7 +55,17 @@ class AlreadyMemberException implements Exception {
   const AlreadyMemberException();
 }
 
+/// A team sheet can't change any more: it locked 1 hour before kick-off,
+/// or the match was postponed or cancelled (3.1a2).
+class SheetLockedException implements Exception {
+  const SheetLockedException();
+}
+
 String appErrorMessage(Object error) {
+  if (error is SheetLockedException) {
+    return 'This team sheet is locked: it closed 1 hour before kick-off, '
+        'or the match is no longer scheduled.';
+  }
   if (error is InviteExistsException) {
     return 'This email already has an open invitation. Share it again from '
         'the Invited tab, or cancel it first.';

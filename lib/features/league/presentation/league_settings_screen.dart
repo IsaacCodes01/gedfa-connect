@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -258,16 +259,22 @@ class _LeagueSettingsScreenState extends ConsumerState<LeagueSettingsScreen> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 18),
-                        const SectionTitle('Team sheets'),
-                        const TileGroup(children: [_SquadListsTile()]),
-                        const _Hint(
-                          'Each team has a list of its approved players for '
-                          'every competition and age group. Team sheets are '
-                          'checked against it. Approvals keep it up to date; '
-                          'Repair adds players approved before the lists '
-                          'existed. It is safe to run again.',
-                        ),
+                        // Squad lists repair: only in debug builds (Isaac,
+                        // 10 Nov 2026). Dev needed it once; prod starts with
+                        // the lists, so the release app doesn't show it.
+                        if (kDebugMode) ...[
+                          const SizedBox(height: 18),
+                          const SectionTitle('Team sheets (debug only)'),
+                          const TileGroup(children: [_SquadListsTile()]),
+                          const _Hint(
+                            'Each team has a list of its approved players for '
+                            'every competition and age group. Team sheets are '
+                            'checked against it. Approvals keep it up to date; '
+                            'Repair adds players approved before the lists '
+                            'existed. It is safe to run again. Hidden in the '
+                            'release app.',
+                          ),
+                        ],
                         const SizedBox(height: 18),
                         const SectionTitle('Recent changes'),
                         const _History(),

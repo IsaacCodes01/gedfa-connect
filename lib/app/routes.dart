@@ -120,6 +120,9 @@ class Routes {
   static String adminMatch(String id) => '$adminFixtures/match/$id';
   static String teamMatch(String id) => '$teamFixtures/match/$id';
 
+  /// Team: the team sheet for one match (3.1a2), full screen.
+  static String teamSheet(String fixtureId) => '$teamFixtures/sheet/$fixtureId';
+
   /// Team: the Home tab (TDa), where team admins land after signing in.
   static const teamHome = '/team/home';
 

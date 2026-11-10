@@ -1,0 +1,260 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+import 'package:gedfa_connect/app/theme_mode_provider.dart';
+import 'package:gedfa_connect/core/constants/approval_status.dart';
+import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
+import 'package:gedfa_connect/features/auth/domain/app_user.dart';
+import 'package:gedfa_connect/features/fixtures/data/fixture_repository.dart';
+import 'package:gedfa_connect/features/fixtures/domain/fixture.dart';
+import 'package:gedfa_connect/features/league/data/league_settings_repository.dart';
+import 'package:gedfa_connect/features/league/domain/league_settings.dart';
+import 'package:gedfa_connect/features/players/data/player_profile_repository.dart';
+import 'package:gedfa_connect/features/players/data/player_repository.dart';
+import 'package:gedfa_connect/features/players/domain/age_group.dart';
+import 'package:gedfa_connect/features/players/domain/player.dart';
+import 'package:gedfa_connect/features/players/domain/player_profile.dart';
+import 'package:gedfa_connect/features/players/domain/position.dart';
+import 'package:gedfa_connect/features/team_sheets/data/team_sheet_repository.dart';
+import 'package:gedfa_connect/features/team_sheets/presentation/team_sheet_screen.dart';
+import 'package:gedfa_connect/features/teams/data/team_repository.dart';
+import 'package:gedfa_connect/features/teams/domain/competition.dart';
+import 'package:gedfa_connect/features/teams/domain/kit.dart';
+import 'package:gedfa_connect/features/teams/domain/kit_slot.dart';
+import 'package:gedfa_connect/features/teams/domain/team.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+/// The team sheet's Players step (3.1a2) on a small phone and a laptop,
+/// light and dark: no overflow, and picking 11 makes it ready to save.
+
+const _team = Team(
+  id: 'ruf',
+  name: 'Royal Unique Football Club of Apam',
+  shortName: 'RUF',
+  town: 'Apam',
+  categories: {Competition.division, Competition.juvenile},
+  adminUids: ['u'],
+  requestUid: 'req',
+);
+
+KitChoice _kit(KitSlot slot) => KitChoice(
+  slot: slot,
+  kit: const Kit(primary: Colors.red, shorts: Colors.white, socks: Colors.red),
+  raw: const {},
+);
+
+Fixture _match({AgeGroup? ageGroup}) => Fixture(
+  id: 'm1',
+  season: '2026-27',
+  competitionId: ageGroup == null
+      ? '2026-27_division-league'
+      : '2026-27_juvenile-league',
+  category: ageGroup == null ? Competition.division : Competition.juvenile,
+  ageGroup: ageGroup,
+  round: 3,
+  home: const FixtureSide(
+    id: 'ruf',
+    name: 'Royal Unique Football Club of Apam',
+    shortName: 'RUF',
+    colour: Colors.red,
+  ),
+  away: const FixtureSide(
+    id: 'ast',
+    name: 'Asebu Stars Sporting Club',
+    shortName: 'AST',
+    colour: Colors.green,
+  ),
+  kits: MatchKits(
+    home: _kit(KitSlot.home),
+    away: _kit(KitSlot.away),
+    homeGk: _kit(KitSlot.goalkeeper),
+    awayGk: _kit(KitSlot.goalkeeper),
+  ),
+  kickoffAt: DateTime.now().add(const Duration(days: 4)),
+  venue: 'Apam Park',
+  status: FixtureStatus.scheduled,
+);
+
+const _positions = [
+  Position.gk,
+  Position.rb,
+  Position.lb,
+  Position.cb,
+  Position.cb,
+  Position.dm,
+  Position.cm,
+  Position.amf,
+  Position.rw,
+  Position.st,
+  Position.lw,
+  Position.gk,
+  Position.cb,
+  Position.cm,
+  Position.cf,
+  Position.st,
+  Position.rwb,
+  Position.rm,
+];
+
+List<Player> _players({AgeGroup? group}) => [
+  for (var i = 0; i < _positions.length; i++)
+    Player(
+      id: 'p$i',
+      teamId: 'ruf',
+      teamName: 'Royal Unique FC',
+      category: group == null ? Competition.division : Competition.juvenile,
+      ageGroup: group == null ? null : (i == 5 ? AgeGroup.u13 : group),
+      fullName: 'Kwabena Mensah-Bonsu Asamoah $i',
+      dob: DateTime(2000),
+      position: _positions[i],
+      jerseyNo: i + 1,
+      playerCode: 'GE26-00${i + 10}',
+      status: ApprovalStatus.approved,
+    ),
+  Player(
+    id: 'waiting',
+    teamId: 'ruf',
+    teamName: 'Royal Unique FC',
+    category: group == null ? Competition.division : Competition.juvenile,
+    ageGroup: group,
+    fullName: 'Yaw Pending',
+    dob: DateTime(2000),
+    position: Position.st,
+    jerseyNo: 40,
+    status: ApprovalStatus.pending,
+  ),
+];
+
+Future<void> _pump(
+  WidgetTester tester,
+  Size size,
+  Brightness b, {
+  AgeGroup? group,
+}) async {
+  tester.view.physicalSize = size;
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+  SharedPreferences.setMockInitialValues({});
+  final prefs = await SharedPreferences.getInstance();
+
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        myTeamProvider.overrideWith((ref) => Stream.value(_team)),
+        appUserProvider.overrideWith(
+          (ref) => Stream.value(
+            const AppUser(uid: 'u', role: null, displayName: 'Isaac Otabil'),
+          ),
+        ),
+        leagueSettingsProvider.overrideWith(
+          (ref) => Stream.value(const LeagueSettings()),
+        ),
+        fixtureProvider.overrideWith(
+          (ref, id) => Stream.value(_match(ageGroup: group)),
+        ),
+        teamPlayersProvider.overrideWith(
+          (ref) => Stream.value(_players(group: group)),
+        ),
+        teamSheetProvider.overrideWith((ref, key) => Stream.value(null)),
+        teamProfilesProvider.overrideWith(
+          (ref) => Stream.value({
+            'p3': const PlayerProfile(
+              playerId: 'p3',
+              teamId: 'ruf',
+              availability: Availability.injured,
+            ),
+          }),
+        ),
+        armbandsProvider.overrideWith(
+          (ref, category) => Stream.value(
+            const Armbands(captainId: 'p3', viceCaptainId: 'p5'),
+          ),
+        ),
+      ],
+      child: MaterialApp.router(
+        theme: ThemeData(useMaterial3: true, brightness: b),
+        // AppBackButton needs go_router
+        routerConfig: GoRouter(
+          initialLocation: '/sheet',
+          routes: [
+            GoRoute(
+              path: '/sheet',
+              builder: (_, _) => const TeamSheetScreen(fixtureId: 'm1'),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+void _noError(WidgetTester tester) {
+  final error = tester.takeException();
+  expect(
+    error,
+    isNull,
+    reason: error is FlutterError ? error.toStringDeep() : '$error',
+  );
+}
+
+void main() {
+  for (final b in Brightness.values) {
+    testWidgets('small phone, ${b.name}: the list fits', (tester) async {
+      await _pump(tester, const Size(360, 740), b);
+      _noError(tester);
+      expect(find.text('GOALKEEPERS'), findsOneWidget);
+      expect(
+        find.text('Pick your starting players (7 at least).'),
+        findsOneWidget,
+      );
+    });
+  }
+
+  testWidgets('laptop: the list fits', (tester) async {
+    await _pump(tester, const Size(1280, 800), Brightness.light);
+    _noError(tester);
+  });
+
+  testWidgets('picking 11 with a goalkeeper makes it ready to save', (
+    tester,
+  ) async {
+    await _pump(tester, const Size(1280, 2400), Brightness.light);
+    final elevens = find.text('11');
+    for (var i = 0; i < 11; i++) {
+      await tester.tap(elevens.at(i));
+      await tester.pump();
+    }
+    _noError(tester);
+    // p3 is injured: picked with a warning, still saveable
+    expect(find.textContaining('injured or unavailable'), findsOneWidget);
+    final save = tester.widget<FilledButton>(find.byType(FilledButton));
+    expect(save.onPressed, isNotNull);
+  });
+
+  testWidgets('juvenile U15: the squad, then playing up from U13', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      const Size(360, 740),
+      Brightness.dark,
+      group: AgeGroup.u15,
+    );
+    _noError(tester);
+    expect(find.text('U15 SQUAD'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('PLAYING UP FROM U13'),
+      300,
+      scrollable: find
+          .descendant(
+            of: find.byType(ListView),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    expect(find.text('U13 ↑'), findsOneWidget);
+  });
+}

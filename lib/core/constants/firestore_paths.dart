@@ -72,6 +72,10 @@ class FirestorePaths {
   static String squad(String teamId, String group) =>
       '$district/squads/${teamId}_$group';
 
+  /// A team's sheet for one match (3.1a2): `teamSheets/{fixtureId}_{teamId}`.
+  static String teamSheet(String fixtureId, String teamId) =>
+      '$district/teamSheets/${fixtureId}_$teamId';
+
   /// Football details the team keeps up to date (2.3d).
   static const playerProfiles = '$district/playerProfiles';
   static String playerProfile(String playerId) =>

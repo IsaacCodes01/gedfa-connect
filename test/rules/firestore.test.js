@@ -4241,3 +4241,142 @@ describe('Squad lists (3.1a1)', () => {
     }));
   });
 });
+
+// ---------- Team sheets (3.1a2) ----------
+
+describe('Team sheets (3.1a2)', () => {
+  const ids = (prefix, from, to) => Array.from({ length: to - from + 1 }, (_, i) => `${prefix}${from + i}`);
+  const ELEVEN = ids('s', 1, 11);
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      const list = (id, players) => setDoc(doc(db, `${D}/squads/${id}`), {
+        teamId: id.split('_')[0], group: id.split('_')[1],
+        players: Object.fromEntries(players.map((p) => [p, true])),
+        changed: players[0], updatedAt: Timestamp.now(),
+      });
+      // Royal's 20 approved Division players, s1 to s20
+      await list('royal_division', ids('s', 1, 20));
+      // Royal's children: one U13, eleven U15, one U17
+      await list('royal_U13', ['k13']);
+      await list('royal_U15', ids('k', 1, 11));
+      await list('royal_U17', ['k17']);
+      await setDoc(doc(db, `${D}/fixtures/f1`), fixtureData());
+      await setDoc(doc(db, `${D}/fixtures/fj`), fixtureData({
+        competitionId: '2026-27_juvenile-league', category: 'juvenile', ageGroup: 'U15',
+      }));
+    });
+  });
+
+  function sheet(changes = {}) {
+    return {
+      fixtureId: 'f1', teamId: 'royal', category: 'division',
+      starters: ELEVEN, bench: ids('s', 12, 16),
+      savedBy: 'admin1', savedAt: serverTimestamp(), ...changes,
+    };
+  }
+  const save = (db, data = sheet(), id = `${data.fixtureId}_${data.teamId}`) =>
+    setDoc(doc(db, `${D}/teamSheets/${id}`), data);
+
+  it('the team saves 11 starting and 5 on the bench', async () => {
+    await assertSucceeds(save(dbAs('admin1')));
+  });
+
+  it('the team can save it again with changes', async () => {
+    await save(dbAs('admin1'));
+    await assertSucceeds(save(dbAs('admin1'), sheet({ bench: ids('s', 12, 18) })));
+  });
+
+  it('7 starting and no bench is allowed; 6 is not', async () => {
+    await assertSucceeds(save(dbAs('admin1'), sheet({ starters: ids('s', 1, 7), bench: [] })));
+    await assertFails(save(dbAs('admin1'), sheet({ starters: ids('s', 1, 6), bench: [] })));
+  });
+
+  it('never more than 11 starting', async () => {
+    await assertFails(save(dbAs('admin1'), sheet({ starters: ids('s', 1, 12), bench: [] })));
+  });
+
+  it('the bench opens only when 11 start', async () => {
+    await assertFails(save(dbAs('admin1'), sheet({ starters: ids('s', 1, 10), bench: ['s11'] })));
+  });
+
+  it('never more than 7 on the bench', async () => {
+    await assertFails(save(dbAs('admin1'), sheet({ bench: ids('s', 12, 19) })));
+  });
+
+  it('a smaller matchday squad in League settings is respected', async () => {
+    await seedLeague({ matchdaySquad: 16 });
+    await assertSucceeds(save(dbAs('admin1'), sheet({ bench: ids('s', 12, 16) })));
+    await assertFails(save(dbAs('admin1'), sheet({ bench: ids('s', 12, 17) })));
+  });
+
+  it('the same player cannot be picked twice', async () => {
+    await assertFails(save(dbAs('admin1'), sheet({ bench: ['s1', 's12'] })));
+  });
+
+  it('only players on the squad list (approved)', async () => {
+    await assertFails(save(dbAs('admin1'), sheet({ bench: ['p3'] })));
+    await assertFails(save(dbAs('admin1'), sheet({ starters: [...ids('s', 1, 10), 'k1'] })));
+  });
+
+  it('a juvenile U15 sheet takes U15 and U13 children, never U17', async () => {
+    const juvenile = (changes) => sheet({
+      fixtureId: 'fj', category: 'juvenile', ageGroup: 'U15',
+      starters: [...ids('k', 1, 10), 'k13'], bench: ['k11'], ...changes,
+    });
+    await assertSucceeds(save(dbAs('admin1'), juvenile()));
+    await assertSucceeds(save(dbAs('admin1'), juvenile({ bench: [] })));
+    await assertFails(save(dbAs('admin1'), juvenile({ starters: [...ids('k', 1, 10), 'k17'], bench: [] })));
+    await assertFails(save(dbAs('admin1'), juvenile({ ageGroup: 'U17', bench: [] })));
+  });
+
+  it('another team cannot save it, nor a sheet for a match it is not in', async () => {
+    await assertFails(save(dbAs('admin2'), sheet({ savedBy: 'admin2' })));
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `${D}/fixtures/f2`),
+        fixtureData({ teamIds: ['stars', 'other'] }));
+    });
+    await assertFails(save(dbAs('admin1'), sheet({ fixtureId: 'f2' })));
+  });
+
+  it('the sheet ID must be the match and the team', async () => {
+    await assertFails(save(dbAs('admin1'), sheet(), 'f1_stars'));
+  });
+
+  it('locked from 1 hour before kick-off', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), `${D}/fixtures/f1`),
+        { kickoffAt: Timestamp.fromMillis(Date.now() + 50 * 60000) });
+    });
+    await assertFails(save(dbAs('admin1')));
+  });
+
+  it('not for a postponed match', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), `${D}/fixtures/f1`),
+        { status: 'postponed', kickoffAt: null, note: 'Rain' });
+    });
+    await assertFails(save(dbAs('admin1')));
+  });
+
+  it('signed by the person saving, at server time', async () => {
+    await assertFails(save(dbAs('admin1'), sheet({ savedBy: 'fa1' })));
+    await assertFails(save(dbAs('admin1'), sheet({ savedAt: Timestamp.now() })));
+  });
+
+  it('the FA cannot write a team sheet', async () => {
+    await assertFails(save(dbAs('fa1'), sheet({ savedBy: 'fa1' })));
+  });
+
+  it('the team and the FA read it; the other team does not (until 3.2)', async () => {
+    await save(dbAs('admin1'));
+    await assertSucceeds(getDoc(doc(dbAs('admin1'), `${D}/teamSheets/f1_royal`)));
+    await assertSucceeds(getDoc(doc(dbAs('fa1'), `${D}/teamSheets/f1_royal`)));
+    await assertFails(getDoc(doc(dbAs('admin2'), `${D}/teamSheets/f1_royal`)));
+  });
+
+  it('a team may look for its sheet before making it', async () => {
+    await assertSucceeds(getDoc(doc(dbAs('admin1'), `${D}/teamSheets/f1_royal`)));
+  });
+});

@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.28, matches the rules after step 3.1a1, squad lists for team sheets (10 Nov 2026)
+**Status:** v2.29, matches the rules after step 3.1a2, team sheets: Players and Save (10 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -450,6 +450,24 @@ The IDs of a team's **approved** players, one list per competition: `group` is `
 - Read: the team (its own lists; a missing list may be looked for) and the FA.
 - **Repair** (FA › More › League settings › Team sheets › Squad lists › Repair, `PlayerRepository.repairSquadLists`): adds every approved player missing from their list and takes off anyone no longer approved. Needed once for players approved before 10 Nov 2026; safe to run again.
 
+### 2.4e `teamSheets/{fixtureId}_{teamId}` — team sheets (3.1a2)
+
+A team's sheet for one match. Saved again and again (each save replaces it) until it **locks 1 hour before kick-off**. 3.1b adds captain, vice-captain, goalkeeper, shirt numbers for the match and officials.
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `fixtureId`, `teamId` | string | The document ID is `{fixtureId}_{teamId}` |
+| `category` | string | `division` / `juvenile`, the match's |
+| `ageGroup` | string? | Juvenile only: the match's age group |
+| `starters` | array | Player IDs, `minPlayers` (7) to 11 |
+| `bench` | array | Player IDs, at most 7 and at most `matchdaySquad` − 11; **only when 11 start** (Isaac, 10 Nov 2026) |
+| `savedBy`, `savedAt` | | The team admin and server time |
+
+- **Write: the team admin only**, its own team, not while suspended. The match must be `scheduled`, the team in `teamIds`, and `now + 1 h < kickoffAt` (the lock). The same player can't be picked twice, and starting + bench ≤ `matchdaySquad` (18).
+- **Players:** every ID must be on the team's squad list (2.4d): the Division list, or in a juvenile match the match's age group **and the younger ones** (playing up; the GFA limits come in 3.1d). Up to 3 lookups.
+- **App only (not rules) in 3.1a2:** a registered goalkeeper must start (3.1b lets the team mark any starter as goalkeeper, then the rules check it); injured or unavailable players (Profiles) are picked with a warning.
+- **Read:** the team and the FA. The opponent and the match officials after the lock (3.2). A team may look for its sheet before making it.
+
 ### 2.4a Player ID (`playerCode`)
 
 **Format:** `GE` + two-digit year of first approval + `-` + four-digit running number. Example: `GE26-0042`.
@@ -878,6 +896,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 10 Nov 2026 | v2.29: new `teamSheets/{fixtureId}_{teamId}` (3.1a2): `starters` (7 to 11), `bench` (at most 7, only with 11 starting, 18 in all), approved players only via the squad lists (juvenile: the match's age group and younger), locked 1 hour before kick-off; the team writes, the team and the FA read. The squad list Repair shows only in debug builds. 387 rules tests. |
 | 10 Nov 2026 | v2.28: new `squads/{teamId}_{group}` (3.1a1): the IDs of a team's approved players per competition / age group, one player per write (`changed`). The FA's approval and screening pass must add the player in the same transaction; a team edit that sends an approved player back to pending must take them off; FA Repair in League settings. 369 rules tests. |
 | 10 Nov 2026 | v2.27.8: no data change yet. Isaac's team sheet builder answers in Section 7 (one Save button, bench only with 11 starting, captain starts, any starter in goal, cup sheets 1 hour before; shirt numbers for one match approved, the registered number kept as the usual number). |
 | 10 Nov 2026 | v2.27.7: no data change. Isaac: when a team uses the head-injury substitute the other team gets one extra too; a goalkeeper in the starting 11 is required. |

@@ -16,7 +16,11 @@ import 'package:gedfa_connect/features/fixtures/domain/fixture.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/widgets/fixture_actions.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/widgets/fixture_row.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/widgets/renamed_pill.dart';
+import 'package:gedfa_connect/features/team_sheets/data/team_sheet_repository.dart';
+import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/kit_thumb.dart';
+import 'package:gedfa_connect/app/routes.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 
 /// Match details (mockups F5 coming up, F6 played): a stadium-night header
 /// with both crests, the kick-off and a countdown; then the match info
@@ -154,7 +158,7 @@ class _DetailsState extends ConsumerState<_Details> {
                           : 'Due ${formatShortDate(f.sheetDueAt!)}, '
                               '${formatTime(f.sheetDueAt!)}',
                     ),
-                    _Sheets(fixture: f, now: now),
+                    _Sheets(fixture: f, now: now, isFa: widget.isFa),
                     const DashboardSectionTitle(
                       title: 'Officials',
                       trailing: 'Phase 4',
@@ -778,14 +782,18 @@ class _Kits extends StatelessWidget {
   }
 }
 
-class _Sheets extends StatelessWidget {
-  const _Sheets({required this.fixture, required this.now});
+/// Team sheets (3.1a2): each side's sheet. The team sees its own and gets
+/// Make team sheet / Change; the other team's opens at the lock (3.2).
+/// The FA sees whether each sheet is saved.
+class _Sheets extends ConsumerWidget {
+  const _Sheets({required this.fixture, required this.now, required this.isFa});
 
   final Fixture fixture;
   final DateTime now;
+  final bool isFa;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final f = fixture;
     final due = f.sheetDueAt;
     final open = due != null && f.isScheduled && due.isAfter(now);
@@ -795,14 +803,40 @@ class _Sheets extends StatelessWidget {
         : left.inDays >= 1
             ? 'Due in ${left.inDays} d'
             : 'Due in ${left.inHours} h ${left.inMinutes % 60} min';
-    Widget row(FixtureSide side) => _Line(
-          leading: FixtureCrest(side: side),
-          title: side.name,
-          detail: 'Team sheets come in the next update (3.1)',
-          trailing: open
-              ? FixtureTag(when, tone: AccentTone.gold)
-              : null,
-        );
+    final myTeamId = isFa ? null : ref.watch(myTeamProvider).value?.id;
+
+    Widget row(FixtureSide side) {
+      final canSee = isFa || side.id == myTeamId;
+      final sheet = canSee
+          ? ref.watch(teamSheetProvider((f.id, side.id))).value
+          : null;
+      final savedAt = sheet?.savedAt;
+      final mine = side.id == myTeamId;
+      final detail = !canSee
+          ? 'You see it when it locks, 1 hour before kick-off'
+          : savedAt != null
+              ? 'Saved ${formatShortDate(savedAt)}, ${formatTime(savedAt)} · '
+                  '${sheet!.playerCount} players'
+              : open
+                  ? 'Not started'
+                  : 'No sheet saved';
+      return _Line(
+        leading: FixtureCrest(side: side),
+        title: mine ? '${side.name} (you)' : side.name,
+        detail: detail,
+        trailing: mine && open
+            ? FilledButton.tonal(
+                onPressed: () => context.open(Routes.teamSheet(f.id)),
+                child: Text(sheet == null ? 'Make team sheet' : 'Change'),
+              )
+            : savedAt != null
+                ? const FixtureTag('Saved', tone: AccentTone.green)
+                : open
+                    ? FixtureTag(when, tone: AccentTone.gold)
+                    : null,
+      );
+    }
+
     return DashboardCard(
       child: Column(children: [row(f.home), row(f.away)]),
     );
