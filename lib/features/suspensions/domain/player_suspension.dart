@@ -267,6 +267,23 @@ int _byKickoff(Fixture a, Fixture b) {
   return ta.compareTo(tb);
 }
 
+/// A suspension moved off a match that won't be played (3.1e2).
+class BanMove {
+  const BanMove({
+    required this.suspension,
+    required this.to,
+    required this.fixtureIds,
+  });
+
+  final PlayerSuspension suspension;
+
+  /// The match it moves to; null when the calendar has none yet.
+  final Fixture? to;
+
+  /// The suspension's new list of matches to miss.
+  final List<String> fixtureIds;
+}
+
 /// The calendar arithmetic of a suspension (pure, tested).
 class BanPlan {
   BanPlan._();
@@ -309,6 +326,45 @@ class BanPlan {
           f.kickoffAt!.isAfter(after))
         f,
   ]..sort(_byKickoff);
+
+  /// 3.1e2: [off] won't be played on its date (postponed, or cancelled).
+  /// Each suspension in force that listed it moves to the club's next
+  /// scheduled match in that competition that it doesn't list yet, so the
+  /// player still misses N matches that are played (mockup SP1). With no
+  /// such match the suspension keeps one more "not in the calendar yet".
+  static List<BanMove> movesFor(
+    Fixture off,
+    List<PlayerSuspension> suspensions,
+    List<Fixture> fixtures,
+    DateTime now,
+  ) => [
+    for (final s in suspensions)
+      if (!s.isLifted && s.fixtureIds.contains(off.id))
+        _move(s, off, fixtures, now),
+  ];
+
+  static BanMove _move(
+    PlayerSuspension s,
+    Fixture off,
+    List<Fixture> fixtures,
+    DateTime now,
+  ) {
+    final to = _upcoming(
+      fixtures,
+      s.teamId,
+      s.competition,
+      now,
+    ).where((f) => f.id != off.id && !s.fixtureIds.contains(f.id)).firstOrNull;
+    return BanMove(
+      suspension: s,
+      to: to,
+      fixtureIds: [
+        for (final id in s.fixtureIds)
+          if (id != off.id) id,
+        ?to?.id,
+      ],
+    );
+  }
 
   /// "Sat 21 Nov v Asebu Stars"
   static String matchText(Fixture f, String teamId) {

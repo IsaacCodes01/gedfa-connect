@@ -4674,6 +4674,17 @@ describe('Team sheets (3.1a2)', () => {
     await assertFails(getDoc(doc(dbAs('admin2'), `${D}/teamSheets/f1_royal`)));
   });
 
+  it('3.1e2: a player suspended for the match can never be picked', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), `${D}/fixtures/f1`), { banned: { royal: ['s14'], stars: ['s1'] } });
+    });
+    // s14 is on the bench of the usual sheet
+    await assertFails(save(dbAs('admin1')));
+    await assertFails(save(dbAs('admin1'), sheet({ bench: ['s14'] })));
+    // Without them it saves; another team's ban doesn't count here
+    await assertSucceeds(save(dbAs('admin1'), sheet({ bench: ids('s', 15, 19) })));
+  });
+
   it('a team may look for its sheet before making it', async () => {
     await assertSucceeds(getDoc(doc(dbAs('admin1'), `${D}/teamSheets/f1_royal`)));
   });
@@ -4856,6 +4867,66 @@ describe('Player suspensions (3.1e1)', () => {
     });
     await assertSucceeds(changeFixture(dbAs('fa1'), 'f1', { venue: 'Gomoa Park' }));
     await assertFails(changeFixture(dbAs('fa1'), 'f1', { venue: 'Apam Park', banned: {} }));
+  });
+
+  // ---------- 3.1e2: a postponed or cancelled match ----------
+
+  /** The move as the app does it, in its own batch just before the
+   *  postpone: the match's marks go, the suspension's new list, a mark on
+   *  the next match. */
+  function moveBan(db, { ids = ['f2', 'f3'], to = 'f3' } = {}) {
+    const batch = writeBatch(db);
+    batch.update(doc(db, `${D}/fixtures/f1`), { banned: deleteField() });
+    batch.update(banRef(db), { fixtureIds: ids });
+    if (to) batch.update(doc(db, `${D}/fixtures/${to}`), { 'banned.royal': arrayUnion('p1') });
+    return batch.commit();
+  }
+  const postpone = (uid, changes) => updateDoc(doc(dbAs(uid), `${D}/fixtures/f1`), {
+    ...changes, updatedBy: uid, updatedAt: serverTimestamp(),
+  });
+
+  async function seedMarked() {
+    await seedBan();
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, `${D}/fixtures/f3`), fixtureData({
+        round: 6, kickoffAt: Timestamp.fromMillis(Date.now() + 17 * 86400000),
+      }));
+      for (const f of ['f1', 'f2']) {
+        await updateDoc(doc(db, `${D}/fixtures/${f}`), { banned: { royal: ['p1'] } });
+      }
+    });
+  }
+
+  it('3.1e2: postponed, the ban moves to the club\'s next match first, then the postpone', async () => {
+    await seedMarked();
+    await assertSucceeds(moveBan(dbAs('off1')));
+    await assertSucceeds(postpone('off1', { status: 'postponed', kickoffAt: null, note: 'Pitch waterlogged' }));
+  });
+
+  it('3.1e2: with no next match the list just gets shorter (cancelled)', async () => {
+    await seedMarked();
+    await assertSucceeds(moveBan(dbAs('fa1'), { ids: ['f2'], to: null }));
+    await assertSucceeds(postpone('fa1', { status: 'cancelled', note: 'Team withdrew' }));
+  });
+
+  it('3.1e2: marks never change with an ordinary change or a postpone', async () => {
+    await seedMarked();
+    await assertFails(postpone('off1', { status: 'postponed', kickoffAt: null, note: 'Rain', banned: deleteField() }));
+    await assertFails(postpone('off1', { venue: 'Gomoa Park', 'banned.royal': ['p1', 'p3'] }));
+    await assertFails(updateDoc(doc(dbAs('admin1'), `${D}/fixtures/f1`), { banned: deleteField() }));
+    await assertFails(moveBan(dbAs('admin1')));
+  });
+
+  it('3.1e2: a suspension\'s matches change alone, never past the number, never once lifted', async () => {
+    await seedMarked();
+    const move = (db, changes) => updateDoc(banRef(db), changes);
+    await assertFails(move(dbAs('off1'), { fixtureIds: ['f1', 'f2', 'f3'] }));
+    await assertFails(move(dbAs('off1'), { fixtureIds: ['f2', 'f3'], matches: 3 }));
+    await assertFails(move(dbAs('admin1'), { fixtureIds: ['f2', 'f3'] }));
+    await assertSucceeds(move(dbAs('off1'), { fixtureIds: ['f2', 'f3'] }));
+    await assertSucceeds(lift(dbAs('off1')));
+    await assertFails(move(dbAs('off1'), { fixtureIds: ['f3'] }));
   });
 
   it('the club\'s note carries the player to open; never a number', async () => {

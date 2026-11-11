@@ -6,6 +6,7 @@ import 'package:gedfa_connect/core/constants/approval_status.dart';
 import 'package:gedfa_connect/features/fixtures/data/fixture_repository.dart';
 import 'package:gedfa_connect/features/fixtures/domain/fixture.dart';
 import 'package:gedfa_connect/features/notifications/domain/app_notification.dart';
+import 'package:gedfa_connect/features/notifications/presentation/widgets/note_look.dart';
 import 'package:gedfa_connect/features/players/data/player_repository.dart';
 import 'package:gedfa_connect/features/players/domain/age_group.dart';
 import 'package:gedfa_connect/features/players/domain/player.dart';
@@ -209,6 +210,48 @@ void main() {
       final bans = bansByPlayer([ban(), ban(liftedAt: now)], fixtures, now);
       expect(bans.keys, ['p2']);
     });
+  });
+
+  group('3.1e2: a postponed or cancelled match', () {
+    test("the ban moves to the club's next match it doesn't list yet", () {
+      final moves = BanPlan.movesFor(fixtures[2], [ban()], fixtures, now);
+      expect(moves.single.to?.id, 'm6');
+      expect(moves.single.fixtureIds, ['m5', 'm6']);
+    });
+
+    test('with no next match the list gets shorter (still owed)', () {
+      final moves = BanPlan.movesFor(
+        fixtures[2],
+        [
+          ban(matches: 3, fixtureIds: ['m4', 'm5', 'm6']),
+        ],
+        fixtures,
+        now,
+      );
+      expect(moves.single.to, isNull);
+      expect(moves.single.fixtureIds, ['m5', 'm6']);
+      final status = BanStatus.of(
+        ban(matches: 3, fixtureIds: moves.single.fixtureIds),
+        fixtures,
+        now,
+      )!;
+      expect(status.left, 3);
+      expect(status.notInCalendar, 1);
+    });
+
+    test('lifted suspensions and other matches are left alone', () {
+      expect(
+        BanPlan.movesFor(fixtures[2], [ban(liftedAt: now)], fixtures, now),
+        isEmpty,
+      );
+      expect(BanPlan.movesFor(fixtures[1], [ban()], fixtures, now), isEmpty);
+    });
+  });
+
+  test('every kind of note has its own icon (Isaac, 11 Nov 2026)', () {
+    final icons = [for (final k in NotificationKind.values) noteKindIcon(k)];
+    expect(icons.toSet().length, NotificationKind.values.length);
+    expect(icons, isNot(contains(announcementIcon)));
   });
 
   group("The club's note", () {

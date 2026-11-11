@@ -19,7 +19,7 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
    - test steps he can do himself in the app
 5. **Before every commit**, run (and show the result):
    - `flutter analyze` → must be **0 issues**
-   - `cd test/rules && npm test` → **all** rules tests pass (426 after 3.1e1)
+   - `cd test/rules && npm test` → **all** rules tests pass (431 after 3.1e2)
    - `flutter test` → all Dart tests pass (layout smoke tests and the kit check)
 6. **Commit after each step** with a clear message, e.g.
    `feat(teams): change requests for name, short name, logo and competitions; 250 rules tests; docs v2.12`
@@ -86,7 +86,7 @@ Build one at a time, mockup first where it says so; details are in `docs/ROADMAP
 | # | Step | What it is | Mockup | Notes |
 |---|------|------------|--------|-------|
 | ✓ | **3.2** Lock and visibility | The FA views any team sheet; the opponent from the lock | — | Done 11 Nov 2026 |
-| 2 | **3.1e** Player suspensions | ✓ **3.1e1** suspend / lift, FA "Suspended" list, the club's rows and bell (SP1–SP3, SP5); **3.1e2** locked row on the sheet (SP4) + moving a ban when a match is postponed | **Approved** (`3.1e-player-suspensions.html`) | Answers in `DATA_MODEL.md` Section 7. 3.1e1 done 11 Nov 2026; **build 3.1e2 next** |
+| ✓ | **3.1e** Player suspensions | 3.1e1 suspend / lift, Suspended list, the club's rows and bell; 3.1e2 locked row on the sheet + moving a ban when a match is postponed; unique note icons | Approved | Done 11 Nov 2026. **Next: 3.5** |
 | 3 | **3.5** Match officials + referee Home | The FA appoints referee, 2 assistants, 4th official, commissioner (FA admin or referee) per fixture (`officials` map, bell notes); referee dashboard RD1; officials see **both sheets from the lock, with player IDs** (MC1) | MC1 approved (`3.6-match-day-check.html`); RD1 first | Referees' accounts exist (invites). The other team sees **Division photos** at the lock, juveniles without (MC3) |
 | 4 | **3.3** Official sheet as a PDF | Both teams' sheets with player IDs, kits, officials, captains' signature lines; `pdf` / `printing`; **no QR code** (Isaac) | MC4 approved | |
 | 5 | **3.6** Player check | "Check players": the **commissioner only** checks each face (big photo, number, ID): Matches / Doesn't match (note) / Absent; a mismatch is **recorded** for the FA and the report, not struck off (MC2, MC5) | MC2, MC5 approved | Photos via a separate locked-down copy, Storage rules too |
@@ -256,6 +256,12 @@ Build one at a time, mockup first where it says so; details are in `docs/ROADMAP
   `widgets/ban_widgets.dart` (`BanBanner`, `FaBanBar`, `liftBan`). Squad cards: `CardExtra.banLeft`. A 10-match suspension (12 writes) is
   tested within the rules limits. Rules changed: Isaac deploys to dev. **Next: 3.1e2** (sheet lock SP4 with `Fixture.isBanned`, rules on
   `banned` in `isValidTeamSheet` without new lookups, and moving marks when a match is postponed / matches added later).
+- **3.1e2** done (11 Nov 2026, 431 rules tests, 321 Dart tests): sheets refuse `fixture.banned[teamId]` (rules, no lookup); sheet rows
+  locked (`_PlayerRow.banNote`, `banMessage`), a saved sheet drops a newly suspended player. `suspensions/data/ban_mover.dart`
+  (`BanMover.moveOff`, `BanPlan.movesFor`) runs in **its own batch before** `FixtureRepository.postpone` / `cancel`: **the rules'
+  1000-expression limit counts every write of a batch together** (a postpone + the moves went over), so never add writes to a
+  postpone or match-change batch. Notes: `noteKindIcon(kind)` in `note_look.dart`, one icon per kind (test in
+  `player_suspension_test.dart`); a new kind needs a new, unused icon.
 - Calendar backdrop (`_CalendarBackdrop` in `match_calendar_card.dart`): GEDFA logo as a one-colour watermark (its letters are white,
   so tint it with `color` + `BlendMode.srcIn`). `assets/images/gedfa_logo.png` is now committed.
 - **Plan agreed 9 Nov 2026 (deadline Thu 12 Nov, 12:30 pm; Isaac's prompts in that conversation):** next, in order:

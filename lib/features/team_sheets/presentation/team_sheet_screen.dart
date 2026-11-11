@@ -25,6 +25,8 @@ import 'package:gedfa_connect/features/players/domain/player.dart';
 import 'package:gedfa_connect/features/players/domain/player_profile.dart';
 import 'package:gedfa_connect/features/players/domain/position.dart';
 import 'package:gedfa_connect/features/players/presentation/widgets/player_photo.dart';
+import 'package:gedfa_connect/features/suspensions/data/player_suspension_repository.dart';
+import 'package:gedfa_connect/features/suspensions/domain/player_suspension.dart';
 import 'package:gedfa_connect/features/team_sheets/data/team_sheet_repository.dart';
 import 'package:gedfa_connect/features/team_sheets/domain/sheet_picks.dart';
 import 'package:gedfa_connect/features/team_sheets/domain/sheet_roles.dart';
@@ -259,12 +261,23 @@ class _BuilderState extends ConsumerState<_Builder> {
         if (p.position == Position.gk) p.id,
     };
 
-    // A player picked on the saved sheet who is no longer approved drops off
+    // Suspended for this match (3.1e2, SP4): locked, and the rules refuse
+    // them. The marks are on the match; the details come from the bans.
+    final banned = {...?f.banned[team.id]};
+    final bans = ref.watch(myBansProvider);
+    final allowed = byId.keys.toSet().difference(banned);
+
+    // A player picked on the saved sheet who is no longer approved, or is
+    // now suspended for this match, drops off
     final savedPicks = saved == null
         ? const SheetPicks()
         : SheetPicks(starters: saved.starters, bench: saved.bench);
-    final fromSaved = savedPicks.keepOnly(byId.keys.toSet());
-    final dropped = savedPicks.size - fromSaved.size;
+    final fromSaved = savedPicks.keepOnly(allowed);
+    final bannedOff = [
+      for (final id in [...savedPicks.starters, ...savedPicks.bench])
+        if (banned.contains(id)) byId[id]?.fullName ?? 'A player',
+    ];
+    final dropped = savedPicks.size - fromSaved.size - bannedOff.length;
     final picks = _picks ?? fromSaved;
 
     // Roles: the team's choice, else the saved sheet's, else Profiles
@@ -311,6 +324,7 @@ class _BuilderState extends ConsumerState<_Builder> {
         _roles != null ||
         _officialPicks != null ||
         dropped > 0 ||
+        bannedOff.isNotEmpty ||
         (saved != null && saved.captainId == null);
 
     final due = f.sheetDueAt;
@@ -332,6 +346,10 @@ class _BuilderState extends ConsumerState<_Builder> {
     );
 
     void tap(Player p, Pick target) {
+      if (banned.contains(p.id)) {
+        AppToast.warning(context, banMessage(p, bans[p.id]));
+        return;
+      }
       if (_limitReached(p, picks, pickable)) {
         AppToast.warning(
           context,
@@ -374,7 +392,7 @@ class _BuilderState extends ConsumerState<_Builder> {
         _picks = SheetPicks(
           starters: l.starters,
           bench: l.bench,
-        ).keepOnly(byId.keys.toSet());
+        ).keepOnly(allowed);
         _roles = SheetRoles(
           captainId: l.captainId ?? armbands.captainId,
           viceCaptainId: l.captainId == null
@@ -500,6 +518,9 @@ class _BuilderState extends ConsumerState<_Builder> {
       pickable: pickable,
       waiting: waiting,
       dropped: dropped,
+      bannedOff: bannedOff,
+      banned: banned,
+      bans: bans,
       locked: locked,
       roles: roles,
       numbers: numbers,
@@ -772,6 +793,9 @@ class _BuilderState extends ConsumerState<_Builder> {
     required List<Player> pickable,
     required int waiting,
     required int dropped,
+    required List<String> bannedOff,
+    required Set<String> banned,
+    required Map<String, BanStatus> bans,
     required bool locked,
     required SheetRoles roles,
     required Map<String, int> numbers,
@@ -847,6 +871,16 @@ class _BuilderState extends ConsumerState<_Builder> {
             text:
                 'This sheet is locked: it closed 1 hour before '
                 'kick-off, or the match is no longer scheduled.',
+          ),
+        if (bannedOff.isNotEmpty)
+          _Banner(
+            tone: AccentTone.red,
+            icon: Icons.block_rounded,
+            text: bannedOff.length == 1
+                ? '${bannedOff.first} is suspended for this match and was '
+                      'taken off your saved sheet. Save again.'
+                : '${bannedOff.length} players are suspended for this match '
+                      'and were taken off your saved sheet. Save again.',
           ),
         if (dropped > 0)
           _Banner(
@@ -946,6 +980,11 @@ class _BuilderState extends ConsumerState<_Builder> {
                         picks.pickOf(p.id) == Pick.start,
                     enabled:
                         !locked && !_busy && !_limitReached(p, picks, pickable),
+                    banNote: !banned.contains(p.id)
+                        ? null
+                        : bans[p.id] == null
+                        ? 'Suspended for this match'
+                        : 'Suspended · ${bans[p.id]!.leftText}',
                     onTap: (target) => tap(p, target),
                   ),
               ],
@@ -1286,10 +1325,15 @@ class _PlayerRow extends StatelessWidget {
     this.limitNote,
     required this.benchOpen,
     required this.enabled,
+    this.banNote,
     required this.onTap,
   });
 
   final Player player;
+
+  /// "Suspended · 2 matches left" (3.1e2, SP4): the row is locked and a
+  /// tap says why.
+  final String? banNote;
 
   /// The shirt number for this match (the usual one unless changed).
   final int number;
@@ -1313,7 +1357,8 @@ class _PlayerRow extends StatelessWidget {
     final p = player;
     final away = profile != null && !profile!.isAvailable;
     final back = profile?.expectedBack;
-    return Padding(
+    final ban = banNote;
+    final row = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       child: Row(
         children: [
@@ -1365,6 +1410,7 @@ class _PlayerRow extends StatelessWidget {
                       FixtureTag(pill, tone: AccentTone.violet),
                     if (limitNote case final note?)
                       FixtureTag(note, tone: AccentTone.gold),
+                    if (ban != null) FixtureTag(ban, tone: AccentTone.red),
                     if (away)
                       FixtureTag(
                         back == null
@@ -1379,16 +1425,51 @@ class _PlayerRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 6),
-          _PickSwitch(
-            pick: pick,
-            benchOpen: benchOpen,
-            enabled: enabled,
-            onTap: onTap,
-          ),
+          if (ban != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.lock, size: 16, color: scheme.onSurfaceVariant),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Suspended',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            _PickSwitch(
+              pick: pick,
+              benchOpen: benchOpen,
+              enabled: enabled,
+              onTap: onTap,
+            ),
         ],
       ),
     );
+    if (ban == null) return row;
+    // Dimmed (MS2); a tap says why ("… returns Sat 5 Dec.")
+    return InkWell(
+      onTap: () => onTap(Pick.start),
+      child: Opacity(opacity: .5, child: row),
+    );
   }
+}
+
+/// "Kofi Boateng is suspended (red card) and returns Sat 5 Dec." (SP4)
+String banMessage(Player p, BanStatus? ban) {
+  if (ban == null) return '${p.fullName} is suspended for this match.';
+  final back = ban.returnMatch?.kickoffAt;
+  return '${p.fullName} is suspended '
+      '(${ban.suspension.reasonLabel.toLowerCase()})'
+      '${back == null ? ' for this match.' : ' and returns ${formatShortDate(back)}.'}';
 }
 
 class _Armband extends StatelessWidget {

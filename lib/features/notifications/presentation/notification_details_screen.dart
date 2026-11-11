@@ -125,7 +125,11 @@ class _DetailsCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final (icon, bg, ink) = noteIcon(context, noteTarget(note).look);
+    final (icon, bg, ink) = noteIcon(
+      context,
+      noteTarget(note).look,
+      icon: noteKindIcon(note.kind),
+    );
     final time = note.updatedAt;
 
     return Card(

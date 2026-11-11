@@ -23,6 +23,7 @@ class _Item {
   const _Item({
     required this.id,
     required this.look,
+    required this.icon,
     required this.title,
     required this.body,
     required this.time,
@@ -33,6 +34,9 @@ class _Item {
 
   final String id;
   final NoteLook look;
+
+  /// The note kind's own icon (or the announcement megaphone).
+  final IconData icon;
   final String title;
   final String body;
   final DateTime? time;
@@ -123,6 +127,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         _Item(
           id: a.id,
           look: NoteLook.fa,
+          icon: announcementIcon,
           title: a.title,
           body: a.body,
           time: a.createdAt,
@@ -258,6 +263,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     return _Item(
       id: n.id,
       look: noteTarget(n).look,
+      icon: noteKindIcon(n.kind),
       title: n.title,
       body: n.body,
       time: n.updatedAt,
@@ -279,7 +285,7 @@ class _ItemCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final (icon, bg, ink) = noteIcon(context, item.look);
+    final (icon, bg, ink) = noteIcon(context, item.look, icon: item.icon);
 
     final background = unread
         ? (isDark ? const Color(0xFF172C47) : const Color(0xFFF3F8FE))

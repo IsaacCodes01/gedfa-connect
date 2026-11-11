@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.35, matches the rules after step 3.1e1, player suspensions by the FA (11 Nov 2026)
+**Status:** v2.36, matches the rules after step 3.1e2, suspended players locked on team sheets (11 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -669,7 +669,7 @@ One match. Made by the FA (one at a time in 3.0a; "Make the season" and cups fol
 | `teamIds` | array | `[home.id, away.id]`, exactly (teams query their matches with `array-contains`) |
 | `home`, `away` | map | `{ id, name, shortName, logoUrl, colour }`: a **copy** of the team (teams can't read other teams). The rules check it matches the team document as it is now, and that the team plays this competition. In a **juvenile** match a club in both competitions is copied with its juvenile side's name: `juvenileName` / `juvenileShortName`, or `name` + " B" / `shortName` + " B" (rules `sideNamesOf`, app `side_name.dart`). A short name ending in " B" marks a "B" side (gold ring on its crest) |
 | `kits` | map | `{ home, away, homeGk, awayGk }`, each `{ slot, kit }`: which of the team's kits it wears and that kit **exactly as on the team** (juvenile kits for a club in both competitions). Outfield slots `home`/`away`/`third`, goalkeeper slots `goalkeeper`/`goalkeeper2` |
-| `banned` | map? | **3.1e1:** team ID → the IDs of its players **suspended for this match** (`playerSuspensions`). Only the FA writes it, alone (nothing else in the match changes), in the same batch as the suspension or its lift; a new match has none; a normal change keeps it as it is. At most 4 keys, 30 players each. Team sheets check it in 3.1e2 |
+| `banned` | map? | **3.1e1:** team ID → the IDs of its players **suspended for this match** (`playerSuspensions`). Only the FA writes it, alone (nothing else in the match changes), in its own write (with the suspension, its lift, or the move off a postponed match); a new match has none; a normal change, a postpone or a cancel keeps it as it is. At most 4 keys, 30 players each. **Team sheets** may not pick anyone in it (3.1e2) |
 | `previousNames` | map? | **JSc2:** team ID → `{ name, until }`: the team's name in this match before the FA approved a new club name or juvenile side name, and when (the gold "Previously …" pill and its note, for everyone). Only the FA's rename sets it; a new match has none; a normal change keeps it as it is |
 | `kickoffAt` | timestamp? | Empty only while **postponed** with no new date |
 | `venue` | string | 2–80; the home team's ground unless the FA changes it |
@@ -704,7 +704,8 @@ One match. Made by the FA (one at a time in 3.0a; "Make the season" and cups fol
 - **Suspend (FA), one batch:** create the suspension + `fixtures/{id}.banned.{teamId}` gets the player (arrayUnion) on each of `fixtureIds` + `playerSuspended` in the club's bell ("Kofi Boateng suspended for 2 matches — Red card. Misses …; Returns Sat 5 Dec, against Ojobi Rangers.", `targetId` = the player).
 - **Lift (FA), one batch:** the lift fields + the player off `banned` on each of `fixtureIds` (arrayRemove) + `playerSuspensionLifted` in the club's bell.
 - **Matches left** (app, `BanStatus`): `matches` minus the listed matches that are **played** (kick-off + 2 h, scheduled). A postponed or cancelled one is not served; matches not in the calendar yet keep it going. It ends by itself after the last one. The return match is the club's next scheduled match in that competition after the missed ones.
-- **Later (3.1e2):** the sheet refuses a player in `banned`; a postponed match moves its marks to the club's next match.
+- **Team sheets (3.1e2):** a sheet may not pick a player in its match's `banned` for the team (rules, no extra lookup). On the sheet the row is locked ("Suspended · 2 matches left", a tap says why); a saved sheet with a player suspended since drops them (red note, Save again).
+- **Postponed or cancelled (3.1e2), one batch of its own just BEFORE the postpone or cancel** (a batch counts all its writes against the rules' 1000-expression limit; a postpone is already near it): the match's `banned` goes, each suspension that listed it gets the club's next scheduled match in that competition it doesn't list yet (`fixtureIds` changes alone, never longer than `matches`), and that match gets the mark. No next match: the list just gets shorter (still owed, "not in the calendar yet"). If the postpone then fails, a retry finds nothing left to move. A whole league postponed together keeps the order, so nothing moves.
 
 ### 2.15a `fixtureDrafts/{draftId}` — "Make the season" drafts (3.0b)
 
@@ -814,6 +815,7 @@ These changes always happen together in **one batch** (all succeed or none do):
 | Save a screening day (FA)             | create `announcements/{id}` (`to: juvenile`) + create `screeningDays/{id}` pointing to it      |
 | Cancel a screening day (FA)           | delete the day + delete its announcement + create a "Screening cancelled" announcement        |
 | Suspend a player (FA, 3.1e1)          | create `playerSuspensions/{id}` + add the player to `banned.{teamId}` on each match to miss + team notification `playerSuspended` |
+| Move suspensions off a match (FA, 3.1e2, before a postpone / cancel) | delete `banned` on that match + update each suspension's `fixtureIds` + add the players to `banned` on their new matches (one write per match) |
 | Lift a player's suspension (FA)       | update the suspension (lift fields) + take the player off `banned.{teamId}` on those matches + team notification `playerSuspensionLifted` |
 
 **Photos and batches.** Storage files can't be part of a Firestore batch, so a player's photo is handled around it:
@@ -955,6 +957,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 11 Nov 2026 | v2.36 (3.1e2): team sheets refuse players in the match's `banned`; a suspension's `fixtureIds` may change alone (FA, never longer than `matches`, not once lifted) when its match is postponed or cancelled, in a batch of its own before the postpone. Every notification kind has its own icon (app only). 431 rules tests. |
 | 11 Nov 2026 | v2.35 (3.1e1): `playerSuspensions/{id}` (any FA official suspends an approved player for 1–10 matches with a reason; lifted early with why), `fixtures.banned` (team ID → suspended player IDs, FA only, alone, same batch), notification kinds `playerSuspended` / `playerSuspensionLifted` and the optional `targetId`. 426 rules tests. |
 | 11 Nov 2026 | v2.34.3: Section 7, Isaac's answers on match day (3.5, 3.3, 3.6): IDs from the lock, face check by the commissioner only, Division photos for the other team, a mismatch recorded. |
 | 11 Nov 2026 | v2.34.2: fix: team sheets could not be saved when `settings/league` was never saved (3.1d2 read it without `exists()`); a U17 match reads its U17 list with one get instead. 412 rules tests. |

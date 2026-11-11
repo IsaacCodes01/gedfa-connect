@@ -14,6 +14,7 @@ import 'package:gedfa_connect/features/fixtures/domain/season_plan.dart';
 import 'package:gedfa_connect/features/notifications/data/notification_writer.dart';
 import 'package:gedfa_connect/features/notifications/domain/app_notification.dart';
 import 'package:gedfa_connect/features/players/domain/age_group.dart';
+import 'package:gedfa_connect/features/suspensions/data/ban_mover.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/teams/domain/kit.dart';
 import 'package:gedfa_connect/features/teams/domain/kit_slot.dart';
@@ -497,6 +498,10 @@ class FixtureRepository {
     DateTime? newKickoff,
     required User by,
   }) async {
+    // Suspended players move to their next match first (3.1e2): its own
+    // small batch (a batch shares the rules' 1000-expression limit, and
+    // the postpone is near it). A retry finds nothing left to move.
+    await BanMover(_db).moveOff(f);
     final fresh = await _freshTeams(f);
     final batch = _db.batch()
       ..update(_fixtures.doc(f.id), {
@@ -691,6 +696,8 @@ class FixtureRepository {
     required String reason,
     required User by,
   }) async {
+    // Suspended players move to their next match first (3.1e2)
+    await BanMover(_db).moveOff(f);
     final fresh = await _freshTeams(f);
     final batch = _db.batch()
       ..update(_fixtures.doc(f.id), {

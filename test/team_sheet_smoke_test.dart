@@ -19,6 +19,8 @@ import 'package:gedfa_connect/features/players/domain/age_group.dart';
 import 'package:gedfa_connect/features/players/domain/player.dart';
 import 'package:gedfa_connect/features/players/domain/player_profile.dart';
 import 'package:gedfa_connect/features/players/domain/position.dart';
+import 'package:gedfa_connect/features/suspensions/data/player_suspension_repository.dart';
+import 'package:gedfa_connect/features/suspensions/domain/player_suspension.dart';
 import 'package:gedfa_connect/features/team_sheets/data/team_sheet_repository.dart';
 import 'package:gedfa_connect/features/team_sheets/domain/team_sheet.dart';
 import 'package:gedfa_connect/features/team_sheets/presentation/team_sheet_screen.dart';
@@ -91,7 +93,10 @@ KitChoice _kit(KitSlot slot) => KitChoice(
   raw: const {},
 );
 
-Fixture _match({AgeGroup? ageGroup}) => Fixture(
+Fixture _match({
+  AgeGroup? ageGroup,
+  Map<String, List<String>> banned = const {},
+}) => Fixture(
   id: 'm1',
   season: '2026-27',
   competitionId: ageGroup == null
@@ -121,6 +126,7 @@ Fixture _match({AgeGroup? ageGroup}) => Fixture(
   kickoffAt: DateTime.now().add(const Duration(days: 4)),
   venue: 'Apam Park',
   status: FixtureStatus.scheduled,
+  banned: banned,
 );
 
 const _positions = [
@@ -185,6 +191,8 @@ Future<void> _pump(
   Map<String, TeamSheet> sheets = const {},
   List<Player> extraPlayers = const [],
   DivisionJuveniles named = const DivisionJuveniles(),
+  Map<String, List<String>> banned = const {},
+  List<PlayerSuspension> suspensions = const [],
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -207,7 +215,12 @@ Future<void> _pump(
           (ref) => Stream.value(const LeagueSettings()),
         ),
         fixtureProvider.overrideWith(
-          (ref, id) => Stream.value(_match(ageGroup: group)),
+          (ref, id) => Stream.value(_match(ageGroup: group, banned: banned)),
+        ),
+        // Player suspensions (3.1e2)
+        mySuspensionsProvider.overrideWith((ref) => Stream.value(suspensions)),
+        myFixturesProvider.overrideWith(
+          (ref) => Stream.value([_match(ageGroup: group, banned: banned)]),
         ),
         teamPlayersProvider.overrideWith(
           (ref) => Stream.value([..._players(group: group), ...extraPlayers]),
@@ -270,6 +283,40 @@ void main() {
       );
     });
   }
+
+  testWidgets('3.1e2 (SP4): a suspended player is locked, and a tap says why', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      const Size(360, 1600),
+      Brightness.dark,
+      banned: {
+        'ruf': ['p1'],
+      },
+      suspensions: const [
+        PlayerSuspension(
+          id: 'b1',
+          playerId: 'p1',
+          playerName: 'Kwabena Mensah-Bonsu Asamoah 1',
+          teamId: 'ruf',
+          teamName: 'Royal Unique FC',
+          season: '2026-27',
+          competition: BanCompetition.division(),
+          reason: BanReason.redCard,
+          matches: 2,
+          fixtureIds: ['m1'],
+        ),
+      ],
+    );
+    _noError(tester);
+    expect(find.text('Suspended · 2 matches left'), findsOneWidget);
+    expect(find.text('Suspended'), findsOneWidget);
+    await tester.tap(find.text('Suspended · 2 matches left'));
+    await tester.pump();
+    expect(find.textContaining('is suspended (red card)'), findsOneWidget);
+    await tester.pumpAndSettle(const Duration(seconds: 5));
+  });
 
   testWidgets('laptop: the list fits', (tester) async {
     await _pump(tester, const Size(1280, 800), Brightness.light);

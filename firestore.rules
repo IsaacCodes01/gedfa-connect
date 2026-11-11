@@ -1381,7 +1381,11 @@ service cloud.firestore {
           // so a rename doesn't spend the 1000-expression limit here
           && request.resource.data.get('previousNames', null)
                == resource.data.get('previousNames', null)
-          // Suspension marks change only with a suspension (below)
+          // Suspension marks change only on their own (isBanningMatch,
+          // below): with a suspension, its lift, or a move off a postponed
+          // match (3.1e2, in a batch of its own just before the postpone:
+          // one batch counts all its writes against the 1000-expression
+          // limit, and a postpone is already near it)
           && request.resource.data.get('banned', null)
                == resource.data.get('banned', null)
           && resource.data.status != 'cancelled'
@@ -2381,6 +2385,8 @@ service cloud.firestore {
               ? divisionPicksOk(sheet.teamId, picked)
               : pickableIds(sheet.teamId, fixture).hasAll(picked)
                   && playUpOk(sheet.teamId, fixture, picked))
+          // Nobody suspended for this match (3.1e2)
+          && !picked.hasAny(fixture.get('banned', {}).get(sheet.teamId, []))
           && hasValidSheetRoles(sheet, starters, picked)
           // A copy of each picked player, nobody else (3.2)
           && sheet.players is map
@@ -2466,6 +2472,14 @@ service cloud.firestore {
 
         allow create: if isFaAdmin()
           && isValidPlayerSuspension(request.resource.data);
+
+        // 3.1e2: its matches change when one is postponed or cancelled
+        // (the FA's postpone, same batch); never more than the number
+        allow update: if isFaAdmin()
+          && !('liftedAt' in resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fixtureIds'])
+          && request.resource.data.fixtureIds is list
+          && request.resource.data.fixtureIds.size() <= resource.data.matches;
 
         // Lifted early, once, with why ("Other" needs a note)
         allow update: if isFaAdmin()
