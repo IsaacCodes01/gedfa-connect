@@ -15,6 +15,9 @@ import 'package:gedfa_connect/features/fixtures/data/fixture_repository.dart';
 import 'package:gedfa_connect/features/fixtures/domain/fixture.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/widgets/fixture_row.dart';
 import 'package:gedfa_connect/features/league/data/league_settings_repository.dart';
+import 'package:gedfa_connect/features/players/data/division_juveniles_repository.dart';
+import 'package:gedfa_connect/features/players/domain/division_juveniles.dart';
+import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/players/data/player_profile_repository.dart';
 import 'package:gedfa_connect/features/players/data/player_repository.dart';
 import 'package:gedfa_connect/features/players/domain/age_group.dart';
@@ -146,7 +149,13 @@ class _BuilderState extends ConsumerState<_Builder> {
 
   /// The players who may go on this sheet: approved, this competition;
   /// in a juvenile match, its age group and the younger ones (playing up).
-  bool _canPlay(Player p) {
+  bool _canPlay(Player p, DivisionJuveniles named) {
+    // A Division match: the Division squad and the club's juveniles in
+    // the Division (3.1d2)
+    if (f.category == Competition.division) {
+      return p.category == Competition.division ||
+          (p.isJuvenile && named.contains(p.id));
+    }
     if (p.category != f.category) return false;
     if (f.ageGroup == null) return true;
     final group = p.ageGroup;
@@ -229,9 +238,12 @@ class _BuilderState extends ConsumerState<_Builder> {
     final teamOfficials =
         ref.watch(myTeamDetailsProvider).value?.officials ?? const <Official>[];
 
+    final named =
+        ref.watch(myDivisionJuvenilesProvider).value ??
+        const DivisionJuveniles();
     final mine = [
       for (final p in widget.players)
-        if (_canPlay(p)) p,
+        if (_canPlay(p, named)) p,
     ];
     final pickable = [
       for (final p in mine)
@@ -309,6 +321,8 @@ class _BuilderState extends ConsumerState<_Builder> {
       roles: roles,
       numbers: numbers,
       officialsReady: officialsReady,
+      matchGroup: f.ageGroup,
+      groupOf: {for (final p in pickable) p.id: ?p.ageGroup},
       notAvailable: {
         for (final p in pickable)
           if (!(profiles[p.id]?.isAvailable ?? true)) p.id: p.fullName,
@@ -316,6 +330,15 @@ class _BuilderState extends ConsumerState<_Builder> {
     );
 
     void tap(Player p, Pick target) {
+      if (_limitReached(p, picks, pickable)) {
+        AppToast.warning(
+          context,
+          '${p.ageGroup!.label} limit reached: at most '
+          '${playUpLimit(f.ageGroup, p.ageGroup)} in a '
+          '${f.ageGroup!.label} match. Take one off first.',
+        );
+        return;
+      }
       final result = target == Pick.start
           ? picks.tapStart(p.id)
           : picks.tapBench(p.id, widget.limits);
@@ -399,6 +422,7 @@ class _BuilderState extends ConsumerState<_Builder> {
       numbers: numbers,
       roles: roles,
       officials: sheetOfficials,
+      matchGroup: f.ageGroup,
     );
 
     // The checks in words (MS5): what is wrong in red, what is right in
@@ -411,7 +435,11 @@ class _BuilderState extends ConsumerState<_Builder> {
       for (final p in [...check.problems, ...check.roleProblems])
         (AccentTone.red, p),
       if (check.canSave) ...[
-        (AccentTone.green, '${picks.size} players, all approved by GEDFA'),
+        (
+          AccentTone.green,
+          '${picks.size} players, all approved by GEDFA'
+              '${f.category == Competition.division && [...starters, ...bench].any((p) => p.isJuvenile) ? ' · ${[...starters, ...bench].where((p) => p.isJuvenile).length} from your juveniles in the Division' : ''}',
+        ),
         (
           AccentTone.green,
           '${picks.starters.length} starting with a goalkeeper · '
@@ -780,9 +808,17 @@ class _BuilderState extends ConsumerState<_Builder> {
       for (final g in PositionGroup.values) {
         final list = [
           for (final p in shown)
-            if (p.positionGroup == g) p,
+            if (!p.isJuvenile && p.positionGroup == g) p,
         ];
         if (list.isNotEmpty) sections.add((_plural(g), list));
+      }
+      // The club's juveniles in the Division (3.1d2, DJ3)
+      final juveniles = [
+        for (final p in shown)
+          if (p.isJuvenile) p,
+      ];
+      if (juveniles.isNotEmpty) {
+        sections.add((_juvenilesTitle, juveniles));
       }
     }
 
@@ -823,6 +859,19 @@ class _BuilderState extends ConsumerState<_Builder> {
           picks: picks,
           limits: widget.limits,
           hasKeeper: roles.goalkeeperId != null,
+          // "U15 3 / 5", "U13 1 / 1" in a U17 match (MS6)
+          playUp: [
+            for (final g in AgeGroup.values)
+              if (playUpLimit(f.ageGroup, g) case final limit?)
+                (
+                  g.label,
+                  [
+                    for (final p in pickable)
+                      if (p.ageGroup == g && picks.pickOf(p.id) != Pick.out) p,
+                  ].length,
+                  limit,
+                ),
+          ],
         ),
         const SizedBox(height: 10),
         Row(
@@ -842,9 +891,7 @@ class _BuilderState extends ConsumerState<_Builder> {
               OutlinedButton.icon(
                 // The theme's buttons are full-width; in a row that breaks
                 // the layout (the search box vanished on the web)
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(0, 48),
-                ),
+                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
                 onPressed: onUseLast,
                 icon: const Icon(Icons.content_copy, size: 17),
                 label: const Text('Use last sheet'),
@@ -880,16 +927,29 @@ class _BuilderState extends ConsumerState<_Builder> {
                     pick: picks.pickOf(p.id),
                     badge: badge(p.id),
                     profile: profiles[p.id],
-                    playingUp: f.ageGroup != null && p.ageGroup != f.ageGroup,
+                    agePill: p.ageGroup == null || p.ageGroup == f.ageGroup
+                        ? null
+                        : f.ageGroup == null
+                        ? p.ageGroup!.label
+                        : '${p.ageGroup!.label} ↑',
+                    limitNote: _limitReached(p, picks, pickable)
+                        ? '${p.ageGroup!.label} limit reached'
+                        : null,
                     benchOpen:
                         picks.starters.length >= SheetLimits.eleven ||
                         picks.pickOf(p.id) == Pick.start,
-                    enabled: !locked && !_busy,
+                    enabled:
+                        !locked && !_busy && !_limitReached(p, picks, pickable),
                     onTap: (target) => tap(p, target),
                   ),
               ],
             ),
           ),
+          if (title == _juvenilesTitle)
+            const _Hint(
+              'Your juveniles in the Division, from Squad. Change the list '
+              'there.',
+            ),
         ],
         if (waiting > 0)
           Padding(
@@ -922,6 +982,21 @@ class _BuilderState extends ConsumerState<_Builder> {
           ),
       ],
     );
+  }
+
+  static const _juvenilesTitle = 'Juveniles (Division list)';
+
+  /// [p] is not picked and their age group already plays up as many as the
+  /// GFA allows in this match (MS6).
+  bool _limitReached(Player p, SheetPicks picks, List<Player> pickable) {
+    if (picks.pickOf(p.id) != Pick.out) return false;
+    final limit = playUpLimit(f.ageGroup, p.ageGroup);
+    if (limit == null) return false;
+    final count = [
+      for (final o in pickable)
+        if (o.ageGroup == p.ageGroup && picks.pickOf(o.id) != Pick.out) o,
+    ].length;
+    return count >= limit;
   }
 
   static String _plural(PositionGroup g) => switch (g) {
@@ -1107,10 +1182,14 @@ class _Checks extends StatelessWidget {
     required this.picks,
     required this.limits,
     required this.hasKeeper,
+    this.playUp = const [],
   });
 
   final SheetPicks picks;
   final SheetLimits limits;
+
+  /// Playing up in this match: (age group, picked, limit), MS6.
+  final List<(String, int, int)> playUp;
 
   /// A goalkeeper starts: picked in step 2, or the only registered
   /// goalkeeper in the 11.
@@ -1138,6 +1217,11 @@ class _Checks extends StatelessWidget {
           FixtureTag(
             room <= 0 ? 'Bench full' : '$room more fit on the bench',
             tone: room <= 0 ? AccentTone.gold : AccentTone.grey,
+          ),
+        for (final (group, count, limit) in playUp)
+          FixtureTag(
+            '$group $count / $limit',
+            tone: count >= limit ? AccentTone.gold : AccentTone.violet,
           ),
       ],
     );
@@ -1192,7 +1276,8 @@ class _PlayerRow extends StatelessWidget {
     required this.pick,
     required this.badge,
     required this.profile,
-    required this.playingUp,
+    required this.agePill,
+    this.limitNote,
     required this.benchOpen,
     required this.enabled,
     required this.onTap,
@@ -1205,7 +1290,13 @@ class _PlayerRow extends StatelessWidget {
   final Pick pick;
   final String? badge;
   final PlayerProfile? profile;
-  final bool playingUp;
+
+  /// "U13 ↑" playing up in a juvenile match, "U15" for a juvenile on a
+  /// Division sheet; null for the match's own players.
+  final String? agePill;
+
+  /// "U13 limit reached" (MS6): this player can't be picked now.
+  final String? limitNote;
   final bool benchOpen;
   final bool enabled;
   final void Function(Pick target) onTap;
@@ -1264,11 +1355,10 @@ class _PlayerRow extends StatelessWidget {
                         color: scheme.onSurfaceVariant,
                       ),
                     ),
-                    if (playingUp && p.ageGroup != null)
-                      FixtureTag(
-                        '${p.ageGroup!.label} ↑',
-                        tone: AccentTone.violet,
-                      ),
+                    if (agePill case final pill?)
+                      FixtureTag(pill, tone: AccentTone.violet),
+                    if (limitNote case final note?)
+                      FixtureTag(note, tone: AccentTone.gold),
                     if (away)
                       FixtureTag(
                         back == null

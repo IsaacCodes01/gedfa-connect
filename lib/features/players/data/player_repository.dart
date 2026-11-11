@@ -350,6 +350,16 @@ class PlayerRepository {
         : null;
     final leavesSquad = squad != null &&
         isOnSquad(await squad.get().timeout(_timeout), before.id);
+    // A juvenile named for the Division leaves that list too (3.1d2): it
+    // only holds approved juveniles, and the rules check it
+    final divisionList = leavesSquad && before.isJuvenile
+        ? squadRef(_db, before.teamId, 'divisionJuveniles')
+        : null;
+    final leavesDivisionList = divisionList != null &&
+        ((await divisionList.get().timeout(_timeout)).data()?['players']
+                as Map?)
+            ?.containsKey(before.id) ==
+            true;
 
     final urls = newPhoto == null
         ? null
@@ -410,6 +420,17 @@ class PlayerRepository {
     }
 
     if (leavesSquad) batch.update(squad, squadRemoval(before.id));
+    if (leavesDivisionList) {
+      batch.update(divisionList, squadRemoval(before.id));
+      NotificationWriter(_db).forFaInBatch(
+        batch,
+        kind: NotificationKind.divisionJuveniles,
+        teamId: after.teamId,
+        teamName: after.teamName,
+        name: '− ${after.fullName.trim()} (${before.ageGroup?.label ?? ''}, '
+            'corrected: waits for screening)',
+      );
+    }
 
     if (jerseyChanged) {
       batch

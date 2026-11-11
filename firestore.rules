@@ -2126,6 +2126,15 @@ service cloud.firestore {
           || getAfter(path).data.players.get(playerId, false) != true;
       }
 
+      // After this write, a juvenile is not on their club's juveniles in
+      // the Division (3.1d2); always true for a Division player
+      function notInDivisionJuvenilesAfter(player, playerId) {
+        let path = squadDoc(player.teamId, 'divisionJuveniles');
+        return player.category != 'juvenile'
+          || !existsAfter(path)
+          || getAfter(path).data.players.get(playerId, null) == null;
+      }
+
       // The FA adds exactly one player, approved in this write (or before:
       // repairing a list), of this team and this competition or age group.
       function isSquadAdd(squadId) {
@@ -2157,7 +2166,10 @@ service cloud.firestore {
           && resource.data.players.diff(after.players).addedKeys().size() == 1
           && after.updatedAt == request.time
           && player.status != 'approved'
-          && player.teamId == resource.data.teamId;
+          && player.teamId == resource.data.teamId
+          // 3.1d2: a juvenile leaving their age list leaves the club's
+          // juveniles in the Division too (that list holds approved ones)
+          && notInDivisionJuvenilesAfter(player, after.changed);
       }
 
       // ---- Juveniles in the Division (3.1d1) ----
@@ -2241,6 +2253,26 @@ service cloud.firestore {
                       .concat(squadIds(teamId, 'U17'))));
       }
 
+      // 3.1d2: on a Division sheet, every player not on the Division list
+      // must be one of the club's juveniles in the Division. That list only
+      // holds approved juveniles: naming checks it, and a juvenile sent back
+      // to pending leaves it in the same batch (see the team's player
+      // update). One lookup, only when a juvenile is picked.
+      function divisionPicksOk(teamId, picked) {
+        let others = picked.toSet().difference(squadIds(teamId, 'division').toSet());
+        return others.size() == 0
+          || others.difference(squadIds(teamId, 'divisionJuveniles').toSet()).size() == 0;
+      }
+
+      // 3.1d2 (MS6, GFA): in a U17 match at most 1 U13 and 5 U15 play up.
+      // (U13 in a U15 match: no limit until GEDFA says one.)
+      function playUpOk(teamId, fixture, picked) {
+        let set = picked.toSet();
+        return fixture.get('ageGroup', '') != 'U17'
+          || (set.intersection(squadIds(teamId, 'U13').toSet()).size() <= 1
+              && set.intersection(squadIds(teamId, 'U15').toSet()).size() <= 5);
+      }
+
       // Shirt numbers on a team sheet (3.1b): 1 to 99
       function shirtNumbers() {
         return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
@@ -2274,6 +2306,20 @@ service cloud.firestore {
           && officials[1].role == 'headCoach';
       }
 
+      // A sheet save is near the rules' limit of 10 document lookups (a
+      // U17 match reads 3 age lists, and exists() + get() of one document
+      // count as 2). So the user and League settings are read with ONE
+      // get each: a missing document makes the get fail, which refuses the
+      // save (settings/league always exists once the season is set up).
+      function isSheetTeamAdmin(teamId) {
+        let user = get(userDoc(request.auth.uid)).data;
+        return user.get('role', '') == 'teamAdmin' && user.get('teamId', '') == teamId;
+      }
+
+      function sheetLeagueValue(field, fallback) {
+        return get(leagueDoc()).data.get(field, fallback);
+      }
+
       function isValidTeamSheet(sheetId, sheet) {
         let fixture = get(fixtureDoc(sheet.fixtureId)).data;
         let starters = sheet.starters;
@@ -2287,7 +2333,8 @@ service cloud.firestore {
                                   'starters', 'bench', 'captainId', 'goalkeeperId',
                                   'numbers', 'officials', 'savedBy', 'savedAt'])
           && sheetId == sheet.fixtureId + '_' + sheet.teamId
-          && isTeamAdminOf(sheet.teamId)
+          && request.auth != null
+          && isSheetTeamAdmin(sheet.teamId)
           && !isSuspended(sheet.teamId)
           // The match: scheduled, ours, not locked yet (1 hour before)
           && fixture.status == 'scheduled'
@@ -2298,14 +2345,17 @@ service cloud.firestore {
           && sheet.get('ageGroup', null) == fixture.get('ageGroup', null)
           // 7 to 11 starting; a bench only with 11 starting; 18 at most
           && starters is list && bench is list
-          && starters.size() >= leagueValue('minPlayers', 7)
+          && starters.size() >= sheetLeagueValue('minPlayers', 7)
           && starters.size() <= 11
           && bench.size() <= 7
           && (bench.size() == 0 || starters.size() == 11)
-          && picked.size() <= leagueValue('matchdaySquad', 18)
+          && picked.size() <= sheetLeagueValue('matchdaySquad', 18)
           && picked.toSet().size() == picked.size()
           // Approved players of this team and competition only
-          && pickableIds(sheet.teamId, fixture).hasAll(picked)
+          && (fixture.category == 'division'
+              ? divisionPicksOk(sheet.teamId, picked)
+              : pickableIds(sheet.teamId, fixture).hasAll(picked)
+                  && playUpOk(sheet.teamId, fixture, picked))
           && hasValidSheetRoles(sheet, starters, picked)
           && sheet.savedBy == request.auth.uid
           && sheet.savedAt == request.time;

@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gedfa_connect/features/players/domain/age_group.dart';
 import 'package:gedfa_connect/features/team_sheets/domain/sheet_picks.dart';
 
 /// Team sheet picks (3.1a2): the 11 | Bench taps and the checks. The same
@@ -98,6 +99,25 @@ void main() {
       final picks = full(bench: ['p12']).tapStart('p11').picks;
       final c = SheetCheck.of(picks, limits);
       expect(c.problems.single, contains('bench needs 11'));
+    });
+
+    test('play-up limits (MS6): 1 U13 and 5 U15 in a U17 match only', () {
+      expect(playUpLimit(AgeGroup.u17, AgeGroup.u13), 1);
+      expect(playUpLimit(AgeGroup.u17, AgeGroup.u15), 5);
+      expect(playUpLimit(AgeGroup.u17, AgeGroup.u17), isNull);
+      expect(playUpLimit(AgeGroup.u15, AgeGroup.u13), isNull);
+      expect(playUpLimit(null, AgeGroup.u13), isNull);
+    });
+
+    test('two U13 in a U17 match cannot be saved', () {
+      final c = SheetCheck.of(
+        full(),
+        limits,
+        matchGroup: AgeGroup.u17,
+        groupOf: {'p2': AgeGroup.u13, 'p3': AgeGroup.u13},
+      );
+      expect(c.canGoOn, isFalse);
+      expect(c.problems.single, contains('At most 1 U13'));
     });
 
     test('injured or unavailable players can be picked, with a warning', () {

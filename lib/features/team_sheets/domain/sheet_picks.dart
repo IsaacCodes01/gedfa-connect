@@ -1,6 +1,19 @@
 import 'dart:math' as math;
 
+import 'package:gedfa_connect/features/players/domain/age_group.dart';
 import 'package:gedfa_connect/features/team_sheets/domain/sheet_roles.dart';
+
+/// The GFA play-up limit in a juvenile match (3.1d2, mockup MS6): in a U17
+/// match at most 1 U13 and 5 U15 may play up. Null = no limit (the match's
+/// own group, a U15 match until GEDFA gives one, or a Division match,
+/// whose juveniles have their own limits on the club's list).
+int? playUpLimit(AgeGroup? match, AgeGroup? player) => match == AgeGroup.u17
+    ? switch (player) {
+        AgeGroup.u13 => 1,
+        AgeGroup.u15 => 5,
+        _ => null,
+      }
+    : null;
 
 /// Where a player is on the sheet.
 enum Pick { out, start, bench }
@@ -144,6 +157,8 @@ class SheetCheck {
     Map<String, int> numbers = const {},
     bool officialsReady = true,
     Map<String, String> notAvailable = const {},
+    AgeGroup? matchGroup,
+    Map<String, AgeGroup> groupOf = const {},
   }) {
     final problems = <String>[];
     final roleProblems = <String>[];
@@ -166,6 +181,21 @@ class SheetCheck {
     }
     if (picks.bench.length > limits.maxBench) {
       problems.add('Bench: ${limits.maxBench} at most.');
+    }
+    // Playing up (MS6): e.g. "At most 1 U13 may play up in a U17 match"
+    for (final g in AgeGroup.values) {
+      final limit = playUpLimit(matchGroup, g);
+      if (limit == null) continue;
+      final count = [
+        ...picks.starters,
+        ...picks.bench,
+      ].where((id) => groupOf[id] == g).length;
+      if (count > limit) {
+        problems.add(
+          'At most $limit ${g.label} may play up in a '
+          '${matchGroup!.label} match: take ${count - limit} off.',
+        );
+      }
     }
 
     if (roles.captainId == null) {

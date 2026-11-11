@@ -11,6 +11,8 @@ import 'package:gedfa_connect/features/fixtures/data/fixture_repository.dart';
 import 'package:gedfa_connect/features/fixtures/domain/fixture.dart';
 import 'package:gedfa_connect/features/league/data/league_settings_repository.dart';
 import 'package:gedfa_connect/features/league/domain/league_settings.dart';
+import 'package:gedfa_connect/features/players/data/division_juveniles_repository.dart';
+import 'package:gedfa_connect/features/players/domain/division_juveniles.dart';
 import 'package:gedfa_connect/features/players/data/player_profile_repository.dart';
 import 'package:gedfa_connect/features/players/data/player_repository.dart';
 import 'package:gedfa_connect/features/players/domain/age_group.dart';
@@ -149,7 +151,11 @@ List<Player> _players({AgeGroup? group}) => [
       teamId: 'ruf',
       teamName: 'Royal Unique FC',
       category: group == null ? Competition.division : Competition.juvenile,
-      ageGroup: group == null ? null : (i == 5 ? AgeGroup.u13 : group),
+      ageGroup: group == null
+          ? null
+          : (i == 5 || (group == AgeGroup.u17 && i == 6)
+                ? AgeGroup.u13
+                : group),
       fullName: 'Kwabena Mensah-Bonsu Asamoah $i',
       dob: DateTime(2000),
       position: _positions[i],
@@ -177,6 +183,8 @@ Future<void> _pump(
   Brightness b, {
   AgeGroup? group,
   Map<String, TeamSheet> sheets = const {},
+  List<Player> extraPlayers = const [],
+  DivisionJuveniles named = const DivisionJuveniles(),
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -202,8 +210,9 @@ Future<void> _pump(
           (ref, id) => Stream.value(_match(ageGroup: group)),
         ),
         teamPlayersProvider.overrideWith(
-          (ref) => Stream.value(_players(group: group)),
+          (ref) => Stream.value([..._players(group: group), ...extraPlayers]),
         ),
+        myDivisionJuvenilesProvider.overrideWith((ref) => Stream.value(named)),
         teamSheetProvider.overrideWith((ref, key) => Stream.value(null)),
         myTeamSheetsProvider.overrideWith((ref) => Stream.value(sheets)),
         teamProfilesProvider.overrideWith(
@@ -426,6 +435,62 @@ void main() {
     await tester.tap(find.text('Done'));
     await tester.pumpAndSettle();
     expect(find.text('11 numbers · 1 changed'), findsOneWidget);
+  });
+
+  testWidgets('Division sheet: the club\'s juveniles with their pills (DJ3)', (
+    tester,
+  ) async {
+    Player child(String id, AgeGroup g) => Player(
+      id: id,
+      teamId: 'ruf',
+      teamName: 'Royal Unique FC',
+      category: Competition.juvenile,
+      ageGroup: g,
+      fullName: 'Kojo Brew $id',
+      dob: DateTime(2011),
+      position: Position.amf,
+      jerseyNo: 60,
+      playerCode: 'GJ26-0$id',
+      status: ApprovalStatus.approved,
+    );
+    await _pump(
+      tester,
+      const Size(400, 2800),
+      Brightness.light,
+      extraPlayers: [child('j1', AgeGroup.u15), child('j2', AgeGroup.u17)],
+      named: const DivisionJuveniles({'j1': AgeGroup.u15}),
+    );
+    _noError(tester);
+    expect(find.text('JUVENILES (DIVISION LIST)'), findsOneWidget);
+    // j1 is named: shown with "U15"; j2 is not named: not on the sheet
+    expect(find.text('Kojo Brew j1'), findsOneWidget);
+    expect(find.text('U15'), findsOneWidget);
+    expect(find.text('Kojo Brew j2'), findsNothing);
+  });
+
+  testWidgets('U17 match: 1 U13 at most; the other is locked (MS6)', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      const Size(400, 2800),
+      Brightness.light,
+      group: AgeGroup.u17,
+    );
+    _noError(tester);
+    expect(find.text('U13 0 / 1'), findsOneWidget);
+    // Pick the first U13 (in "Playing up from U13")
+    final firstU13 = find.ancestor(
+      of: find.text('Kwabena Mensah-Bonsu Asamoah 5'),
+      matching: find.byType(Row),
+    );
+    await tester.tap(
+      // (the nearest Row is the name line; the next one is the player row)
+      find.descendant(of: firstU13.at(1), matching: find.text('11')),
+    );
+    await tester.pump();
+    expect(find.text('U13 1 / 1'), findsOneWidget);
+    expect(find.text('U13 limit reached'), findsOneWidget);
   });
 
   testWidgets('juvenile U15: the squad, then playing up from U13', (

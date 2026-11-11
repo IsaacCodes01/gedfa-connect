@@ -4339,6 +4339,29 @@ describe('Juveniles in the Division (3.1d1)', () => {
       { audience: 'fa', kind: 'divisionJuveniles', teamId: 'stars' }));
   });
 
+  it('3.1d2: a juvenile leaving their age list leaves the Division list too', async () => {
+    await seedNamed({ a15: 'U15', a17: 'U17' });
+    // a15 is no longer approved (the team corrected them: pending again)
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `${D}/players/a15`),
+        juvenileData({ ageGroup: 'U15', born: 2012, status: 'pending' }));
+    });
+    function offLists(db, { offDivision }) {
+      const batch = writeBatch(db);
+      batch.update(doc(db, `${D}/squads/royal_U15`), {
+        'players.a15': deleteField(), changed: 'a15', updatedAt: serverTimestamp(),
+      });
+      if (offDivision) {
+        batch.update(doc(db, `${D}/squads/${ID}`), {
+          'players.a15': deleteField(), changed: 'a15', updatedAt: serverTimestamp(),
+        });
+      }
+      return batch.commit();
+    }
+    await assertFails(offLists(dbAs('admin1'), { offDivision: false }));
+    await assertSucceeds(offLists(dbAs('admin1'), { offDivision: true }));
+  });
+
   it('the team and the FA read it; another team does not', async () => {
     await seedNamed({ a15: 'U15' });
     await assertSucceeds(getDoc(ref(dbAs('admin1'))));
@@ -4368,6 +4391,8 @@ describe('Team sheets (3.1a2)', () => {
       await list('royal_U15', ids('k', 1, 11));
       await list('royal_U17', ['k17']);
       await setDoc(doc(db, `${D}/fixtures/f1`), fixtureData());
+      // League settings always exist once the season is set up
+      await setDoc(doc(db, `${D}/settings/league`), { matchdaySquad: 18, minPlayers: 7 });
       await setDoc(doc(db, `${D}/fixtures/fj`), fixtureData({
         competitionId: '2026-27_juvenile-league', category: 'juvenile', ageGroup: 'U15',
       }));
@@ -4478,6 +4503,40 @@ describe('Team sheets (3.1a2)', () => {
         { status: 'postponed', kickoffAt: null, note: 'Rain' });
     });
     await assertFails(save(dbAs('admin1')));
+  });
+
+  // ----- 3.1d2: juveniles in the Division; play-up limits -----
+
+  it('3.1d2: a Division sheet may pick the club\'s named juveniles', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `${D}/squads/royal_divisionJuveniles`), {
+        teamId: 'royal', group: 'divisionJuveniles', players: { k1: 'U15', k17: 'U17' },
+        changed: 'k1', updatedAt: Timestamp.now(),
+      });
+    });
+    await assertSucceeds(save(dbAs('admin1'), sheet({ bench: ['s12', 'k1', 'k17'] })));
+    // k2 is an approved U15 child, but not named for the Division
+    await assertFails(save(dbAs('admin1'), sheet({ bench: ['s12', 'k2'] })));
+  });
+
+  it('3.1d2: in a U17 match at most 1 U13 and 5 U15 play up', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, `${D}/squads/royal_U13`), {
+        teamId: 'royal', group: 'U13', players: { k13: true, k13b: true },
+        changed: 'k13', updatedAt: Timestamp.now(),
+      });
+      await setDoc(doc(db, `${D}/fixtures/f17`), fixtureData({
+        competitionId: '2026-27_juvenile-league', category: 'juvenile', ageGroup: 'U17',
+      }));
+    });
+    const u17 = (starters) => sheet({
+      fixtureId: 'f17', category: 'juvenile', ageGroup: 'U17', starters, bench: [],
+    });
+    const five15 = ['k1', 'k2', 'k3', 'k4', 'k5'];
+    await assertSucceeds(save(dbAs('admin1'), u17(['k17', 'k13', ...five15])));
+    await assertFails(save(dbAs('admin1'), u17(['k17', 'k13', 'k13b', ...five15])));
+    await assertFails(save(dbAs('admin1'), u17(['k17', 'k13', ...five15, 'k6'])));
   });
 
   // ----- 3.1c: a team lists its own sheets -----

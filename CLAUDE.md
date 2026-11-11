@@ -206,6 +206,11 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
   `myDivisionJuvenilesProvider`, Squad › Division `DivisionJuvenilesCard` + picker; FA told with `teamUpdated`. Rules changed:
   Isaac deploys to dev. Next: **3.1d2** the Division sheet takes the 7 (pills) + juvenile play-up limits (MS6). Widget tests
   with `PlayerAvatar` need `sharedPreferencesProvider` overridden.
+- **3.1d2** done (11 Nov 2026, 409 rules tests, 297 Dart tests): Division sheets pick from `division` + `divisionJuveniles`
+  (rules `divisionPicksOk`), U17 sheets `playUpOk` (1 U13, 5 U15; `playUpLimit` in `sheet_picks.dart`). The Division list is kept
+  exact via `isSquadRemoval` → `notInDivisionJuvenilesAfter` (not in the player rule: it is at the 1000-expression limit).
+  **Rules lookups: `exists()` + `get()` of one doc count as 2**; sheet saves are at 10 (U17), so they use `isSheetTeamAdmin` /
+  `sheetLeagueValue` (one get each). FA note kind `divisionJuveniles`. Rules changed: Isaac deploys to dev. Next: **3.1e**.
 - Calendar backdrop (`_CalendarBackdrop` in `match_calendar_card.dart`): GEDFA logo as a one-colour watermark (its letters are white,
   so tint it with `color` + `BlendMode.srcIn`). `assets/images/gedfa_logo.png` is now committed.
 - **Plan agreed 9 Nov 2026 (deadline Thu 12 Nov, 12:30 pm; Isaac's prompts in that conversation):** next, in order:

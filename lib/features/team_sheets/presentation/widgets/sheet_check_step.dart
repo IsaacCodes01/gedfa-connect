@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:gedfa_connect/app/theme.dart';
 import 'package:gedfa_connect/features/dashboard/presentation/widgets/dashboard_card.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/widgets/fixture_row.dart';
+import 'package:gedfa_connect/features/players/domain/age_group.dart';
 import 'package:gedfa_connect/features/players/domain/player.dart';
 import 'package:gedfa_connect/features/team_sheets/domain/sheet_roles.dart';
 import 'package:gedfa_connect/features/teams/domain/kit.dart';
@@ -24,6 +25,7 @@ class SheetPaper extends StatelessWidget {
     required this.numbers,
     required this.roles,
     required this.officials,
+    this.matchGroup,
   });
 
   final String title;
@@ -39,6 +41,10 @@ class SheetPaper extends StatelessWidget {
   /// Fitted to the picks.
   final SheetRoles roles;
   final List<Official> officials;
+
+  /// The match's age group (null in a Division match): a juvenile of
+  /// another group gets a pill, "U15" (DJ4).
+  final AgeGroup? matchGroup;
 
   @override
   Widget build(BuildContext context) {
@@ -84,6 +90,11 @@ class SheetPaper extends StatelessWidget {
                   if (p.id == roles.captainId) const _Mark('C', captain: true),
                   if (p.id == roles.viceCaptainId) const _Mark('VC'),
                   if (p.id == roles.goalkeeperId) const _Mark('GK'),
+                  if (p.ageGroup case final g? when g != matchGroup)
+                    FixtureTag(
+                      matchGroup == null ? g.label : '${g.label} ↑',
+                      tone: AccentTone.violet,
+                    ),
                   if (number != p.jerseyNo)
                     FixtureTag('usual ${p.jerseyNo}', tone: AccentTone.grey),
                 ],
