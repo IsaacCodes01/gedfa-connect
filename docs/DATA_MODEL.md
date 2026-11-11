@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.34.2, matches the rules after step 3.2, team sheets visible to the FA and, from the lock, the opponent (11 Nov 2026)
+**Status:** v2.34.3, matches the rules after step 3.2, team sheets visible to the FA and, from the lock, the opponent (11 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -893,6 +893,8 @@ Feed rules: never include dates of birth; player photos only if agreed with GEDF
 
 **Answered by Isaac (11 Nov 2026), player suspensions (3.1e, mockup `3.1e-player-suspensions.html`):** a suspension counts **matches**, not days: the app finds the club's next matches in the calendar and tells the club when the player is back ("Kofi Boateng returns on Sat 30 Nov, against Royal Unique FC"); no date is typed. **Any FA official** can suspend (the chairman may be busy); reasons: red card, violent conduct, yellow cards. The club sees the reason and the matches left.
 
+**Answered by Isaac (11 Nov 2026), match day (mockup `3.6-match-day-check.html`, MC1–MC5, approved):** from the lock the appointed officials see both sheets **with player IDs** (3.5) and the PDF shows them (3.3). The **face check** (3.6, "Check players": big photo, shirt number for the match, name, ID; Matches / Doesn't match with a note / Absent) is done by the **commissioner only**. The **other team sees the photos at the lock for Division players; juveniles without photos** (children's photos stay with the team, the FA and the officials). A player who **doesn't match** is **recorded** for the FA and the match report, not struck off the sheet by the commissioner. Photos can't go on the sheet itself (the other team reads it): a separate copy for the match, opened at the lock to the appointed officials and the FA (and the Division photos to the other team); Storage rules must allow the images too.
+
 **Answered by GEDFA via Isaac (10 Nov 2026), fees:** the **Juvenile affiliation fee is separate from the Division one**. A club pays one Juvenile fee whatever the number of age groups it enters; a club in both competitions pays the Division fee too. There is also a **referee fee**, for the Division and for the Juvenile league. Every fee (affiliation and referee) can be paid in instalments, like the affiliation fee today, and its amount is set in League settings. Planned as its own payments step (after JA): today `settings/league.fee` and `fees/{season}_{uid}` hold one affiliation fee per club.
 
 **Decided by Isaac (10 Nov 2026), team dashboard (mockup `td-team-dashboard.html`):** a team is match-ready with the matchday squad (`settings/league.matchdaySquad`, 18) of approved players, per competition and per juvenile age group; with fewer than that but at least `minPlayers` (7) it can still play. Teams land on a new Home tab (Home · Squad · Fixtures · Profiles · More). A club in both competitions gets a Division | Juvenile switch on Home and Fixtures (matches only), and a month calendar (opponent crests on match days; League, Cup, Gala) on Home and in Fixtures. The team sheet line comes in 3.1.
@@ -926,6 +928,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 11 Nov 2026 | v2.34.3: Section 7, Isaac's answers on match day (3.5, 3.3, 3.6): IDs from the lock, face check by the commissioner only, Division photos for the other team, a mismatch recorded. |
 | 11 Nov 2026 | v2.34.2: fix: team sheets could not be saved when `settings/league` was never saved (3.1d2 read it without `exists()`); a U17 match reads its U17 list with one get instead. 412 rules tests. |
 | 11 Nov 2026 | v2.34.1: Section 7, Isaac's answers on player suspensions (3.1e). |
 | 11 Nov 2026 | v2.34 (3.2): `teamSheets.players` (copies: name, position, usual number, player ID, age group); the opponent reads a sheet from the lock. 411 rules tests. |
