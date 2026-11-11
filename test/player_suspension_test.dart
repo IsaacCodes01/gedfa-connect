@@ -248,6 +248,110 @@ void main() {
     });
   });
 
+  group('3.1e3: blocked in every competition until served', () {
+    // Royal's juvenile matches around the Division ones (m4 day 6, m5 day 13)
+    final u17Soon = match('u17a', 10, 'Gomoa Stars B', ageGroup: AgeGroup.u17);
+    final u17Late = match('u17b', 25, 'Asebu Stars B', ageGroup: AgeGroup.u17);
+    final u13 = match('u13', 9, 'Ojobi Rangers B', ageGroup: AgeGroup.u13);
+    final all = [...fixtures, u17Soon, u17Late, u13];
+    const kojo = BanPlayer(
+      category: Competition.juvenile,
+      ageGroup: AgeGroup.u15,
+      namedForDivision: true,
+    );
+
+    test('where a player can be picked', () {
+      expect(kojo.canBePickedFor(fixtures[2]), isTrue); // Division, named
+      expect(kojo.canBePickedFor(u17Soon), isTrue); // playing up
+      expect(kojo.canBePickedFor(u13), isFalse); // never down
+      const notNamed = BanPlayer(
+        category: Competition.juvenile,
+        ageGroup: AgeGroup.u15,
+      );
+      expect(notNamed.canBePickedFor(fixtures[2]), isFalse);
+      const senior = BanPlayer(category: Competition.division);
+      expect(senior.canBePickedFor(u17Soon), isFalse);
+    });
+
+    test('a Division ban blocks the U15 and U17 matches until the last '
+        'counted one, and only the Division ones count', () {
+      final status = BanStatus.of(ban(), all, now)!;
+      expect(status.blockedUntil, fixtures[4].kickoffAt); // m5, day 13
+      expect(status.blocks(fixtures[5], kojo, now), isTrue); // U15 day 8
+      expect(status.blocks(u17Soon, kojo, now), isTrue); // U17 day 10
+      expect(status.blocks(u17Late, kojo, now), isFalse); // after the ban
+      expect(status.blocks(u13, kojo, now), isFalse);
+      expect(status.counts(u17Soon), isFalse);
+      expect(status.left, 2);
+    });
+
+    test('the sync plan marks them, and takes marks off a lifted ban', () {
+      final plan = BanSyncPlan.of(
+        teamIds: {'ruf'},
+        suspensions: [ban()],
+        players: {'p2': kojo},
+        fixtures: all,
+        now: now,
+      );
+      expect(plan.marks.keys.toSet(), {'m4', 'm5', 'u15', 'u17a'});
+      expect(plan.marks['u17a'], {
+        'ruf': ['p2'],
+      });
+
+      // The marks are there; the ban is lifted: they all go
+      final marked = [
+        for (final f in all)
+          plan.marks.containsKey(f.id)
+              ? Fixture(
+                  id: f.id,
+                  season: f.season,
+                  competitionId: f.competitionId,
+                  category: f.category,
+                  ageGroup: f.ageGroup,
+                  round: f.round,
+                  home: f.home,
+                  away: f.away,
+                  kits: f.kits,
+                  kickoffAt: f.kickoffAt,
+                  venue: f.venue,
+                  status: f.status,
+                  banned: plan.marks[f.id]!,
+                )
+              : f,
+      ];
+      final again = BanSyncPlan.of(
+        teamIds: {'ruf'},
+        suspensions: [ban()],
+        players: {'p2': kojo},
+        fixtures: marked,
+        now: now,
+      );
+      expect(again.isEmpty, isTrue);
+      final lifted = BanSyncPlan.of(
+        teamIds: {'ruf'},
+        suspensions: [ban(liftedAt: now)],
+        players: {'p2': kojo},
+        fixtures: marked,
+        now: now,
+      );
+      expect(lifted.marks.length, 4);
+      expect(lifted.marks.values.every((t) => t['ruf']!.isEmpty), isTrue);
+    });
+
+    test('a ban short of matches takes new ones in its competition', () {
+      final plan = BanSyncPlan.of(
+        teamIds: {'ruf'},
+        suspensions: [
+          ban(matches: 3, fixtureIds: ['m4']),
+        ],
+        players: const {},
+        fixtures: all,
+        now: now,
+      );
+      expect(plan.lists['b1'], ['m4', 'm5', 'm6']);
+    });
+  });
+
   test('every kind of note has its own icon (Isaac, 11 Nov 2026)', () {
     final icons = [for (final k in NotificationKind.values) noteKindIcon(k)];
     expect(icons.toSet().length, NotificationKind.values.length);

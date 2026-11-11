@@ -8,6 +8,7 @@ import 'package:gedfa_connect/features/fixtures/domain/fixture.dart';
 import 'package:gedfa_connect/features/notifications/data/notification_writer.dart';
 import 'package:gedfa_connect/features/notifications/domain/app_notification.dart';
 import 'package:gedfa_connect/features/players/domain/player.dart';
+import 'package:gedfa_connect/features/suspensions/data/ban_mover.dart';
 import 'package:gedfa_connect/features/suspensions/domain/player_suspension.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 
@@ -54,7 +55,7 @@ class PlayerSuspensionRepository {
     required Fixture? back,
     required String byUid,
     String? byName,
-  }) {
+  }) async {
     final ref = _all.doc();
     final other = reasonText?.trim() ?? '';
     final noteText = note?.trim() ?? '';
@@ -97,9 +98,12 @@ class PlayerSuspensionRepository {
           '${matches == 1 ? '1 match' : '$matches matches'}'
           '${AppNotification.lineBreak}$reasonLabel. '
           '${BanPlan.missesText(toMiss, teamId: player.teamId, notInCalendar: notInCalendar)} '
+          'No other match until then. '
           '${BanPlan.returnsText(back, teamId: player.teamId, pending: notInCalendar)}',
     );
-    return batch.commit().timeout(_timeout);
+    await batch.commit().timeout(_timeout);
+    // Blocked from every other competition until then too (3.1e3)
+    await BanSync(_db).trySync([player.teamId]);
   }
 
   /// Ends [s] early, with why. The player's marks come off the matches
@@ -110,7 +114,7 @@ class PlayerSuspensionRepository {
     String? note,
     required String byUid,
     String? byName,
-  }) {
+  }) async {
     final text = note?.trim() ?? '';
     final batch = _db.batch()
       ..update(_all.doc(s.id), {
@@ -136,7 +140,9 @@ class PlayerSuspensionRepository {
           '${s.displayName}${AppNotification.lineBreak}$why. '
           '${s.playerName} can be picked again.',
     );
-    return batch.commit().timeout(_timeout);
+    await batch.commit().timeout(_timeout);
+    // Free in every competition again (3.1e3)
+    await BanSync(_db).trySync([s.teamId]);
   }
 
   static String _name(Player p, BanCompetition c) =>

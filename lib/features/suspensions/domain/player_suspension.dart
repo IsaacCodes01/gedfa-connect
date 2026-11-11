@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/features/fixtures/domain/fixture.dart';
 import 'package:gedfa_connect/features/players/domain/age_group.dart';
+import 'package:gedfa_connect/features/players/domain/player.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
 
 /// Why the FA suspends a player (3.1e, mockup SP1; Isaac 11 Nov 2026).
@@ -138,6 +139,27 @@ class PlayerSuspension {
 
   bool get isLifted => liftedAt != null;
 
+  PlayerSuspension withFixtureIds(List<String> ids) => PlayerSuspension(
+    id: id,
+    playerId: playerId,
+    playerName: playerName,
+    playerCode: playerCode,
+    teamId: teamId,
+    teamName: teamName,
+    season: season,
+    competition: competition,
+    reason: reason,
+    reasonText: reasonText,
+    note: note,
+    matches: matches,
+    fixtureIds: ids,
+    byName: byName,
+    at: at,
+    liftedAt: liftedAt,
+    liftReason: liftReason,
+    liftNote: liftNote,
+  );
+
   /// "Red card", or what the FA typed for "Other".
   String get reasonLabel =>
       reason == BanReason.other ? (reasonText ?? reason.label) : reason.label;
@@ -259,6 +281,139 @@ class BanStatus {
   /// "Returns Sat 5 Dec, against Ojobi Rangers."
   String returnsText(String teamId) =>
       BanPlan.returnsText(returnMatch, teamId: teamId, pending: notInCalendar);
+
+  /// 3.1e3 (Isaac, 11 Nov 2026): until the last counted match the player
+  /// can't play in ANY competition. Its kick-off; null while counted
+  /// matches are still missing from the calendar (no end yet).
+  DateTime? get blockedUntil =>
+      notInCalendar > 0 || toMiss.isEmpty ? null : toMiss.last.kickoffAt;
+
+  /// Whether this ban keeps [p] out of match [f]: one of its counted
+  /// matches, or any other match of the club they could be picked for
+  /// that kicks off before the end ([blockedUntil]).
+  bool blocks(Fixture f, BanPlayer p, DateTime now) {
+    if (counts(f)) return !f.isPlayed(now);
+    final when = f.kickoffAt;
+    if (!f.isScheduled || when == null || !when.isAfter(now)) return false;
+    if (!f.hasTeam(suspension.teamId) || !p.canBePickedFor(f)) return false;
+    final end = blockedUntil;
+    return end == null || !when.isAfter(end);
+  }
+
+  /// One of the matches that count towards the number.
+  bool counts(Fixture f) => suspension.fixtureIds.contains(f.id);
+}
+
+/// Where a player could be picked (3.1e3): a Division player in the
+/// Division; a juvenile in their age group and the older ones (playing
+/// up), and in the Division when the club named them for it (3.1d).
+class BanPlayer {
+  const BanPlayer({
+    required this.category,
+    this.ageGroup,
+    this.namedForDivision = false,
+  });
+
+  BanPlayer.of(Player p, {bool named = false})
+    : category = p.category,
+      ageGroup = p.ageGroup,
+      namedForDivision = p.isJuvenile && named;
+
+  final Competition category;
+  final AgeGroup? ageGroup;
+  final bool namedForDivision;
+
+  bool canBePickedFor(Fixture f) {
+    if (f.category == Competition.division) {
+      return category == Competition.division || namedForDivision;
+    }
+    final own = ageGroup, match = f.ageGroup;
+    return category == Competition.juvenile &&
+        own != null &&
+        match != null &&
+        match.index >= own.index;
+  }
+}
+
+/// 3.1e3: the `banned` marks every match should carry, and the counted
+/// lists still short of matches that new matches can fill. The app keeps
+/// the marks right after every suspension, lift, postpone, new date and
+/// new match ([BanSync]); the rules refuse anyone marked on a sheet.
+class BanSyncPlan {
+  const BanSyncPlan({required this.lists, required this.marks});
+
+  /// Suspension ID → its new counted list (filled from new matches).
+  final Map<String, List<String>> lists;
+
+  /// Match ID → team ID → the players it must carry, only where that
+  /// differs from what the match carries now.
+  final Map<String, Map<String, List<String>>> marks;
+
+  bool get isEmpty => lists.isEmpty && marks.isEmpty;
+
+  /// For the clubs [teamIds]: their [suspensions] (any state), the
+  /// players' [players] (by player ID; a missing one counts only where the
+  /// ban was given) and the season's [fixtures]. Only matches still to
+  /// kick off change.
+  static BanSyncPlan of({
+    required Set<String> teamIds,
+    required List<PlayerSuspension> suspensions,
+    required Map<String, BanPlayer> players,
+    required List<Fixture> fixtures,
+    required DateTime now,
+  }) {
+    final lists = <String, List<String>>{};
+    final bans = <(BanStatus, BanPlayer)>[];
+    for (var s in suspensions) {
+      if (s.isLifted || !teamIds.contains(s.teamId)) continue;
+      // Short of matches: new matches in its competition count
+      if (s.fixtureIds.length < s.matches) {
+        final more = BanPlan.matchesToMiss(
+          fixtures,
+          teamId: s.teamId,
+          competition: s.competition,
+          count: s.matches,
+          now: now,
+        ).where((f) => !s.fixtureIds.contains(f.id));
+        final filled = [
+          ...s.fixtureIds,
+          for (final f in more.take(s.matches - s.fixtureIds.length)) f.id,
+        ];
+        if (filled.length > s.fixtureIds.length) {
+          lists[s.id] = filled;
+          s = s.withFixtureIds(filled);
+        }
+      }
+      final status = BanStatus.of(s, fixtures, now);
+      if (status == null) continue;
+      final c = s.competition;
+      bans.add((
+        status,
+        players[s.playerId] ??
+            BanPlayer(category: c.category, ageGroup: c.ageGroup),
+      ));
+    }
+
+    final marks = <String, Map<String, List<String>>>{};
+    for (final f in fixtures) {
+      final when = f.kickoffAt;
+      if (!f.isScheduled || when == null || !when.isAfter(now)) continue;
+      for (final team in [f.home.id, f.away.id]) {
+        if (!teamIds.contains(team)) continue;
+        final want = <String>{
+          for (final (status, player) in bans)
+            if (status.suspension.teamId == team &&
+                status.blocks(f, player, now))
+              status.suspension.playerId,
+        };
+        final now0 = {...?f.banned[team]};
+        if (want.length != now0.length || !want.containsAll(now0)) {
+          (marks[f.id] ??= {})[team] = want.toList()..sort();
+        }
+      }
+    }
+    return BanSyncPlan(lists: lists, marks: marks);
+  }
 }
 
 int _byKickoff(Fixture a, Fixture b) {

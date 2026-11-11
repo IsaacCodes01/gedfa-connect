@@ -1,6 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:gedfa_connect/core/constants/firestore_paths.dart';
+import 'package:gedfa_connect/core/constants/season.dart';
 import 'package:gedfa_connect/features/fixtures/domain/fixture.dart';
+import 'package:gedfa_connect/features/players/domain/division_juveniles.dart';
+import 'package:gedfa_connect/features/players/domain/player.dart';
 import 'package:gedfa_connect/features/suspensions/domain/player_suspension.dart';
 
 const _timeout = Duration(seconds: 15);
@@ -73,5 +77,116 @@ class BanMover {
     }
     await batch.commit().timeout(_timeout);
     return moves.length;
+  }
+}
+
+/// 3.1e3 (Isaac, 11 Nov 2026): a suspended player can't play in ANY
+/// competition until the ban is served. Keeps every match's `banned` marks
+/// right for some clubs: the counted matches, and every other match the
+/// player could be picked for until the last counted one. Also fills a
+/// ban still short of matches from new ones. Run after every suspension,
+/// lift, postpone, cancel, new date and new match.
+///
+/// Writes only what differs, 10 matches per batch (a batch counts all its
+/// writes against the rules' 1000-expression limit).
+class BanSync {
+  BanSync(this._db);
+
+  final FirebaseFirestore _db;
+
+  Future<void> syncTeams(Iterable<String> ids) async {
+    final teamIds = ids.where((id) => id.isNotEmpty).toSet();
+    if (teamIds.isEmpty) return;
+
+    // The clubs' suspensions this season ("in" takes 10 at most)
+    final suspensions = <PlayerSuspension>[];
+    final list = teamIds.toList();
+    for (var i = 0; i < list.length; i += 10) {
+      final snap = await _db
+          .collection(FirestorePaths.playerSuspensions)
+          .where('teamId', whereIn: list.skip(i).take(10).toList())
+          .get()
+          .timeout(_timeout);
+      suspensions.addAll([
+        for (final doc in snap.docs)
+          if (PlayerSuspension.fromMap(doc.id, doc.data()) case final s?)
+            if (s.season == Season.current) s,
+      ]);
+    }
+
+    final fixtures = [
+      for (final doc
+          in (await _db
+                  .collection(FirestorePaths.fixtures)
+                  .where('season', isEqualTo: Season.current)
+                  .get()
+                  .timeout(_timeout))
+              .docs)
+        ?Fixture.fromMap(doc.id, doc.data()),
+    ];
+
+    // Where each suspended player could be picked
+    final players = <String, BanPlayer>{};
+    final named = <String, DivisionJuveniles>{};
+    for (final s in suspensions) {
+      if (s.isLifted || players.containsKey(s.playerId)) continue;
+      final doc = await _db
+          .doc(FirestorePaths.player(s.playerId))
+          .get()
+          .timeout(_timeout);
+      final data = doc.data();
+      if (data == null) continue;
+      final p = Player.fromMap(doc.id, data);
+      if (p.isJuvenile && !named.containsKey(p.teamId)) {
+        final list = await _db
+            .doc(FirestorePaths.squad(p.teamId, 'divisionJuveniles'))
+            .get()
+            .timeout(_timeout);
+        named[p.teamId] = DivisionJuveniles.fromMap(list.data());
+      }
+      players[s.playerId] = BanPlayer.of(
+        p,
+        named: named[p.teamId]?.contains(p.id) ?? false,
+      );
+    }
+
+    final plan = BanSyncPlan.of(
+      teamIds: teamIds,
+      suspensions: suspensions,
+      players: players,
+      fixtures: fixtures,
+      now: DateTime.now(),
+    );
+    if (plan.isEmpty) return;
+
+    final writes = <void Function(WriteBatch)>[
+      for (final MapEntry(key: id, value: ids) in plan.lists.entries)
+        (b) => b.update(
+          _db.collection(FirestorePaths.playerSuspensions).doc(id),
+          {'fixtureIds': ids},
+        ),
+      for (final MapEntry(key: fixtureId, value: teams) in plan.marks.entries)
+        (b) => b.update(_db.doc(FirestorePaths.fixture(fixtureId)), {
+          for (final MapEntry(key: team, value: players) in teams.entries)
+            FieldPath(['banned', team]): players,
+        }),
+    ];
+    for (var i = 0; i < writes.length; i += 10) {
+      final batch = _db.batch();
+      for (final write in writes.skip(i).take(10)) {
+        write(batch);
+      }
+      await batch.commit().timeout(_timeout);
+    }
+  }
+
+  /// [syncTeams] that never fails the action it follows: the app still
+  /// locks the players on the sheet from the suspensions themselves.
+  Future<void> trySync(Iterable<String> teamIds) async {
+    try {
+      await syncTeams(teamIds);
+    } catch (error) {
+      debugPrint('Suspension marks not synced: $error');
+    }
   }
 }

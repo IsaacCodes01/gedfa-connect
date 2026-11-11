@@ -186,6 +186,28 @@ class _FormState extends ConsumerState<_Form> {
             after: toMiss.lastOrNull?.kickoffAt ?? now,
           );
     final notInCalendar = _matches - toMiss.length;
+
+    // 3.1e3 (SB1): until the last counted match the player can't play in
+    // any competition; the other matches they could be picked for are
+    // blocked too but don't count
+    final me = BanPlayer.of(_player, named: named);
+    final end = notInCalendar > 0 ? null : toMiss.lastOrNull?.kickoffAt;
+    final blocked = [
+      for (final g in widget.fixtures)
+        if (g.hasTeam(_player.teamId) &&
+            g.isScheduled &&
+            !competition.covers(g) &&
+            me.canBePickedFor(g) &&
+            g.kickoffAt != null &&
+            g.kickoffAt!.isAfter(now) &&
+            (end == null || !g.kickoffAt!.isAfter(end)))
+          g,
+    ];
+    final mixed = blocked.isNotEmpty;
+    final rows = [
+      for (final g in toMiss) (g, _Kind.counts),
+      for (final g in blocked) (g, _Kind.blocked),
+    ]..sort((a, b) => a.$1.kickoffAt!.compareTo(b.$1.kickoffAt!));
     final gold = isDark ? const Color(0xFFF5D25B) : const Color(0xFF8A6A00);
 
     Widget chip(String label, bool selected, VoidCallback onTap) => ChoiceChip(
@@ -324,7 +346,9 @@ class _FormState extends ConsumerState<_Form> {
                         Padding(
                           padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
                           child: Text(
-                            competition.label,
+                            mixed
+                                ? '${competition.label} counts'
+                                : competition.label,
                             style: textTheme.labelMedium?.copyWith(
                               color: scheme.onSurfaceVariant,
                               fontWeight: FontWeight.w600,
@@ -337,11 +361,12 @@ class _FormState extends ConsumerState<_Form> {
                       padding: const EdgeInsets.symmetric(vertical: 4),
                       child: Column(
                         children: [
-                          for (final f in toMiss)
+                          for (final (g, kind) in rows)
                             _CalendarRow(
-                              fixture: f,
+                              fixture: g,
                               teamId: _player.teamId,
-                              returns: false,
+                              kind: mixed ? kind : _Kind.misses,
+                              byCompetition: mixed,
                             ),
                           if (notInCalendar > 0)
                             _CalendarRow.notYet(count: notInCalendar),
@@ -349,14 +374,22 @@ class _FormState extends ConsumerState<_Form> {
                             _CalendarRow(
                               fixture: back,
                               teamId: _player.teamId,
-                              returns: true,
+                              kind: _Kind.returns,
+                              byCompetition: mixed,
                             ),
                         ],
                       ),
                     ),
-                    const _Hint(
-                      'Only matches that are played count. If one is '
-                      "postponed, the ban moves to the club's next match.",
+                    _Hint(
+                      mixed
+                          ? 'Until the ${competition.label} '
+                                '${_matches == 1 ? 'match is' : 'matches are'} '
+                                'played, ${_player.fullName.split(' ').first} '
+                                "can't play in any competition."
+                          : 'Only matches that are played count. If one is '
+                                "postponed, the ban moves to the club's next "
+                                "match. Until then the player can't play in "
+                                'any competition.',
                     ),
                     const SizedBox(height: 18),
                     const SectionTitle('Note (optional)'),
@@ -482,23 +515,33 @@ class _Hint extends StatelessWidget {
   );
 }
 
-/// One line of "From the calendar": a match missed (red, "Misses"), the
-/// return match (green, "Returns"), or matches not in the calendar yet.
+/// What a calendar line says: missed ("Misses", or "Counts" when other
+/// matches are blocked too), blocked without counting (3.1e3), or back.
+enum _Kind { misses, counts, blocked, returns }
+
+/// One line of "From the calendar": a match missed (red), a match blocked
+/// that doesn't count (grey, SB1), the return match (green), or matches
+/// not in the calendar yet.
 class _CalendarRow extends StatelessWidget {
   const _CalendarRow({
     required Fixture this.fixture,
     required String this.teamId,
-    required this.returns,
+    required this.kind,
+    this.byCompetition = false,
   }) : count = 0;
 
   const _CalendarRow.notYet({required this.count})
     : fixture = null,
       teamId = null,
-      returns = false;
+      kind = _Kind.misses,
+      byCompetition = false;
 
   final Fixture? fixture;
   final String? teamId;
-  final bool returns;
+  final _Kind kind;
+
+  /// "Wed 25 Nov · U15" instead of "… · Matchday 4" (mixed lists, SB1).
+  final bool byCompetition;
   final int count;
 
   @override
@@ -528,14 +571,31 @@ class _CalendarRow extends StatelessWidget {
       final when = f.kickoffAt;
       title = [
         if (when != null) formatShortDate(when),
-        'Matchday ${f.round}',
+        byCompetition ? f.competitionLabel : 'Matchday ${f.round}',
       ].join(' · ');
       sub =
           'v ${f.opponentOf(team).name} (${f.isHome(team) ? 'H' : 'A'})'
-          '${returns ? ' · back for this one' : ''}';
-      look = returns
-          ? (greenBg, greenInk, Icons.sports_soccer_rounded, 'Returns')
-          : (redBg, redInk, Icons.block_rounded, 'Misses');
+          '${switch (kind) {
+            _Kind.returns => ' · back for this one',
+            _Kind.blocked => " · doesn't count",
+            _ => '',
+          }}';
+      look = switch (kind) {
+        _Kind.returns => (
+          greenBg,
+          greenInk,
+          Icons.sports_soccer_rounded,
+          'Returns',
+        ),
+        _Kind.blocked => (
+          isDark ? AppColors.darkBorder : const Color(0xFFE6EDF5),
+          scheme.onSurfaceVariant,
+          Icons.lock_rounded,
+          'Blocked',
+        ),
+        _Kind.counts => (redBg, redInk, Icons.block_rounded, 'Counts'),
+        _Kind.misses => (redBg, redInk, Icons.block_rounded, 'Misses'),
+      };
     }
     final (bg, ink, icon, tag) = look;
 

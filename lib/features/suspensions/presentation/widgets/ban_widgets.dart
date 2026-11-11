@@ -57,12 +57,16 @@ class BanBanner extends StatelessWidget {
                     style: TextStyle(color: ink, fontWeight: FontWeight.w700),
                   ),
                   Text(
-                    '${s.reasonLabel} · by the FA'
-                    '${at == null ? '' : ' on ${formatShortDate(at)}'}'
-                    '${s.competition.ageGroup == null ? '' : ' · ${s.competition.label} matches'}',
+                    '${s.reasonLabel} · ${s.competition.label} · by the FA'
+                    '${at == null ? '' : ' on ${formatShortDate(at)}'}',
                   ),
                   if (note != null) Text('"$note"'),
                   Text(status.missesText(s.teamId)),
+                  // 3.1e3 (SB2): blocked everywhere until it is served
+                  const Text(
+                    "Can't play in any competition until then.",
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
                   Text(
                     status.returnsText(s.teamId),
                     style: const TextStyle(fontWeight: FontWeight.w700),

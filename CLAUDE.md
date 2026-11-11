@@ -19,7 +19,7 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
    - test steps he can do himself in the app
 5. **Before every commit**, run (and show the result):
    - `flutter analyze` → must be **0 issues**
-   - `cd test/rules && npm test` → **all** rules tests pass (431 after 3.1e2)
+   - `cd test/rules && npm test` → **all** rules tests pass (432 after 3.1e3)
    - `flutter test` → all Dart tests pass (layout smoke tests and the kit check)
 6. **Commit after each step** with a clear message, e.g.
    `feat(teams): change requests for name, short name, logo and competitions; 250 rules tests; docs v2.12`
@@ -262,6 +262,11 @@ Build one at a time, mockup first where it says so; details are in `docs/ROADMAP
   1000-expression limit counts every write of a batch together** (a postpone + the moves went over), so never add writes to a
   postpone or match-change batch. Notes: `noteKindIcon(kind)` in `note_look.dart`, one icon per kind (test in
   `player_suspension_test.dart`); a new kind needs a new, unused icon.
+- **3.1e3** done (11 Nov 2026, Isaac's rule): a suspension **blocks every competition** until served; only where it was given counts.
+  `BanPlayer.canBePickedFor`, `BanStatus.blocks` / `blockedUntil`, `BanSyncPlan` (pure) + `BanSync.syncTeams` / `trySync` in
+  `ban_mover.dart`, called after suspend, lift and every `FixtureRepository` write (add, publish, change, postpone, new date, cancel,
+  league postpone). It sets whole `banned.{team}` lists (rule `isBanningMatch`). The sheet also computes the blocking from
+  `myBansProvider`, so it is right even if a sync failed. 432 rules tests, 326 Dart tests. **Next: 3.5.**
 - Calendar backdrop (`_CalendarBackdrop` in `match_calendar_card.dart`): GEDFA logo as a one-colour watermark (its letters are white,
   so tint it with `color` + `BlendMode.srcIn`). `assets/images/gedfa_logo.png` is now committed.
 - **Plan agreed 9 Nov 2026 (deadline Thu 12 Nov, 12:30 pm; Isaac's prompts in that conversation):** next, in order:

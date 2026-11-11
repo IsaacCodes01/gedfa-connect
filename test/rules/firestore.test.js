@@ -4476,6 +4476,20 @@ describe('Team sheets (3.1a2)', () => {
     await assertFails(save(dbAs('admin1'), juvenile({ ageGroup: 'U17', bench: [] })));
   });
 
+  it('3.1e3: a ban from another competition, marked on a juvenile match by the FA, blocks a playing-up child', async () => {
+    // The FA's sync sets the whole list for the team (a Division ban)
+    await assertSucceeds(updateDoc(doc(dbAs('fa1'), `${D}/fixtures/fj`), { 'banned.royal': ['k13'] }));
+    const juvenile = (changes) => sheet({
+      fixtureId: 'fj', category: 'juvenile', ageGroup: 'U15',
+      starters: [...ids('k', 1, 10), 'k13'], bench: [], ...changes,
+    });
+    await assertFails(save(dbAs('admin1'), juvenile()));
+    await assertSucceeds(save(dbAs('admin1'), juvenile({ starters: ids('k', 1, 11) })));
+    // Lifted: the FA's sync empties the list, and the child plays again
+    await assertSucceeds(updateDoc(doc(dbAs('fa1'), `${D}/fixtures/fj`), { 'banned.royal': [] }));
+    await assertSucceeds(save(dbAs('admin1'), juvenile()));
+  });
+
   it('another team cannot save it, nor a sheet for a match it is not in', async () => {
     await assertFails(save(dbAs('admin2'), sheet({ savedBy: 'admin2' })));
     await testEnv.withSecurityRulesDisabled(async (context) => {

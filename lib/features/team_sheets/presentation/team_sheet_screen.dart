@@ -263,8 +263,21 @@ class _BuilderState extends ConsumerState<_Builder> {
 
     // Suspended for this match (3.1e2, SP4): locked, and the rules refuse
     // them. The marks are on the match; the details come from the bans.
-    final banned = {...?f.banned[team.id]};
+    // 3.1e3: a ban blocks every competition until it is served, so the
+    // app also works it out from the suspensions (the marks follow)
     final bans = ref.watch(myBansProvider);
+    final now = DateTime.now();
+    final banned = {
+      ...?f.banned[team.id],
+      for (final p in pickable)
+        if (bans[p.id]?.blocks(
+              f,
+              BanPlayer.of(p, named: named.contains(p.id)),
+              now,
+            ) ??
+            false)
+          p.id,
+    };
     final allowed = byId.keys.toSet().difference(banned);
 
     // A player picked on the saved sheet who is no longer approved, or is
@@ -347,7 +360,7 @@ class _BuilderState extends ConsumerState<_Builder> {
 
     void tap(Player p, Pick target) {
       if (banned.contains(p.id)) {
-        AppToast.warning(context, banMessage(p, bans[p.id]));
+        AppToast.warning(context, banMessage(p, bans[p.id], f));
         return;
       }
       if (_limitReached(p, picks, pickable)) {
@@ -982,9 +995,15 @@ class _BuilderState extends ConsumerState<_Builder> {
                         !locked && !_busy && !_limitReached(p, picks, pickable),
                     banNote: !banned.contains(p.id)
                         ? null
-                        : bans[p.id] == null
-                        ? 'Suspended for this match'
-                        : 'Suspended · ${bans[p.id]!.leftText}',
+                        : switch (bans[p.id]) {
+                            null => 'Suspended for this match',
+                            final b when b.counts(f) =>
+                              'Suspended · ${b.leftText}',
+                            // Blocked by a ban from another competition
+                            final b =>
+                              'Suspended · '
+                                  '${b.suspension.competition.label} ban',
+                          },
                     onTap: (target) => tap(p, target),
                   ),
               ],
@@ -1464,12 +1483,19 @@ class _PlayerRow extends StatelessWidget {
 }
 
 /// "Kofi Boateng is suspended (red card) and returns Sat 5 Dec." (SP4)
-String banMessage(Player p, BanStatus? ban) {
+/// A ban from another competition (3.1e3, SB3): "Kojo Brew is suspended
+/// (red card, Division) and can't play any match until Sat 5 Dec."
+String banMessage(Player p, BanStatus? ban, Fixture f) {
   if (ban == null) return '${p.fullName} is suspended for this match.';
   final back = ban.returnMatch?.kickoffAt;
-  return '${p.fullName} is suspended '
-      '(${ban.suspension.reasonLabel.toLowerCase()})'
-      '${back == null ? ' for this match.' : ' and returns ${formatShortDate(back)}.'}';
+  final why = ban.suspension.reasonLabel.toLowerCase();
+  if (ban.counts(f)) {
+    return '${p.fullName} is suspended ($why)'
+        '${back == null ? ' for this match.' : ' and returns ${formatShortDate(back)}.'}';
+  }
+  return '${p.fullName} is suspended ($why, '
+      "${ban.suspension.competition.label}) and can't play any match until "
+      '${back == null ? 'it is served.' : '${formatShortDate(back)}.'}';
 }
 
 class _Armband extends StatelessWidget {

@@ -193,6 +193,7 @@ Future<void> _pump(
   DivisionJuveniles named = const DivisionJuveniles(),
   Map<String, List<String>> banned = const {},
   List<PlayerSuspension> suspensions = const [],
+  List<Fixture> otherMatches = const [],
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -220,7 +221,10 @@ Future<void> _pump(
         // Player suspensions (3.1e2)
         mySuspensionsProvider.overrideWith((ref) => Stream.value(suspensions)),
         myFixturesProvider.overrideWith(
-          (ref) => Stream.value([_match(ageGroup: group, banned: banned)]),
+          (ref) => Stream.value([
+            _match(ageGroup: group, banned: banned),
+            ...otherMatches,
+          ]),
         ),
         teamPlayersProvider.overrideWith(
           (ref) => Stream.value([..._players(group: group), ...extraPlayers]),
@@ -315,6 +319,71 @@ void main() {
     await tester.tap(find.text('Suspended · 2 matches left'));
     await tester.pump();
     expect(find.textContaining('is suspended (red card)'), findsOneWidget);
+    await tester.pumpAndSettle(const Duration(seconds: 5));
+  });
+
+  testWidgets('3.1e3 (SB3): a U15 playing up, blocked by a Division ban', (
+    tester,
+  ) async {
+    // Division matches on days 2 and 6 count; the U17 match (day 4) is
+    // between them, so the player can't play it (no mark on it yet)
+    Fixture division(String id, int days) => Fixture(
+      id: id,
+      season: '2026-27',
+      competitionId: '2026-27_division-league',
+      category: Competition.division,
+      round: days,
+      home: _match().home,
+      away: _match().away,
+      kits: _match().kits,
+      kickoffAt: DateTime.now().add(Duration(days: days)),
+      venue: 'Apam Park',
+      status: FixtureStatus.scheduled,
+    );
+    await _pump(
+      tester,
+      const Size(360, 1800),
+      Brightness.light,
+      group: AgeGroup.u17,
+      extraPlayers: [
+        Player(
+          id: 'k15',
+          teamId: 'ruf',
+          teamName: 'Royal Unique FC',
+          category: Competition.juvenile,
+          ageGroup: AgeGroup.u15,
+          fullName: 'Kojo Brew',
+          dob: DateTime(2012),
+          position: Position.dm,
+          jerseyNo: 60,
+          playerCode: 'GJ26-0012',
+          status: ApprovalStatus.approved,
+        ),
+      ],
+      otherMatches: [division('d1', 2), division('d2', 6)],
+      suspensions: const [
+        PlayerSuspension(
+          id: 'b1',
+          playerId: 'k15',
+          playerName: 'Kojo Brew',
+          teamId: 'ruf',
+          teamName: 'Royal Unique FC',
+          season: '2026-27',
+          competition: BanCompetition.division(),
+          reason: BanReason.redCard,
+          matches: 2,
+          fixtureIds: ['d1', 'd2'],
+        ),
+      ],
+    );
+    _noError(tester);
+    expect(find.text('Suspended · Division ban'), findsOneWidget);
+    await tester.tap(find.text('Suspended · Division ban'));
+    await tester.pump();
+    expect(
+      find.textContaining("(red card, Division) and can't play any match"),
+      findsOneWidget,
+    );
     await tester.pumpAndSettle(const Duration(seconds: 5));
   });
 

@@ -270,7 +270,7 @@ class FixtureRepository {
 
   /// "Add one match": the match, its first history line, and "New match"
   /// in both teams' bells.
-  Future<void> add(FixtureDraft d, {required User by}) {
+  Future<void> add(FixtureDraft d, {required User by}) async {
     final ref = _fixtures.doc();
     final batch = _db.batch()..set(ref, _newFixture(d, by));
     _history(batch, ref.id, 'Match added', null, by);
@@ -282,7 +282,9 @@ class FixtureRepository {
         _line(team.id, d.round, d.home.side, d.away.side, d.kickoffAt),
       );
     }
-    return batch.commit().timeout(_timeout);
+    await batch.commit().timeout(_timeout);
+    // A suspended player is blocked from it too (3.1e3)
+    await BanSync(_db).trySync([d.home.side.id, d.away.side.id]);
   }
 
   /// "Publish and tell all teams" (3.0b): a whole season of matches.
@@ -364,6 +366,8 @@ class FixtureRepository {
       }
       await batch.commit().timeout(_timeout);
     }
+    // Suspended players are blocked from the new matches too (3.1e3)
+    await BanSync(_db).trySync(teamIds);
   }
 
   // ---------- "Make the season" drafts (3.0b) ----------
@@ -440,7 +444,7 @@ class FixtureRepository {
     FixtureDraft d, {
     required String reason,
     required User by,
-  }) {
+  }) async {
     final what = _changes(old, d);
     final batch = _db.batch()
       ..update(
@@ -464,7 +468,9 @@ class FixtureRepository {
         '${reason.trim().isEmpty ? '' : '. ${_sentence(reason)}'}',
       );
     }
-    return batch.commit().timeout(_timeout);
+    await batch.commit().timeout(_timeout);
+    // A new date may fall inside a suspension (3.1e3)
+    await BanSync(_db).trySync(told);
   }
 
   /// The match's copy of both teams, read again: a team may have changed
@@ -525,7 +531,9 @@ class FixtureRepository {
         '${_vs(team.id, f)}: postponed, $when. ${_sentence(reason)}',
       );
     }
-    return batch.commit().timeout(_timeout);
+    await batch.commit().timeout(_timeout);
+    // The blocked period follows the moved ban (3.1e3)
+    await BanSync(_db).trySync([f.home.id, f.away.id]);
   }
 
   /// "Postpone" a league (3.0c1c, mockup C11): saves the job first
@@ -661,6 +669,8 @@ class FixtureRepository {
       if (i + 9 >= teamIds.length) batch.delete(jobRef);
       await batch.commit().timeout(_timeout);
     }
+    // New dates may fall inside a suspension (3.1e3)
+    await BanSync(_db).trySync(teamIds);
   }
 
   /// A postponed match gets its new date.
@@ -687,7 +697,9 @@ class FixtureRepository {
         '${_vs(team.id, f)}: new date $when',
       );
     }
-    return batch.commit().timeout(_timeout);
+    await batch.commit().timeout(_timeout);
+    // The new date may fall inside a suspension (3.1e3)
+    await BanSync(_db).trySync([f.home.id, f.away.id]);
   }
 
   /// Called off for good, with a reason. It keeps its date.
@@ -715,7 +727,8 @@ class FixtureRepository {
         '${_vs(team.id, f)}: cancelled. ${_sentence(reason)}',
       );
     }
-    return batch.commit().timeout(_timeout);
+    await batch.commit().timeout(_timeout);
+    await BanSync(_db).trySync([f.home.id, f.away.id]);
   }
 
   // ---------- Helpers ----------
