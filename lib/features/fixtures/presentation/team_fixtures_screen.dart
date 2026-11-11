@@ -7,7 +7,7 @@ import 'package:gedfa_connect/app/theme.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
-import 'package:gedfa_connect/core/widgets/app_toast.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/notification_bell.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
@@ -383,7 +383,7 @@ class NextMatchCard extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 14),
-                    _DueBox(due: due, now: now),
+                    _DueBox(fixtureId: f.id, due: due, now: now),
                   ],
                 ),
               ),
@@ -425,8 +425,13 @@ class _Meta extends StatelessWidget {
 
 /// "Team sheet due in 2 h 14 min" in gold, with "Make sheet" (3.1).
 class _DueBox extends StatelessWidget {
-  const _DueBox({required this.due, required this.now});
+  const _DueBox({
+    required this.fixtureId,
+    required this.due,
+    required this.now,
+  });
 
+  final String fixtureId;
   final DateTime due;
   final DateTime now;
 
@@ -489,16 +494,13 @@ class _DueBox extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          // Team sheets are step 3.1
+          // The team sheet (3.1); after the lock it opens read-only
           Material(
             color: gold.withValues(alpha: closed ? 0.4 : 1),
             borderRadius: BorderRadius.circular(99),
             child: InkWell(
               borderRadius: BorderRadius.circular(99),
-              onTap: () => AppToast.info(
-                context,
-                'Making the team sheet comes in the next update (3.1).',
-              ),
+              onTap: () => context.open(Routes.teamSheet(fixtureId)),
               child: const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 child: Text(
