@@ -4242,6 +4242,104 @@ describe('Squad lists (3.1a1)', () => {
   });
 });
 
+// ---------- Juveniles in the Division (3.1d1) ----------
+
+describe('Juveniles in the Division (3.1d1)', () => {
+  const ID = 'royal_divisionJuveniles';
+  const ref = (db, id = ID) => doc(db, `${D}/squads/${id}`);
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await updateDoc(doc(db, `${D}/teams/royal`), { categories: ['division', 'juvenile'] });
+      const list = (group, ids) => setDoc(doc(db, `${D}/squads/royal_${group}`), {
+        teamId: 'royal', group, players: Object.fromEntries(ids.map((i) => [i, true])),
+        changed: ids[0], updatedAt: Timestamp.now(),
+      });
+      // Royal's approved children
+      await list('U13', ['a13', 'b13']);
+      await list('U15', ['a15', 'b15', 'c15', 'd15']);
+      await list('U17', ['a17', 'b17', 'c17', 'd17', 'e17', 'f17', 'g17']);
+    });
+  });
+
+  /** The list already holds [players] (rules off). */
+  async function seedNamed(players) {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(ref(context.firestore()), {
+        teamId: 'royal', group: 'divisionJuveniles', players,
+        changed: Object.keys(players)[0], updatedAt: Timestamp.now(),
+      });
+    });
+  }
+  const name = (db, id, group, changes = {}) => setDoc(ref(db), {
+    teamId: 'royal', group: 'divisionJuveniles', players: { [id]: group },
+    changed: id, updatedAt: serverTimestamp(), ...changes,
+  }, { merge: true });
+  const unname = (db, id) => updateDoc(ref(db), {
+    [`players.${id}`]: deleteField(), changed: id, updatedAt: serverTimestamp(),
+  });
+
+  it('the team names an approved juvenile', async () => {
+    await assertSucceeds(name(dbAs('admin1'), 'a15', 'U15'));
+    await assertSucceeds(name(dbAs('admin1'), 'a17', 'U17'));
+  });
+
+  it('only approved juveniles of that age group', async () => {
+    await assertFails(name(dbAs('admin1'), 'pending15', 'U15'));
+    await assertFails(name(dbAs('admin1'), 'a15', 'U17'));
+    await assertFails(name(dbAs('admin1'), 'a15', 'U19'));
+  });
+
+  it('at most 1 U13', async () => {
+    await seedNamed({ a13: 'U13' });
+    await assertFails(name(dbAs('admin1'), 'b13', 'U13'));
+  });
+
+  it('at most 3 U15', async () => {
+    await seedNamed({ a15: 'U15', b15: 'U15' });
+    await assertSucceeds(name(dbAs('admin1'), 'c15', 'U15'));
+    await assertFails(name(dbAs('admin1'), 'd15', 'U15'));
+  });
+
+  it('7 at most; U17 has no limit of its own', async () => {
+    await seedNamed({ a17: 'U17', b17: 'U17', c17: 'U17', d17: 'U17', e17: 'U17', f17: 'U17' });
+    await assertSucceeds(name(dbAs('admin1'), 'g17', 'U17'));
+    await assertFails(name(dbAs('admin1'), 'a15', 'U15'));
+  });
+
+  it('the team removes one', async () => {
+    await seedNamed({ a15: 'U15', a17: 'U17' });
+    await assertSucceeds(unname(dbAs('admin1'), 'a15'));
+  });
+
+  it('one player per write, and their group never changes', async () => {
+    await seedNamed({ a15: 'U15' });
+    await assertFails(setDoc(ref(dbAs('admin1')), {
+      teamId: 'royal', group: 'divisionJuveniles', players: { b15: 'U15', a17: 'U17' },
+      changed: 'b15', updatedAt: serverTimestamp(),
+    }, { merge: true }));
+    await assertFails(name(dbAs('admin1'), 'a15', 'U17'));
+  });
+
+  it('never another team, the FA, or a club in one competition', async () => {
+    await assertFails(name(dbAs('admin2'), 'a15', 'U15'));
+    await assertFails(name(dbAs('fa1'), 'a15', 'U15'));
+    await assertFails(name(dbAs('admin1'), 'a15', 'U15', { teamId: 'stars' }));
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), `${D}/teams/royal`), { categories: ['division'] });
+    });
+    await assertFails(name(dbAs('admin1'), 'a15', 'U15'));
+  });
+
+  it('the team and the FA read it; another team does not', async () => {
+    await seedNamed({ a15: 'U15' });
+    await assertSucceeds(getDoc(ref(dbAs('admin1'))));
+    await assertSucceeds(getDoc(ref(dbAs('fa1'))));
+    await assertFails(getDoc(ref(dbAs('admin2'))));
+  });
+});
+
 // ---------- Team sheets (3.1a2) ----------
 
 describe('Team sheets (3.1a2)', () => {

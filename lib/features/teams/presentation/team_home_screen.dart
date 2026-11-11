@@ -25,6 +25,7 @@ import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/teams/domain/team.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/team_logo.dart';
+import 'package:gedfa_connect/features/players/presentation/widgets/division_juveniles_card.dart';
 
 class TeamHomeScreen extends ConsumerStatefulWidget {
   const TeamHomeScreen({super.key});
@@ -236,6 +237,8 @@ class _TeamHomeScreenState extends ConsumerState<TeamHomeScreen> {
               onStatusChanged: (status) => setState(() => _status = status),
               onSearchChanged: () => setState(() {}),
               onAddPlayer: add,
+              // 3.1d1: a club in both competitions names up to 7 juveniles
+              divisionJuvenilesTeam: team.hasBoth ? team : null,
             ),
           ),
         ],
@@ -254,9 +257,14 @@ class _SquadBody extends ConsumerWidget {
     required this.onStatusChanged,
     required this.onSearchChanged,
     required this.onAddPlayer,
+    this.divisionJuvenilesTeam,
   });
 
   final Competition competition;
+
+  /// The club, when it plays both competitions: the Division view shows
+  /// its juveniles in the Division under the players (3.1d1, DJ1).
+  final Team? divisionJuvenilesTeam;
 
   /// Juvenile: the age group tab (U13 / U15 / U17).
   final AgeGroup ageGroup;
@@ -483,6 +491,11 @@ class _SquadBody extends ConsumerWidget {
                       sections: sectionsByGroup(shown, isDark: isDark),
                       cardLine: CardLine.squad,
                       onTap: (player) => context.open(Routes.player(player.id)),
+                    ),
+                  if (isDivision && divisionJuvenilesTeam != null)
+                    DivisionJuvenilesCard(
+                      team: divisionJuvenilesTeam!,
+                      players: allPlayers,
                     ),
                 ],
               ),

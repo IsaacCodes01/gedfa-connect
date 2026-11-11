@@ -2159,6 +2159,47 @@ service cloud.firestore {
           && player.teamId == resource.data.teamId;
       }
 
+      // ---- Juveniles in the Division (3.1d1) ----
+      // squads/{teamId}_divisionJuveniles: player ID -> age group ("U15").
+      // A club in both competitions names up to 7 of its approved juveniles
+      // who may also play Division matches (Isaac, 11 Nov 2026): at most
+      // 1 U13 and 3 U15, U17 without a limit. The TEAM names or removes one
+      // player per write ('changed'); a named player must be on its
+      // juvenile squad list for that age group (approved): 1 lookup.
+
+      // How many of [groups] (a list of age groups) are [group]
+      function countOf(groups, group) {
+        return groups.size() - groups.removeAll([group]).size();
+      }
+
+      function isDivisionJuvenilesChange(squadId) {
+        let after = request.resource.data;
+        let before = resource == null ? {} : resource.data.players;
+        let diff = after.players.diff(before);
+        let groups = after.players.values();
+        let group = after.players.get(after.changed, '');
+        return after.keys().hasOnly(['teamId', 'group', 'players', 'changed', 'updatedAt'])
+          && after.group == 'divisionJuveniles'
+          && squadId == after.teamId + '_divisionJuveniles'
+          && (resource == null || after.teamId == resource.data.teamId)
+          && isTeamAdminOf(after.teamId)
+          && !isSuspended(after.teamId)
+          && get(teamDoc(after.teamId)).data.categories.hasAll(['division', 'juvenile'])
+          && after.players is map
+          && diff.affectedKeys().hasOnly([after.changed])
+          && diff.changedKeys().size() == 0
+          && after.updatedAt == request.time
+          && after.players.size() <= 7
+          && countOf(groups, 'U13') <= 1
+          && countOf(groups, 'U15') <= 3
+          && (diff.removedKeys().size() == 1
+              || (diff.addedKeys().size() == 1
+                  && group in ['U13', 'U15', 'U17']
+                  && exists(squadDoc(after.teamId, group))
+                  && get(squadDoc(after.teamId, group)).data.players
+                       .get(after.changed, false) == true));
+      }
+
       match /squads/{squadId} {
         // (a list not made yet doesn't exist: a team admin may look, and
         // finds nothing)
@@ -2168,6 +2209,8 @@ service cloud.firestore {
         allow create, update: if isFaAdmin() && isSquadAdd(squadId);
         allow update: if (isFaAdmin() || isTeamAdminOf(resource.data.teamId))
           && isSquadRemoval();
+        // Juveniles in the Division: the team (3.1d1)
+        allow create, update: if isDivisionJuvenilesChange(squadId);
       }
 
       // ---------- teamSheets/{fixtureId}_{teamId} (3.1a2) ----------

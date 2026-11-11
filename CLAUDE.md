@@ -200,6 +200,12 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
   `widgets/sheet_line.dart` on the Home card (`HomeNextMatchCard.sheetLine`); Needs you rows; Fixtures `_DueBox` and
   `FixtureRow.extraTags`; `Routes.teamSheet(id, check: true)` opens on Check (`?view=check`). Laptop (>= 840 px): two
   columns, no steps. Tests building team screens override `myTeamSheetsProvider`. Next: **3.1d** juvenile play-up limits.
+- **3.1d1** done (11 Nov 2026, 405 rules tests, 293 Dart tests): **juveniles in the Division** (mockup `3.1d-division-juveniles.html`,
+  approved): `squads/{teamId}_divisionJuveniles` (player ID → "U15"), the TEAM names / removes one per write (rules
+  `isDivisionJuvenilesChange`, limits counted with `removeAll`); `players/domain/division_juveniles.dart`, repository +
+  `myDivisionJuvenilesProvider`, Squad › Division `DivisionJuvenilesCard` + picker; FA told with `teamUpdated`. Rules changed:
+  Isaac deploys to dev. Next: **3.1d2** the Division sheet takes the 7 (pills) + juvenile play-up limits (MS6). Widget tests
+  with `PlayerAvatar` need `sharedPreferencesProvider` overridden.
 - Calendar backdrop (`_CalendarBackdrop` in `match_calendar_card.dart`): GEDFA logo as a one-colour watermark (its letters are white,
   so tint it with `color` + `BlendMode.srcIn`). `assets/images/gedfa_logo.png` is now committed.
 - **Plan agreed 9 Nov 2026 (deadline Thu 12 Nov, 12:30 pm; Isaac's prompts in that conversation):** next, in order:
