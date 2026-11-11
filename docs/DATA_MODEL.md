@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.32, matches the rules after step 3.1d1, juveniles in the Division (11 Nov 2026)
+**Status:** v2.32.1, matches the rules after step 3.1d1, juveniles in the Division (11 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -463,7 +463,7 @@ A club in **both** competitions names up to **7** of its approved juvenile playe
 | `updatedAt` | timestamp | Server time |
 
 - **Write: the team admin only** (not the FA), its own team, not while suspended, and only a club whose `categories` hold both `division` and `juvenile`. **One player per write**: named (the player must be on its juvenile squad list for that age group, i.e. approved: 1 lookup) or removed; a player's age group never changes in place. The 7 and the 1 / 3 limits are counted from the map's values (`removeAll`, the rules have no loops).
-- **No FA approval** (Isaac): the same batch writes a `teamUpdated` note to the FA's bell ("… updated their juveniles in the Division").
+- **No FA approval** (Isaac): the same batch writes a `divisionJuveniles` note to the FA's bell ("Royal Unique FC: juveniles in the Division", `names` one line per change: "+ Kojo Brew (U15)" / "− Yaw Sam (U17)"); it opens the team's players page, which lists the 7 (read only). The kind is in both notification lists in the rules.
 - Read: the team and the FA.
 - The app: Squad tab › Division, card "Juveniles in the Division" (DJ1) and the picker (DJ2), `players/data/division_juveniles_repository.dart`.
 
@@ -921,6 +921,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 11 Nov 2026 | v2.32.1: notification kind `divisionJuveniles` (team → FA) with one line per change. 406 rules tests. |
 | 11 Nov 2026 | v2.32: new `squads/{teamId}_divisionJuveniles` (3.1d1): the club names up to 7 approved juveniles for the Division (at most 1 U13 and 3 U15), one per write, the team only, clubs in both competitions; the FA is told in the bell. 405 rules tests. |
 | 11 Nov 2026 | v2.31.1: Section 7, Isaac's answers on juveniles in the Division (3.1d): up to 7 named by the club, at most 1 U13 and 3 U15, they still play juvenile matches. |
 | 11 Nov 2026 | v2.31 (3.1c): no new fields or rules; a team lists its own `teamSheets` (new rules test). Needs you shows a sheet not started from 2 days before it is due, red on the day. 396 rules tests. |

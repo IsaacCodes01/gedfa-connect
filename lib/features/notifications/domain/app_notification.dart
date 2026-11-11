@@ -33,6 +33,7 @@ enum NotificationKind {
   correctionSentBack, // a team corrected what the FA asked (2.11b)
   inviteAccepted,
   paymentSent, // a team added a payment (2.13c)
+  divisionJuveniles, // a club named or removed juveniles for the Division (3.1d)
   registrationChanged; // an FA official opened or closed registration
 
   static NotificationKind? fromString(String? value) {
@@ -109,6 +110,8 @@ class AppNotification {
               ? 'Player resubmitted ($teamName)'
               : '$people players resubmitted ($teamName)',
         NotificationKind.teamUpdated => '$teamName updated their profile',
+        NotificationKind.divisionJuveniles =>
+          '$teamName: juveniles in the Division',
         NotificationKind.juvenileSubmitted => people == 1
             ? 'New juvenile player from $teamName'
             : '$people juvenile players from $teamName',
@@ -214,6 +217,9 @@ class AppNotification {
         withNames('Waiting for your review in Players.'),
       NotificationKind.juvenileSubmitted => withNames(
           'Waiting for the screening day; see Players › Juvenile.'),
+      NotificationKind.divisionJuveniles => withNames(
+          'Named (+) or removed (−) by the club; up to 7 may play Division '
+          'matches. No approval needed.'),
       NotificationKind.teamUpdated => names == null
           ? 'Saved straight away (no approval needed). Changed:'
           : 'Changed: $names. Saved straight away (no approval needed).',

@@ -4332,6 +4332,13 @@ describe('Juveniles in the Division (3.1d1)', () => {
     await assertFails(name(dbAs('admin1'), 'a15', 'U15'));
   });
 
+  it('the team tells the FA: "Royal Unique FC: juveniles in the Division"', async () => {
+    await assertSucceeds(notify(dbAs('admin1'), 'fa_divisionJuveniles_royal',
+      { audience: 'fa', kind: 'divisionJuveniles', teamId: 'royal', names: ['+ Kojo Brew (U15)'] }));
+    await assertFails(notify(dbAs('admin1'), 'fa_divisionJuveniles_stars',
+      { audience: 'fa', kind: 'divisionJuveniles', teamId: 'stars' }));
+  });
+
   it('the team and the FA read it; another team does not', async () => {
     await seedNamed({ a15: 'U15' });
     await assertSucceeds(getDoc(ref(dbAs('admin1'))));

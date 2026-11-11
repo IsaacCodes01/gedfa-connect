@@ -16,8 +16,8 @@ const divisionJuvenilesGroup = 'divisionJuveniles';
 
 /// Juveniles in the Division (3.1d1): `squads/{teamId}_divisionJuveniles`,
 /// `players` = player ID → age group ("U15"). The team names or removes
-/// one player per write; the FA is told in the bell ("… updated their
-/// juveniles in the Division"), in the same batch.
+/// one player per write; the FA is told in the bell ("Royal Unique FC:
+/// juveniles in the Division", with each name), in the same batch.
 class DivisionJuvenilesRepository {
   DivisionJuvenilesRepository(this._db);
 
@@ -47,28 +47,36 @@ class DivisionJuvenilesRepository {
         'changed': player.id,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
-    _tellFa(batch, team);
+    _tellFa(batch, team, '+ ${player.fullName} (${player.ageGroup!.label})');
     return batch.commit().timeout(_timeout);
   }
 
-  Future<void> remove({required Team team, required String playerId}) {
+  /// Takes [player] off the list.
+  Future<void> remove({required Team team, required Player player}) {
+    final playerId = player.id;
     final batch = _db.batch()
       ..update(_ref(team.id), {
         'players.$playerId': FieldValue.delete(),
         'changed': playerId,
         'updatedAt': FieldValue.serverTimestamp(),
       });
-    _tellFa(batch, team);
+    _tellFa(
+      batch,
+      team,
+      '− ${player.fullName} (${player.ageGroup?.label ?? 'juvenile'})',
+    );
     return batch.commit().timeout(_timeout);
   }
 
-  void _tellFa(WriteBatch batch, Team team) =>
+  /// One note per team and day for the FA, listing each change:
+  /// "+ Kojo Brew (U15)", "− Yaw Sam (U17)".
+  void _tellFa(WriteBatch batch, Team team, String line) =>
       NotificationWriter(_db).forFaInBatch(
         batch,
-        kind: NotificationKind.teamUpdated,
+        kind: NotificationKind.divisionJuveniles,
         teamId: team.id,
         teamName: team.name,
-        name: 'juveniles in the Division',
+        name: line,
       );
 }
 
@@ -85,6 +93,13 @@ class DivisionJuvenileException implements Exception {
 final divisionJuvenilesRepositoryProvider =
     Provider<DivisionJuvenilesRepository>(
       (ref) => DivisionJuvenilesRepository(ref.watch(firestoreProvider)),
+    );
+
+/// Any club's juveniles in the Division, live (the FA's team page).
+final divisionJuvenilesProvider =
+    StreamProvider.family<DivisionJuveniles, String>(
+      (ref, teamId) =>
+          ref.watch(divisionJuvenilesRepositoryProvider).watch(teamId),
     );
 
 /// My club's juveniles in the Division, live.

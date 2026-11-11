@@ -482,7 +482,7 @@ service cloud.firestore {
                            'correctionSentBack', 'correctionDone',
                            'teamSuspended', 'suspensionLifted',
                            'fixtureAdded', 'fixtureChanged', 'fixturePostponed',
-                           'fixtureCancelled']
+                           'fixtureCancelled', 'divisionJuveniles']
           && data.teamId is string
           && data.teamName is string
           && data.names is list && data.names.size() <= 60
@@ -497,7 +497,8 @@ service cloud.firestore {
           && (isFaAdmin()
               || (data.kind in ['playersSubmitted', 'playersResubmitted',
                                 'juvenileSubmitted', 'paymentSent', 'teamUpdated',
-                                'changeRequested', 'correctionSentBack']
+                                'changeRequested', 'correctionSentBack',
+                                'divisionJuveniles']
                   && isTeamAdminOf(data.teamId))
               || data.kind in ['teamRequest', 'inviteAccepted']);
       }

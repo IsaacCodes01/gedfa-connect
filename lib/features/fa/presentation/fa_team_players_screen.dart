@@ -16,6 +16,7 @@ import 'package:gedfa_connect/features/players/data/player_repository.dart';
 import 'package:gedfa_connect/features/players/domain/player.dart';
 import 'package:gedfa_connect/features/players/presentation/widgets/position_rows.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
+import 'package:gedfa_connect/features/players/presentation/widgets/division_juveniles_card.dart';
 
 /// The three tabs on this screen.
 enum _Tab { toReview, approved, all }
@@ -141,7 +142,7 @@ class _FaTeamPlayersScreenState extends ConsumerState<FaTeamPlayersScreen> {
         message: 'It may have been removed.',
       );
     } else {
-      body = _body(teamPlayers, pending);
+      body = _body(teamPlayers, pending, hasBoth: team.hasBoth);
     }
 
     return Scaffold(
@@ -180,7 +181,11 @@ class _FaTeamPlayersScreenState extends ConsumerState<FaTeamPlayersScreen> {
     );
   }
 
-  Widget _body(List<Player> teamPlayers, int pending) {
+  Widget _body(
+    List<Player> teamPlayers,
+    int pending, {
+    required bool hasBoth,
+  }) {
     final textTheme = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
 
@@ -262,6 +267,13 @@ class _FaTeamPlayersScreenState extends ConsumerState<FaTeamPlayersScreen> {
                   selecting: _selecting,
                   picked: _picked,
                   onTap: _open,
+                ),
+              // The club's juveniles in the Division, read only (3.1d)
+              if (hasBoth && !_selecting)
+                FaDivisionJuveniles(
+                  teamId: widget.teamId,
+                  onOpen: (p) =>
+                      context.pushKeepingHome(Routes.adminJuvenileChild(p.id)),
                 ),
             ],
           ),

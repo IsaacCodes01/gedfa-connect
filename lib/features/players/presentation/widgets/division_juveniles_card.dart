@@ -6,6 +6,7 @@ import 'package:gedfa_connect/core/widgets/app_toast.dart';
 import 'package:gedfa_connect/features/dashboard/presentation/widgets/dashboard_card.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/widgets/fixture_row.dart';
 import 'package:gedfa_connect/features/players/data/division_juveniles_repository.dart';
+import 'package:gedfa_connect/features/players/data/player_repository.dart';
 import 'package:gedfa_connect/features/players/domain/age_group.dart';
 import 'package:gedfa_connect/features/players/domain/division_juveniles.dart';
 import 'package:gedfa_connect/features/players/domain/player.dart';
@@ -43,7 +44,7 @@ class DivisionJuvenilesCard extends ConsumerWidget {
       try {
         await ref
             .read(divisionJuvenilesRepositoryProvider)
-            .remove(team: team, playerId: p.id);
+            .remove(team: team, player: p);
         if (context.mounted) {
           AppToast.success(
             context,
@@ -461,6 +462,71 @@ class _PickerState extends ConsumerState<_Picker> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// The FA's view of a club's juveniles in the Division (3.1d): read only,
+/// at the bottom of the team's players page, where the bell note
+/// "…: juveniles in the Division" opens. Tapping one opens the child.
+class FaDivisionJuveniles extends ConsumerWidget {
+  const FaDivisionJuveniles({
+    super.key,
+    required this.teamId,
+    required this.onOpen,
+  });
+
+  final String teamId;
+  final ValueChanged<Player> onOpen;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final list =
+        ref.watch(divisionJuvenilesProvider(teamId)).value ??
+        const DivisionJuveniles();
+    final children = ref.watch(juvenilePlayersProvider).value ?? const [];
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    final named = [
+      for (final p in children)
+        if (p.teamId == teamId && list.contains(p.id)) p,
+    ]..sort((a, b) => b.ageGroup!.index.compareTo(a.ageGroup!.index));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        DashboardSectionTitle(
+          title: 'Juveniles in the Division',
+          trailing: '${list.size} of ${DivisionJuveniles.max}',
+        ),
+        DashboardCard(
+          padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final p in named)
+                InkWell(
+                  onTap: () => onOpen(p),
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: JuvenileLine(player: p),
+                  ),
+                ),
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Text(
+                  named.isEmpty
+                      ? 'None named yet. The club names up to 7 of its '
+                            'approved juveniles who may also play Division '
+                            'matches (at most 1 U13 and 3 U15).'
+                      : 'Named by the club (no approval needed). They may '
+                            'also play Division matches.',
+                  style: TextStyle(fontSize: 11.5, color: muted),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

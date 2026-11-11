@@ -78,6 +78,8 @@ enum NoteLook { ok, no, fa, team, ref }
     // Players › Juvenile › that team's children
     NotificationKind.juvenileSubmitted =>
       (NoteLook.fa, Routes.adminTeamJuvenile(n.teamId), 'Open Juvenile'),
+    NotificationKind.divisionJuveniles =>
+      (NoteLook.team, Routes.adminTeamPlayers(n.teamId), 'Open the squad'),
     NotificationKind.inviteAccepted =>
       (NoteLook.ref, Routes.adminPeople, 'Open People'),
     NotificationKind.paymentConfirmed => (NoteLook.ok, Routes.teamFee, fee),
