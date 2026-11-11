@@ -817,6 +817,7 @@ class _Sheets extends ConsumerWidget {
           : savedAt != null
               ? 'Saved ${formatShortDate(savedAt)}, ${formatTime(savedAt)} · '
                   '${sheet!.playerCount} players'
+                  '${mine ? ' · the FA can see it' : ''}'
               : open
                   ? 'Not started'
                   : 'No sheet saved';
@@ -828,6 +829,13 @@ class _Sheets extends ConsumerWidget {
             ? FilledButton.tonal(
                 onPressed: () => context.open(Routes.teamSheet(f.id)),
                 child: Text(sheet == null ? 'Make team sheet' : 'Change'),
+              )
+            // Locked: the team can still look at what it saved (3.1c)
+            : mine && savedAt != null
+            ? FilledButton.tonal(
+                onPressed: () =>
+                    context.open(Routes.teamSheet(f.id, check: true)),
+                child: const Text('View'),
               )
             : savedAt != null
                 ? const FixtureTag('Saved', tone: AccentTone.green)

@@ -7,6 +7,7 @@ import 'package:gedfa_connect/features/fixtures/domain/fixture.dart';
 import 'package:gedfa_connect/features/team_sheets/domain/sheet_picks.dart';
 import 'package:gedfa_connect/features/team_sheets/domain/sheet_roles.dart';
 import 'package:gedfa_connect/features/team_sheets/domain/team_sheet.dart';
+import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/official.dart';
 
 const _timeout = Duration(seconds: 15);
@@ -25,6 +26,13 @@ class TeamSheetRepository {
         final data = snap.data();
         return data == null ? null : TeamSheet.fromMap(data);
       });
+
+  /// Every sheet of one team, live (the rules let a team list its own).
+  Stream<List<TeamSheet>> watchTeam(String teamId) => _db
+      .collection(FirestorePaths.teamSheets)
+      .where('teamId', isEqualTo: teamId)
+      .snapshots()
+      .map((snap) => [for (final d in snap.docs) TeamSheet.fromMap(d.data())]);
 
   /// Saves the whole sheet (saving again replaces it). The rules check
   /// the match, the limits, that every player is approved, and the roles:
@@ -77,6 +85,22 @@ class TeamSheetRepository {
 
 final teamSheetRepositoryProvider = Provider<TeamSheetRepository>((ref) {
   return TeamSheetRepository(ref.watch(firestoreProvider));
+});
+
+/// My team's sheets by match ID, live (3.1c: the sheet lines on Home and
+/// Fixtures, Needs you, and "Use last sheet").
+final myTeamSheetsProvider = StreamProvider<Map<String, TeamSheet>>((
+  ref,
+) async* {
+  final team = await ref.watch(myTeamProvider.future);
+  if (team == null) {
+    yield const {};
+    return;
+  }
+  yield* ref
+      .watch(teamSheetRepositoryProvider)
+      .watchTeam(team.id)
+      .map((list) => {for (final s in list) s.fixtureId: s});
 });
 
 /// One sheet by its ID parts, live: `(fixtureId, teamId)`.

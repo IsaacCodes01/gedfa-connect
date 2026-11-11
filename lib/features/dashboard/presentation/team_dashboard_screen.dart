@@ -34,6 +34,9 @@ import 'package:gedfa_connect/features/players/domain/age_group.dart';
 import 'package:gedfa_connect/features/players/data/player_repository.dart';
 import 'package:gedfa_connect/features/screening/data/screening_repository.dart';
 import 'package:gedfa_connect/features/teams/data/correction_request_repository.dart';
+import 'package:gedfa_connect/features/team_sheets/data/team_sheet_repository.dart';
+import 'package:gedfa_connect/features/team_sheets/domain/sheet_status.dart';
+import 'package:gedfa_connect/features/team_sheets/presentation/widgets/sheet_line.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/teams/domain/correction_request.dart';
@@ -102,6 +105,7 @@ class _TeamDashboardScreenState extends ConsumerState<TeamDashboardScreen> {
     final now = DateTime.now();
     final wide = MediaQuery.sizeOf(context).width >= 600;
     final fixtures = ref.watch(myFixturesProvider).value ?? const <Fixture>[];
+    final sheets = ref.watch(myTeamSheetsProvider).value ?? const {};
     final settings = ref.watch(leagueSettingsProvider).value;
     final view = ref.watch(matchViewProvider);
     final groups = juvenileGroupsOf(fixtures);
@@ -213,6 +217,11 @@ class _TeamDashboardScreenState extends ConsumerState<TeamDashboardScreen> {
           now: now,
           onDetails: () => context.open(Routes.teamMatch(next.id)),
           onKits: () => context.open(Routes.teamFixtureKits(next.id)),
+          sheetLine: SheetLine(
+            status: SheetStatus.of(next, sheets[next.id], now),
+            onOpen: () => context.open(Routes.teamSheet(next.id)),
+            onView: () => context.open(Routes.teamSheet(next.id, check: true)),
+          ),
         ),
       if (upcoming.comingUp.isNotEmpty) ...[
         const SizedBox(height: 10),
@@ -485,6 +494,19 @@ class _TeamDashboardScreenState extends ConsumerState<TeamDashboardScreen> {
     ];
   }
 
+  /// "Team sheet for Saturday", "Team sheet for today".
+  static String _sheetLabel(Fixture f, DateTime now) {
+    final k = f.kickoffAt!;
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(k.year, k.month, k.day).difference(today).inDays;
+    final name = day == 0
+        ? 'today'
+        : day == 1
+        ? 'tomorrow'
+        : formatLongDate(k).split(',').first;
+    return 'Team sheet for $name';
+  }
+
   /// "Needs you" in words, from [teamNeeds].
   List<TeamNeedRow> _needRows(Team team, List<AgeGroup> groups) {
     final players = ref.watch(teamPlayersProvider).value ?? const [];
@@ -511,7 +533,33 @@ class _TeamDashboardScreenState extends ConsumerState<TeamDashboardScreen> {
 
     void open(String route) => context.open(route);
 
+    // Team sheets first (3.1c, MS1): not started, due within 2 days; red
+    // on the day. Every competition, whatever the switch shows.
+    final now = DateTime.now();
+    final sheets = ref.watch(myTeamSheetsProvider).value ?? const {};
+    final fixtures = ref.watch(myFixturesProvider).value ?? const <Fixture>[];
+    final dueSheets = [
+      for (final f in fixtures)
+        if (SheetStatus.of(f, sheets[f.id], now) case final s
+            when s.needsYou(now))
+          (f, s),
+    ]..sort((a, b) => a.$2.due!.compareTo(b.$2.due!));
+
     return [
+      for (final (f, s) in dueSheets)
+        TeamNeedRow(
+          icon: Icons.assignment_outlined,
+          tone: s.isDueToday(now) ? AccentTone.red : AccentTone.gold,
+          label: _sheetLabel(f, now),
+          detail: [
+            'v ${f.opponentOf(team.id).name}',
+            if (f.ageGroup case final g?) g.label,
+            'due ${formatShortDate(s.due!).substring(0, 3)} '
+                '${formatTime(s.due!)}',
+            'not started',
+          ].join(' · '),
+          onTap: () => open(Routes.teamSheet(f.id)),
+        ),
       for (final need in needs)
         switch (need.kind) {
           TeamNeedKind.playersSentBack => TeamNeedRow(

@@ -28,6 +28,7 @@ import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/teams/domain/kit.dart';
 import 'package:gedfa_connect/features/teams/domain/kit_slot.dart';
 import 'package:gedfa_connect/features/teams/domain/team.dart';
+import 'package:gedfa_connect/features/team_sheets/data/team_sheet_repository.dart';
 
 KitChoice _kit(KitSlot slot, Color c) => KitChoice(
       slot: slot,
@@ -194,6 +195,7 @@ Future<void> _pump(
       overrides: [
         sharedPreferencesProvider.overrideWithValue(prefs),
         seasonFixturesProvider.overrideWith((ref) => Stream.value(_fixtures)),
+        myTeamSheetsProvider.overrideWith((ref) => Stream.value(const {})),
         myFixturesProvider.overrideWith((ref) => Stream.value(_fixtures)),
         appUserProvider.overrideWith(
           (ref) => Stream.value(

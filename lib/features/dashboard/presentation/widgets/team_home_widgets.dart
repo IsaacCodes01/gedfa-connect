@@ -235,6 +235,7 @@ class HomeNextMatchCard extends StatefulWidget {
     required this.now,
     required this.onDetails,
     required this.onKits,
+    this.sheetLine,
   });
 
   final Fixture fixture;
@@ -242,6 +243,9 @@ class HomeNextMatchCard extends StatefulWidget {
   final DateTime now;
   final VoidCallback onDetails;
   final VoidCallback onKits;
+
+  /// The team sheet line and its buttons (3.1c, MS1), above Match details.
+  final Widget? sheetLine;
 
   @override
   State<HomeNextMatchCard> createState() => _HomeNextMatchCardState();
@@ -419,11 +423,12 @@ class _HomeNextMatchCardState extends State<HomeNextMatchCard> {
               ],
             ),
           ),
+          ?widget.sheetLine,
           const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
-                child: FilledButton(
+                child: FilledButton.tonal(
                   onPressed: widget.onDetails,
                   child: const Text('Match details'),
                 ),

@@ -7,13 +7,21 @@ enum Pick { out, start, bench }
 
 /// The numbers a sheet must respect (from League settings).
 class SheetLimits {
-  const SheetLimits({this.matchdaySquad = 18, this.minPlayers = 7});
+  const SheetLimits({
+    this.matchdaySquad = 18,
+    this.minPlayers = 7,
+    this.matchdaySubs = 5,
+  });
 
   /// Starting 11 + bench, at most (`settings/league.matchdaySquad`, 18).
   final int matchdaySquad;
 
   /// The fewest players a team may start with (`minPlayers`, 7).
   final int minPlayers;
+
+  /// Substitutes who may come on in a match (`matchdaySubs`, 5); shown on
+  /// the Check step.
+  final int matchdaySubs;
 
   static const eleven = 11;
 

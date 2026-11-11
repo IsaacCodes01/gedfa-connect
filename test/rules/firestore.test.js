@@ -4375,6 +4375,17 @@ describe('Team sheets (3.1a2)', () => {
     await assertFails(save(dbAs('admin1')));
   });
 
+  // ----- 3.1c: a team lists its own sheets -----
+
+  it('3.1c: a team lists its own sheets, never another team\'s', async () => {
+    await save(dbAs('admin1'));
+    const sheets = (db, teamId) =>
+      getDocs(query(collection(db, `${D}/teamSheets`), where('teamId', '==', teamId)));
+    await assertSucceeds(sheets(dbAs('admin1'), 'royal'));
+    await assertFails(sheets(dbAs('admin2'), 'royal'));
+    await assertFails(getDocs(collection(dbAs('admin1'), `${D}/teamSheets`)));
+  });
+
   // ----- 3.1b roles and numbers -----
 
   it('3.1b: a full sheet with captain, vice-captain, goalkeeper, numbers and officials', async () => {

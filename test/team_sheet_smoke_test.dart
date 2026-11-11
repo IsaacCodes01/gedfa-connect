@@ -17,6 +17,7 @@ import 'package:gedfa_connect/features/players/domain/player.dart';
 import 'package:gedfa_connect/features/players/domain/player_profile.dart';
 import 'package:gedfa_connect/features/players/domain/position.dart';
 import 'package:gedfa_connect/features/team_sheets/data/team_sheet_repository.dart';
+import 'package:gedfa_connect/features/team_sheets/domain/team_sheet.dart';
 import 'package:gedfa_connect/features/team_sheets/presentation/team_sheet_screen.dart';
 import 'package:gedfa_connect/features/teams/data/team_profile_repository.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
@@ -174,6 +175,7 @@ Future<void> _pump(
   Size size,
   Brightness b, {
   AgeGroup? group,
+  Map<String, TeamSheet> sheets = const {},
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -202,6 +204,7 @@ Future<void> _pump(
           (ref) => Stream.value(_players(group: group)),
         ),
         teamSheetProvider.overrideWith((ref, key) => Stream.value(null)),
+        myTeamSheetsProvider.overrideWith((ref) => Stream.value(sheets)),
         teamProfilesProvider.overrideWith(
           (ref) => Stream.value({
             'p3': const PlayerProfile(
@@ -280,10 +283,11 @@ void main() {
         ),
       );
 
-  testWidgets('picking 11 opens step 2; with a goalkeeper it can be saved', (
+  testWidgets('phone: Players, Roles & numbers, then Check and Save', (
     tester,
   ) async {
-    await _pump(tester, const Size(1280, 2400), Brightness.light);
+    // Phone width, tall enough for every row to be tapped
+    await _pump(tester, const Size(400, 2600), Brightness.light);
     await pickEleven(tester);
     _noError(tester);
     // p3 is injured: picked with a warning, still fine
@@ -303,7 +307,7 @@ void main() {
       find.text('Pick a goalkeeper from the starting 11.'),
       findsOneWidget,
     );
-    expect(button(tester, 'Save team sheet').onPressed, isNull);
+    expect(button(tester, 'Next: Check').onPressed, isNull);
 
     // Goalkeeper: Change, then the second goalkeeper (p11, number 12)
     await tester.tap(find.text('Change').at(2));
@@ -312,7 +316,79 @@ void main() {
     await tester.pumpAndSettle();
     _noError(tester);
     expect(find.text('#12 Kwabena Mensah-Bonsu Asamoah 11'), findsOneWidget);
+
+    // Step 3, Check (MS5): the sheet as it will look, the checks, Save
+    await tester.tap(find.text('Next: Check'));
+    await tester.pumpAndSettle();
+    _noError(tester);
+    expect(find.text('STARTING 11'), findsOneWidget);
+    expect(
+      find.text('Team manager and head coach on the sheet'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Captain starts · vice-captain on the sheet'),
+      findsOneWidget,
+    );
+    // Officials on the sheet: the manager first, then the head coach
+    expect(
+      find.textContaining('Kojo Antwi (Team manager) · Kofi Mensah'),
+      findsOneWidget,
+    );
     expect(button(tester, 'Save team sheet').onPressed, isNotNull);
+  });
+
+  testWidgets('laptop (MS7): players left, the sheet filling in on the right', (
+    tester,
+  ) async {
+    await _pump(tester, const Size(1280, 2400), Brightness.dark);
+    await pickEleven(tester);
+    _noError(tester);
+    // No steps: the sheet, roles and checks sit beside the players
+    expect(find.text('Next: Roles & numbers'), findsNothing);
+    expect(find.text('The sheet'), findsOneWidget);
+    expect(find.text('STARTING 11'), findsOneWidget);
+    expect(find.text('ARMBANDS AND GOALKEEPER'), findsOneWidget);
+    expect(button(tester, 'Save team sheet').onPressed, isNull);
+
+    await tester.tap(find.text('Change').at(2));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Kwabena Mensah-Bonsu Asamoah 0').last);
+    await tester.pumpAndSettle();
+    _noError(tester);
+    expect(button(tester, 'Save team sheet').onPressed, isNotNull);
+  });
+
+  testWidgets('Use last sheet copies the picks, armbands and numbers', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      const Size(400, 2600),
+      Brightness.light,
+      sheets: {
+        'm0': TeamSheet(
+          fixtureId: 'm0',
+          teamId: 'ruf',
+          category: Competition.division,
+          starters: [for (var i = 0; i <= 10; i++) 'p$i'],
+          captainId: 'p4',
+          goalkeeperId: 'p0',
+          numbers: {for (var i = 0; i <= 10; i++) 'p$i': i == 1 ? 33 : i + 1},
+          savedAt: DateTime(2026, 11, 1),
+        ),
+      },
+    );
+    await tester.tap(find.text('Use last sheet'));
+    await tester.pumpAndSettle();
+    _noError(tester);
+    expect(find.textContaining('Goalkeeper starts'), findsOneWidget);
+
+    await tester.tap(find.text('Next: Roles & numbers'));
+    await tester.pumpAndSettle();
+    expect(find.text('#5 Kwabena Mensah-Bonsu Asamoah 4'), findsOneWidget);
+    expect(find.text('#1 Kwabena Mensah-Bonsu Asamoah 0'), findsOneWidget);
+    expect(find.text('11 numbers · 1 changed'), findsOneWidget);
   });
 
   testWidgets('shirt numbers: the page and the picker fit a small phone', (

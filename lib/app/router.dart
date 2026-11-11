@@ -553,6 +553,8 @@ final routerProvider = Provider<GoRouter>((ref) {
                     parentNavigatorKey: rootNavigatorKey,
                     builder: (_, state) => TeamSheetScreen(
                       fixtureId: state.pathParameters['id']!,
+                      startOnCheck:
+                          state.uri.queryParameters['view'] == 'check',
                     ),
                   ),
                 ],

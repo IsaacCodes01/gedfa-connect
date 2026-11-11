@@ -29,6 +29,7 @@ import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/teams/domain/kit.dart';
 import 'package:gedfa_connect/features/teams/domain/kit_slot.dart';
 import 'package:gedfa_connect/features/teams/domain/team.dart';
+import 'package:gedfa_connect/features/team_sheets/data/team_sheet_repository.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// The team's Home (TDa) on a small phone, light and dark: no overflow,
@@ -128,6 +129,7 @@ Future<void> _pump(
         leagueSettingsProvider.overrideWith(
           (ref) => Stream.value(const LeagueSettings()),
         ),
+        myTeamSheetsProvider.overrideWith((ref) => Stream.value(const {})),
         myFixturesProvider.overrideWith(
           (ref) => Stream.value([
             _match('div1', soon),

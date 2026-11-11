@@ -23,6 +23,9 @@ import 'package:gedfa_connect/features/fixtures/presentation/widgets/match_calen
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/fixtures/domain/fixture.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/widgets/fixture_row.dart';
+import 'package:gedfa_connect/features/team_sheets/data/team_sheet_repository.dart';
+import 'package:gedfa_connect/features/team_sheets/domain/sheet_status.dart';
+import 'package:gedfa_connect/features/team_sheets/domain/team_sheet.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:go_router/go_router.dart';
 
@@ -66,6 +69,7 @@ class _TeamFixturesScreenState extends ConsumerState<TeamFixturesScreen> {
     final teamId = ref.watch(appUserProvider).value?.teamId ?? '';
     final team = ref.watch(myTeamProvider).value;
     final fixturesAsync = ref.watch(myFixturesProvider);
+    final sheets = ref.watch(myTeamSheetsProvider).value ?? const {};
     final view = ref.watch(matchViewProvider);
     final now = DateTime.now();
 
@@ -115,8 +119,22 @@ class _TeamFixturesScreenState extends ConsumerState<TeamFixturesScreen> {
           Widget row(Fixture f) {
             final home = f.isHome(teamId);
             final k = f.kickoffAt;
+            // 3.1c: "Sheet saved", or "Sheet due Sat" within a week
+            final sheet = SheetStatus.of(f, sheets[f.id], now);
+            final due = sheet.due;
             return FixtureRow(
               fixture: f,
+              extraTags: [
+                if (sheet.state == SheetState.saved)
+                  const FixtureTag('Sheet saved', tone: AccentTone.green)
+                else if (sheet.state == SheetState.notStarted &&
+                    due != null &&
+                    due.difference(now).inDays < 7)
+                  FixtureTag(
+                    'Sheet due ${formatShortDate(due).substring(0, 3)}',
+                    tone: AccentTone.gold,
+                  ),
+              ],
               dateLabel: k == null
                   ? 'New date to come · ${home ? 'Home' : 'Away'}'
                   : '${formatShortDate(k)} · ${home ? 'Home' : 'Away'}',
@@ -214,6 +232,7 @@ class _TeamFixturesScreenState extends ConsumerState<TeamFixturesScreen> {
                     fixture: next,
                     teamId: teamId,
                     now: now,
+                    sheet: sheets[next.id],
                     onTap: () => context.push(Routes.teamMatch(next.id)),
                   ),
                 ],
@@ -260,12 +279,16 @@ class NextMatchCard extends StatelessWidget {
     required this.teamId,
     required this.now,
     this.onTap,
+    this.sheet,
   });
 
   final Fixture fixture;
   final String teamId;
   final DateTime now;
   final VoidCallback? onTap;
+
+  /// My team's saved sheet for this match, if any (3.1c).
+  final TeamSheet? sheet;
 
   @override
   Widget build(BuildContext context) {
@@ -383,7 +406,7 @@ class NextMatchCard extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 14),
-                    _DueBox(fixtureId: f.id, due: due, now: now),
+                    _DueBox(fixtureId: f.id, due: due, now: now, sheet: sheet),
                   ],
                 ),
               ),
@@ -423,17 +446,21 @@ class _Meta extends StatelessWidget {
   }
 }
 
-/// "Team sheet due in 2 h 14 min" in gold, with "Make sheet" (3.1).
+/// "Team sheet due in 2 h 14 min" in gold with "Make sheet"; once saved,
+/// "Team sheet saved · 16 players" in green with "Change" (3.1c); after
+/// the lock, "View" opens the sheet as saved.
 class _DueBox extends StatelessWidget {
   const _DueBox({
     required this.fixtureId,
     required this.due,
     required this.now,
+    required this.sheet,
   });
 
   final String fixtureId;
   final DateTime due;
   final DateTime now;
+  final TeamSheet? sheet;
 
   /// "2 d 4 h", "2 h 14 min", "14 min"
   static String _left(Duration d) {
@@ -445,75 +472,94 @@ class _DueBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final closed = !due.isAfter(now);
-    const gold = AppColors.ghanaGold;
+    final saved = sheet;
+    final colour = saved != null
+        ? const Color(0xFF7BE0A4)
+        : AppColors.ghanaGold;
+    final soft = TextStyle(color: Colors.white.withValues(alpha: 0.8));
+    final bold = TextStyle(color: colour, fontWeight: FontWeight.w700);
+    final when = '${formatShortDate(due)}, ${formatTime(due)}';
+
+    final List<InlineSpan> text = saved != null
+        ? [
+            TextSpan(text: closed ? 'Team sheet locked · ' : 'Team sheet '),
+            TextSpan(
+              text: closed ? '${saved.playerCount} players' : 'saved',
+              style: bold,
+            ),
+            if (!closed) TextSpan(text: ' · ${saved.playerCount} players'),
+            TextSpan(
+              text: closed
+                  ? '\nLocked $when, 1 hour before kick-off'
+                  : '\nChange until $when',
+              style: soft,
+            ),
+          ]
+        : closed
+        ? [
+            const TextSpan(text: 'Team sheets closed at '),
+            TextSpan(text: formatTime(due), style: bold),
+            TextSpan(text: '\nNo sheet was saved', style: soft),
+          ]
+        : [
+            const TextSpan(text: 'Team sheet due '),
+            TextSpan(text: 'in ${_left(due.difference(now))}', style: bold),
+            TextSpan(text: '\n$when, 1 hour before kick-off', style: soft),
+          ];
+
+    final String? action = saved != null
+        ? (closed ? 'View' : 'Change')
+        : (closed ? null : 'Make sheet');
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: gold.withValues(alpha: 0.16),
-        border: Border.all(color: gold.withValues(alpha: 0.45)),
+        color: colour.withValues(alpha: 0.16),
+        border: Border.all(color: colour.withValues(alpha: 0.45)),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
         children: [
-          const Icon(Icons.assignment, color: Colors.white),
+          Icon(
+            saved != null ? Icons.task_alt : Icons.assignment,
+            color: Colors.white,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text.rich(
               TextSpan(
                 style: const TextStyle(color: Colors.white, fontSize: 12.5),
-                children: closed
-                    ? [
-                        const TextSpan(text: 'Team sheets closed at '),
-                        TextSpan(
-                          text: formatTime(due),
-                          style: const TextStyle(
-                            color: gold,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ]
-                    : [
-                        const TextSpan(text: 'Team sheet due '),
-                        TextSpan(
-                          text: 'in ${_left(due.difference(now))}',
-                          style: const TextStyle(
-                            color: gold,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        TextSpan(
-                          text:
-                              '\n${formatShortDate(due)}, '
-                              '${formatTime(due)}, 1 hour before kick-off',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.8),
-                          ),
-                        ),
-                      ],
+                children: text,
               ),
             ),
           ),
-          const SizedBox(width: 8),
-          // The team sheet (3.1); after the lock it opens read-only
-          Material(
-            color: gold.withValues(alpha: closed ? 0.4 : 1),
-            borderRadius: BorderRadius.circular(99),
-            child: InkWell(
+          if (action != null) ...[
+            const SizedBox(width: 8),
+            Material(
+              color: colour,
               borderRadius: BorderRadius.circular(99),
-              onTap: () => context.open(Routes.teamSheet(fixtureId)),
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                child: Text(
-                  'Make sheet',
-                  style: TextStyle(
-                    color: Color(0xFF3A2C00),
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(99),
+                onTap: () => context.open(
+                  Routes.teamSheet(fixtureId, check: action == 'View'),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  child: Text(
+                    action,
+                    style: const TextStyle(
+                      color: Color(0xFF16261C),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );

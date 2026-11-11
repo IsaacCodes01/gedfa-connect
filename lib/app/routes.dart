@@ -121,7 +121,9 @@ class Routes {
   static String teamMatch(String id) => '$teamFixtures/match/$id';
 
   /// Team: the team sheet for one match (3.1a2), full screen.
-  static String teamSheet(String fixtureId) => '$teamFixtures/sheet/$fixtureId';
+  /// A team sheet; [check] opens it on the Check step ("View sheet").
+  static String teamSheet(String fixtureId, {bool check = false}) =>
+      '$teamFixtures/sheet/$fixtureId${check ? '?view=check' : ''}';
 
   /// Team: the Home tab (TDa), where team admins land after signing in.
   static const teamHome = '/team/home';

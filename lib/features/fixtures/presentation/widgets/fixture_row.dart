@@ -74,9 +74,13 @@ class FixtureRow extends StatefulWidget {
     this.onTap,
     this.dateLabel,
     this.showJuvenileRules = false,
+    this.extraTags = const [],
   });
 
   final Fixture fixture;
+
+  /// More tags after the usual ones, e.g. "Sheet saved" (3.1c).
+  final List<Widget> extraTags;
   final VoidCallback? onTap;
 
   /// Instead of the plain date, e.g. "Sat 21 Nov · Away".
@@ -113,6 +117,7 @@ class _FixtureRowState extends State<FixtureRow> {
         FixtureTag(group.matchLengthText),
         if (group.playUpText case final text?) FixtureTag(text),
       ],
+      ...widget.extraTags,
     ];
 
     return Semantics(

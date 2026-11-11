@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.30, matches the rules after step 3.1b, team sheets: roles and numbers (11 Nov 2026)
+**Status:** v2.31, matches the rules after step 3.1c, team sheets: Check step and sheet lines (11 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -472,7 +472,7 @@ A team's sheet for one match. Saved again and again (each save replaces it) unti
 - **Players:** every ID must be on the team's squad list (2.4d): the Division list, or in a juvenile match the match's age group **and the younger ones** (playing up; the GFA limits come in 3.1d). Up to 3 lookups.
 - **Roles (rules, 3.1b):** the captain and the goalkeeper are in `starters`; the vice-captain (if any) is in `starters` + `bench` and isn't the captain; `numbers` has exactly the picked players, every value in 1–99 (checked against a list, the rules have no loops), all different; `officials` has 2 to 7, `[0]` the team manager, `[1]` the head coach.
 - **App only:** injured or unavailable players (Profiles) are picked with a warning.
-- **Read:** the team and the FA. The opponent and the match officials after the lock (3.2). A team may look for its sheet before making it.
+- **Read:** the team and the FA. The opponent and the match officials after the lock (3.2). A team may look for its sheet before making it, and **list its own sheets** (`where teamId ==` its team, 3.1c: the sheet lines on Home and Fixtures, Needs you, "Use last sheet"); never another team's.
 
 ### 2.4a Player ID (`playerCode`)
 
@@ -902,6 +902,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 11 Nov 2026 | v2.31 (3.1c): no new fields or rules; a team lists its own `teamSheets` (new rules test). Needs you shows a sheet not started from 2 days before it is due, red on the day. 396 rules tests. |
 | 11 Nov 2026 | v2.30: `teamSheets` (3.1b) adds `captainId` (starts), `viceCaptainId` (optional, on the sheet), `goalkeeperId` (any starter), `numbers` (shirt numbers for this match, 1–99, no two the same, every picked player) and `officials` (2–7 copies without phones, manager first, head coach second). Isaac: sheets open any time until the lock. 395 rules tests. |
 | 10 Nov 2026 | v2.29: new `teamSheets/{fixtureId}_{teamId}` (3.1a2): `starters` (7 to 11), `bench` (at most 7, only with 11 starting, 18 in all), approved players only via the squad lists (juvenile: the match's age group and younger), locked 1 hour before kick-off; the team writes, the team and the FA read. The squad list Repair shows only in debug builds. 387 rules tests. |
 | 10 Nov 2026 | v2.28: new `squads/{teamId}_{group}` (3.1a1): the IDs of a team's approved players per competition / age group, one player per write (`changed`). The FA's approval and screening pass must add the player in the same transaction; a team edit that sends an approved player back to pending must take them off; FA Repair in League settings. 369 rules tests. |

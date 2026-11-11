@@ -191,6 +191,12 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
   `widgets/sheet_roles_step.dart`, `widgets/shirt_numbers.dart`. Sheets open any time until the lock (Isaac). Rules changed:
   Isaac deploys to dev. Next: **3.1c** Check step and sheet lines. Rules tests: if the emulators run, `npm test` alone; else
   `firebase emulators:exec --only firestore "cd test/rules && npm test"`.
+- **3.1c** done, **team sheet builder finished for Division** (11 Nov 2026, 396 rules tests, 285 Dart tests, no rules change):
+  step 3 Check (`widgets/sheet_check_step.dart`: `SheetPaper`, `SheetCheckList`); `myTeamSheetsProvider` (a team lists its
+  own sheets); `domain/sheet_status.dart` (`SheetStatus.of`, `needsYou` 2 days before, `lastSheetFor` = Use last sheet);
+  `widgets/sheet_line.dart` on the Home card (`HomeNextMatchCard.sheetLine`); Needs you rows; Fixtures `_DueBox` and
+  `FixtureRow.extraTags`; `Routes.teamSheet(id, check: true)` opens on Check (`?view=check`). Laptop (>= 840 px): two
+  columns, no steps. Tests building team screens override `myTeamSheetsProvider`. Next: **3.1d** juvenile play-up limits.
 - Calendar backdrop (`_CalendarBackdrop` in `match_calendar_card.dart`): GEDFA logo as a one-colour watermark (its letters are white,
   so tint it with `color` + `BlendMode.srcIn`). `assets/images/gedfa_logo.png` is now committed.
 - **Plan agreed 9 Nov 2026 (deadline Thu 12 Nov, 12:30 pm; Isaac's prompts in that conversation):** next, in order:
