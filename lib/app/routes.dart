@@ -74,6 +74,12 @@ class Routes {
       '$adminPlayers/team/$teamId/juvenile';
   static String adminPlayer(String playerId) =>
       '$adminPlayers/player/$playerId';
+
+  /// FA: suspend a player for matches (3.1e1, SP1), and everyone
+  /// suspended now (SP2). Both full-screen.
+  static String adminSuspendPlayer(String playerId) =>
+      '$adminPlayers/suspend/$playerId';
+  static const adminSuspended = '$adminPlayers/suspended';
   static const adminMore = '/admin/more';
   static const adminPeople = '/admin/more/people';
 

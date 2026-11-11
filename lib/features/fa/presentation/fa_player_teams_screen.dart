@@ -17,6 +17,8 @@ import 'package:gedfa_connect/features/players/domain/age_group.dart';
 import 'package:gedfa_connect/features/players/domain/player.dart';
 import 'package:gedfa_connect/features/players/presentation/widgets/player_photo.dart';
 import 'package:gedfa_connect/features/screening/presentation/widgets/next_screening_strip.dart';
+import 'package:gedfa_connect/features/suspensions/data/player_suspension_repository.dart';
+import 'package:gedfa_connect/features/suspensions/presentation/widgets/ban_widgets.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/teams/domain/team.dart';
@@ -182,6 +184,8 @@ class _FaPlayerTeamsScreenState extends ConsumerState<FaPlayerTeamsScreen> {
                   ],
                 ],
               ),
+              const SizedBox(height: 10),
+              const _SuspendedTile(),
               const SizedBox(height: 12),
               const NextScreeningStrip(),
               const SizedBox(height: 12),
@@ -319,6 +323,8 @@ class _FaPlayerTeamsScreenState extends ConsumerState<FaPlayerTeamsScreen> {
                   ),
                 ],
               ),
+              const SizedBox(height: 10),
+              const _SuspendedTile(),
               const SizedBox(height: 12),
               TextField(
                 key: const ValueKey('division-search'),
@@ -553,6 +559,63 @@ class _TeamStats {
 }
 
 /// One of the three numbers at the top (To review / Approved / Teams).
+/// SP2 (3.1e1): "Suspended · 3 now" opens everyone suspended.
+class _SuspendedTile extends ConsumerWidget {
+  const _SuspendedTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final count = ref.watch(faBansProvider).length;
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final (bg, ink) = banColours(context);
+    return Material(
+      color: scheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: scheme.outline),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => context.open(Routes.adminSuspended),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: bg,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.block_rounded, color: ink, size: 19),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Suspended players',
+                  style: textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Text(
+                count == 0 ? 'None now' : '$count now',
+                style: textTheme.labelMedium?.copyWith(
+                  color: count == 0 ? scheme.onSurfaceVariant : ink,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: scheme.onSurfaceVariant),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _TotalCard extends StatelessWidget {
   const _TotalCard({
     required this.value,

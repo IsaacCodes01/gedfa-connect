@@ -160,6 +160,7 @@ class Fixture {
     this.kickoffAt,
     this.note,
     this.previousNames = const {},
+    this.banned = const {},
   });
 
   final String id;
@@ -187,6 +188,13 @@ class Fixture {
   /// JSc2: team ID → its name before the FA approved a new one. Everyone
   /// sees "Previously …" on the match.
   final Map<String, PreviousName> previousNames;
+
+  /// 3.1e1: team ID → its players suspended for this match (written by
+  /// the FA with each player suspension; team sheets check it in 3.1e2).
+  final Map<String, List<String>> banned;
+
+  bool isBanned(String teamId, String playerId) =>
+      banned[teamId]?.contains(playerId) ?? false;
 
   /// The renamed sides of this match, home first, with their old names.
   List<(FixtureSide, PreviousName)> get renamedSides => [
@@ -246,6 +254,11 @@ class Fixture {
         for (final MapEntry(:key, :value)
             in ((data['previousNames'] as Map<String, dynamic>?) ?? {}).entries)
           key: ?PreviousName.fromMap(value),
+      },
+      banned: {
+        for (final MapEntry(:key, :value)
+            in ((data['banned'] as Map<String, dynamic>?) ?? {}).entries)
+          if (value is List) key: [for (final id in value) id.toString()],
       },
     );
   }

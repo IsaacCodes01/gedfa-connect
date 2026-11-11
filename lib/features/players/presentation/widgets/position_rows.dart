@@ -37,7 +37,7 @@ enum CardLine {
 
 /// Extra things a card can show (Player profiles tab, 2.3d).
 class CardExtra {
-  const CardExtra({this.badge, this.availability, this.line});
+  const CardExtra({this.badge, this.availability, this.line, this.banLeft});
 
   /// 'C' or 'VC' in a gold circle (top right).
   final String? badge;
@@ -48,6 +48,10 @@ class CardExtra {
 
   /// A third small line, e.g. "1.82 m · Right".
   final String? line;
+
+  /// Suspended by the FA (3.1e1, SP3): matches left. The bottom strip says
+  /// "Suspended · 2 left" in red, over anything else.
+  final int? banLeft;
 }
 
 // ── Sections ─────────────────────────────────────────────────────────────
@@ -392,19 +396,28 @@ class PlayerGridCard extends ConsumerWidget {
     final isRejected = status == ApprovalStatus.rejected;
     final faded = selecting && !isPending;
 
+    final banLeft = extra?.banLeft;
     final borderColor = selected
         ? scheme.primary
+        : banLeft != null
+        ? scheme.error
         : isPending
             ? AppColors.ghanaGold
             : isRejected
                 ? scheme.error
                 : scheme.outline;
-    final thickBorder = selected || isPending || isRejected;
+    final thickBorder = selected || isPending || isRejected || banLeft != null;
 
     // Approved players on the Player profiles tab show their availability
     final availability =
         status == ApprovalStatus.approved ? extra?.availability : null;
-    final (statusText, statusBg, statusInk) = switch (availability) {
+    final (statusText, statusBg, statusInk) = banLeft != null
+        ? (
+            'Suspended · $banLeft left',
+            isDark ? const Color(0xFF4A1820) : AppColors.rejectedBg,
+            isDark ? const Color(0xFFFF9DA6) : AppColors.rejectedText,
+          )
+        : switch (availability) {
       Availability.available => (
           'Available',
           isDark ? const Color(0xFF123D2B) : AppColors.approvedBg,
@@ -504,13 +517,18 @@ class PlayerGridCard extends ConsumerWidget {
                           color: statusBg,
                           padding: const EdgeInsets.symmetric(vertical: 3),
                           alignment: Alignment.center,
-                          child: Text(
-                            statusText.toUpperCase(),
-                            style: TextStyle(
-                              color: statusInk,
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.4,
+                          // "SUSPENDED · 2 LEFT" shrinks to fit a small card
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              statusText.toUpperCase(),
+                              maxLines: 1,
+                              style: TextStyle(
+                                color: statusInk,
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.4,
+                              ),
                             ),
                           ),
                         ),

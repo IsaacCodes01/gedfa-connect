@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.34.3, matches the rules after step 3.2, team sheets visible to the FA and, from the lock, the opponent (11 Nov 2026)
+**Status:** v2.35, matches the rules after step 3.1e1, player suspensions by the FA (11 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -586,10 +586,11 @@ Readable and writable only by FA admins. Created with `next: 2` by the very firs
 | Field | Notes |
 | ----- | ----- |
 | `audience` | `fa` or `team:<teamId>` |
-| `kind` | `playersApproved`, `playersRejected`, `teamApproved`, `paymentConfirmed`, `paymentNotFound`, `feeReminder`, `changeApproved`, `changeRefused`, `teamCorrected`, `correctionAsked`, `correctionDone`, `teamSuspended`, `suspensionLifted`, `fixtureAdded`, `fixtureChanged`, `fixturePostponed`, `fixtureCancelled` (for teams, written by the FA); `teamRequest`, `playersSubmitted`, `playersResubmitted`, `juvenileSubmitted`, `inviteAccepted`, `paymentSent`, `teamUpdated`, `changeRequested`, `correctionSentBack` (for the FA) |
+| `kind` | `playersApproved`, `playersRejected`, `teamApproved`, `paymentConfirmed`, `paymentNotFound`, `feeReminder`, `changeApproved`, `changeRefused`, `teamCorrected`, `correctionAsked`, `correctionDone`, `teamSuspended`, `suspensionLifted`, `fixtureAdded`, `fixtureChanged`, `fixturePostponed`, `fixtureCancelled`, `playerSuspended`, `playerSuspensionLifted` (for teams, written by the FA); `teamRequest`, `playersSubmitted`, `playersResubmitted`, `juvenileSubmitted`, `inviteAccepted`, `paymentSent`, `teamUpdated`, `changeRequested`, `correctionSentBack` (for the FA) |
 | `teamId`, `teamName` | The team concerned (`teamRequest`: the club's uid) |
 | `names` | e.g. `Kojo Arthur (GE26-0011)`, `Yaw Boateng: Jersey number #10 → #14` |
 | `count`, `day`, `updatedAt` | |
+| `targetId` | Optional (3.1e1): what the note's button opens, e.g. the suspended player ("Open the player"); a grouped note keeps the latest |
 
 - Written in the **same batch or transaction** as the action. Teams write only `playersSubmitted` / `playersResubmitted` / `juvenileSubmitted` / `paymentSent` / `teamUpdated` / `changeRequested` / `correctionSentBack` for their own team; only the FA writes team notifications.
 - Read: the FA reads `fa`; a team admin reads `team:<their team>`.
@@ -668,6 +669,7 @@ One match. Made by the FA (one at a time in 3.0a; "Make the season" and cups fol
 | `teamIds` | array | `[home.id, away.id]`, exactly (teams query their matches with `array-contains`) |
 | `home`, `away` | map | `{ id, name, shortName, logoUrl, colour }`: a **copy** of the team (teams can't read other teams). The rules check it matches the team document as it is now, and that the team plays this competition. In a **juvenile** match a club in both competitions is copied with its juvenile side's name: `juvenileName` / `juvenileShortName`, or `name` + " B" / `shortName` + " B" (rules `sideNamesOf`, app `side_name.dart`). A short name ending in " B" marks a "B" side (gold ring on its crest) |
 | `kits` | map | `{ home, away, homeGk, awayGk }`, each `{ slot, kit }`: which of the team's kits it wears and that kit **exactly as on the team** (juvenile kits for a club in both competitions). Outfield slots `home`/`away`/`third`, goalkeeper slots `goalkeeper`/`goalkeeper2` |
+| `banned` | map? | **3.1e1:** team ID → the IDs of its players **suspended for this match** (`playerSuspensions`). Only the FA writes it, alone (nothing else in the match changes), in the same batch as the suspension or its lift; a new match has none; a normal change keeps it as it is. At most 4 keys, 30 players each. Team sheets check it in 3.1e2 |
 | `previousNames` | map? | **JSc2:** team ID → `{ name, until }`: the team's name in this match before the FA approved a new club name or juvenile side name, and when (the gold "Previously …" pill and its note, for everyone). Only the FA's rename sets it; a new match has none; a normal change keeps it as it is |
 | `kickoffAt` | timestamp? | Empty only while **postponed** with no new date |
 | `venue` | string | 2–80; the home team's ground unless the FA changes it |
@@ -680,6 +682,29 @@ One match. Made by the FA (one at a time in 3.0a; "Make the season" and cups fol
 - **Kits (GEDFA, 8 Nov 2026):** the home team keeps its home kit; the away team wears the first of home, away, third whose shirt doesn't clash (then shorts and socks). Two colours clash when their CIEDE2000 colour difference is below **20.5** (`kitClashThreshold` in `kit_clash.dart`): on the 16 kit colours that is yellow–gold, black–navy, maroon–brown, navy–purple, red–orange and red–maroon. Goalkeepers (Law 4) must look different from both teams' outfield shirts; the two goalkeepers may match; the referee's colour is checked when referees are appointed (Phase 4). A goalkeeper clash is a warning, an outfield clash a problem for the FA. Photo kits read the team's home and away colours; third and goalkeeper photo kits have no colours yet (planned). The FA can change any choice.
 - **Team sheets** are due `kickoffAt` − 1 hour (GEDFA); nothing is stored for that yet (3.1).
 - `fixtures/{id}/history/{entryId}`: `{ what, reason?, by, byName, at }`, written by the FA with each change (the match must exist after the batch). Read by everyone with a role.
+
+### 2.15c `playerSuspensions/{id}` — player suspensions (3.1e1)
+
+**Any FA official** suspends an approved player for a **number of matches** (Isaac, 11 Nov 2026; mockup `3.1e-player-suspensions.html`, SP1–SP5). Not the team suspensions of 2.11c (`teams/{teamId}/suspensions`). Read by the FA and the club's team admin. **Never deleted**; lifted early with why.
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `playerId`, `playerName`, `playerCode` | | The player, copied (the rules check name and ID against the player, who must be **approved**) |
+| `teamId`, `teamName` | | The player's team |
+| `season` | string | `2026-27` |
+| `category`, `group` | string | Where it applies (**only the competition where it was given**): `division` / `division`, or `juvenile` / the child's age group (`U13`, `U15`, `U17`). A juvenile named for the Division (3.1d) may get a Division ban (the rules check the `divisionJuveniles` list) |
+| `reason` | string | `redCard`, `violentConduct`, `yellowCards`, `other` |
+| `reasonText` | string? | Only with `other`, required then (3–60) |
+| `note` | string? | Up to 200; the club sees it |
+| `matches` | number | 1 to 10 |
+| `fixtureIds` | array | The club's next **scheduled** matches in that competition when the FA saved (at most `matches`; fewer when the calendar has fewer) |
+| `byUid`, `byName`, `at` | | Who and when (server time) |
+| `liftedAt`, `liftReason`, `liftNote`, `liftedByUid`, `liftedByName` | | Only when lifted: `appealWon`, `givenByMistake` or `other` (needs a note, 3–200). Once |
+
+- **Suspend (FA), one batch:** create the suspension + `fixtures/{id}.banned.{teamId}` gets the player (arrayUnion) on each of `fixtureIds` + `playerSuspended` in the club's bell ("Kofi Boateng suspended for 2 matches — Red card. Misses …; Returns Sat 5 Dec, against Ojobi Rangers.", `targetId` = the player).
+- **Lift (FA), one batch:** the lift fields + the player off `banned` on each of `fixtureIds` (arrayRemove) + `playerSuspensionLifted` in the club's bell.
+- **Matches left** (app, `BanStatus`): `matches` minus the listed matches that are **played** (kick-off + 2 h, scheduled). A postponed or cancelled one is not served; matches not in the calendar yet keep it going. It ends by itself after the last one. The return match is the club's next scheduled match in that competition after the missed ones.
+- **Later (3.1e2):** the sheet refuses a player in `banned`; a postponed match moves its marks to the club's next match.
 
 ### 2.15a `fixtureDrafts/{draftId}` — "Make the season" drafts (3.0b)
 
@@ -788,6 +813,8 @@ These changes always happen together in **one batch** (all succeed or none do):
 | Child not eligible (FA)               | update player (`rejected`, `notEligible: true`, reason) + team notification                    |
 | Save a screening day (FA)             | create `announcements/{id}` (`to: juvenile`) + create `screeningDays/{id}` pointing to it      |
 | Cancel a screening day (FA)           | delete the day + delete its announcement + create a "Screening cancelled" announcement        |
+| Suspend a player (FA, 3.1e1)          | create `playerSuspensions/{id}` + add the player to `banned.{teamId}` on each match to miss + team notification `playerSuspended` |
+| Lift a player's suspension (FA)       | update the suspension (lift fields) + take the player off `banned.{teamId}` on those matches + team notification `playerSuspensionLifted` |
 
 **Photos and batches.** Storage files can't be part of a Firestore batch, so a player's photo is handled around it:
 
@@ -928,6 +955,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 11 Nov 2026 | v2.35 (3.1e1): `playerSuspensions/{id}` (any FA official suspends an approved player for 1–10 matches with a reason; lifted early with why), `fixtures.banned` (team ID → suspended player IDs, FA only, alone, same batch), notification kinds `playerSuspended` / `playerSuspensionLifted` and the optional `targetId`. 426 rules tests. |
 | 11 Nov 2026 | v2.34.3: Section 7, Isaac's answers on match day (3.5, 3.3, 3.6): IDs from the lock, face check by the commissioner only, Division photos for the other team, a mismatch recorded. |
 | 11 Nov 2026 | v2.34.2: fix: team sheets could not be saved when `settings/league` was never saved (3.1d2 read it without `exists()`); a U17 match reads its U17 list with one get instead. 412 rules tests. |
 | 11 Nov 2026 | v2.34.1: Section 7, Isaac's answers on player suspensions (3.1e). |

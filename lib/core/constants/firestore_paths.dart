@@ -79,6 +79,10 @@ class FirestorePaths {
   static String teamSheet(String fixtureId, String teamId) =>
       '$district/teamSheets/${fixtureId}_$teamId';
 
+  /// The FA suspends a player for a number of matches (3.1e1). Not the
+  /// team suspensions of 2.11c (`teams/{id}/suspensions`).
+  static const playerSuspensions = '$district/playerSuspensions';
+
   /// Football details the team keeps up to date (2.3d).
   static const playerProfiles = '$district/playerProfiles';
   static String playerProfile(String playerId) =>

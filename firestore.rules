@@ -469,7 +469,7 @@ service cloud.firestore {
       function isValidNotification(data) {
         return data.keys().hasOnly([
             'audience', 'kind', 'teamId', 'teamName', 'names', 'count', 'day',
-            'updatedAt'
+            'updatedAt', 'targetId'
           ])
           && data.audience is string
           && data.kind in ['playersApproved', 'playersRejected', 'teamApproved',
@@ -482,7 +482,10 @@ service cloud.firestore {
                            'correctionSentBack', 'correctionDone',
                            'teamSuspended', 'suspensionLifted',
                            'fixtureAdded', 'fixtureChanged', 'fixturePostponed',
-                           'fixtureCancelled', 'divisionJuveniles']
+                           'fixtureCancelled', 'divisionJuveniles',
+                           'playerSuspended', 'playerSuspensionLifted']
+          // What the note's button opens (3.1e1: a player)
+          && isOptionalText(data, 'targetId', 60)
           && data.teamId is string
           && data.teamName is string
           && data.names is list && data.names.size() <= 60
@@ -1272,7 +1275,7 @@ service cloud.firestore {
             'season', 'competitionId', 'category', 'ageGroup', 'round',
             'teamIds', 'home', 'away', 'kits', 'kickoffAt', 'venue', 'status',
             'note', 'createdBy', 'createdAt', 'updatedBy', 'updatedAt',
-            'previousNames'
+            'previousNames', 'banned'
           ])
           && data.keys().hasAll([
             'season', 'competitionId', 'category', 'round', 'teamIds', 'home',
@@ -1341,6 +1344,22 @@ service cloud.firestore {
           && isRenamedSide(before.away, after.away, before.category, prev, prevBefore);
       }
 
+      // 3.1e1: the FA marks a player suspended for this match, or takes
+      // the mark off (banned: team ID -> player IDs), in the same batch as
+      // the suspension. Nothing else in the match changes. At most 4 teams
+      // (a team changed after a ban keeps its line), 30 players each.
+      function isBanningMatch() {
+        let before = resource.data;
+        let banned = request.resource.data.get('banned', {});
+        return request.resource.data.diff(before).affectedKeys().hasOnly(['banned'])
+          && banned is map
+          && banned.size() <= 4
+          && banned.get(before.teamIds[0], []) is list
+          && banned.get(before.teamIds[0], []).size() <= 30
+          && banned.get(before.teamIds[1], []) is list
+          && banned.get(before.teamIds[1], []).size() <= 30;
+      }
+
       match /fixtures/{fixtureId} {
         // The schedule is for everyone with a role (teams, referees, FA)
         allow get, list: if hasRole();
@@ -1349,6 +1368,7 @@ service cloud.firestore {
         allow create: if isFaAdmin()
           && isValidFixture(request.resource.data)
           && !('previousNames' in request.resource.data)
+          && !('banned' in request.resource.data)
           && request.resource.data.status == 'scheduled'
           && request.resource.data.kickoffAt > request.time
           && request.resource.data.createdBy == request.auth.uid
@@ -1361,6 +1381,9 @@ service cloud.firestore {
           // so a rename doesn't spend the 1000-expression limit here
           && request.resource.data.get('previousNames', null)
                == resource.data.get('previousNames', null)
+          // Suspension marks change only with a suspension (below)
+          && request.resource.data.get('banned', null)
+               == resource.data.get('banned', null)
           && resource.data.status != 'cancelled'
           && isValidFixture(request.resource.data)
           && request.resource.data.season == resource.data.season
@@ -1377,6 +1400,9 @@ service cloud.firestore {
 
         // The FA renames a team in its matches (JSc2)
         allow update: if isFaAdmin() && isRenamingMatch();
+
+        // The FA marks a suspended player on a match (3.1e1)
+        allow update: if isFaAdmin() && isBanningMatch();
 
         // Never deleted: cancel it instead, so the teams keep the record
 
@@ -2386,6 +2412,73 @@ service cloud.firestore {
         allow create: if isValidTeamSheet(sheetId, request.resource.data);
         allow update: if isValidTeamSheet(sheetId, request.resource.data)
           && request.resource.data.teamId == resource.data.teamId;
+      }
+
+      // ---------- playerSuspensions/{id} (3.1e1) ----------
+      // Any FA official suspends an approved player for 1 to 10 matches,
+      // with a reason; the club and the FA read it. The matches to miss
+      // (fixtureIds, the club's next ones, up to the number) are marked in
+      // the same batch (fixtures.banned). Never deleted; lifted early with
+      // why. A juvenile serves it in their age group, or in the Division
+      // when named for the Division (Isaac, 11 Nov 2026).
+
+      function isValidPlayerSuspension(data) {
+        let player = get(playerDoc(data.playerId)).data;
+        return data.keys().hasOnly([
+            'playerId', 'playerName', 'playerCode', 'teamId', 'teamName',
+            'season', 'category', 'group', 'reason', 'reasonText', 'note',
+            'matches', 'fixtureIds', 'byUid', 'byName', 'at'
+          ])
+          && data.keys().hasAll([
+            'playerId', 'playerName', 'playerCode', 'teamId', 'teamName',
+            'season', 'category', 'group', 'reason', 'matches', 'fixtureIds',
+            'byUid', 'at'
+          ])
+          && player.status == 'approved'
+          && player.teamId == data.teamId
+          && data.playerName == player.fullName
+          && data.playerCode == player.get('playerCode', null)
+          && isText(data.teamName, 1, 80)
+          && isSeason(data.season)
+          && (data.category == 'division'
+              ? data.group == 'division'
+                && (player.category == 'division'
+                    || get(squadDoc(data.teamId, 'divisionJuveniles')).data
+                         .get('players', {}).get(data.playerId, '') != '')
+              : data.category == 'juvenile'
+                && player.category == 'juvenile'
+                && data.group == player.get('ageGroup', ''))
+          && data.reason in ['redCard', 'violentConduct', 'yellowCards', 'other']
+          && (data.reason == 'other'
+              ? isText(data.get('reasonText', ''), 3, 60)
+              : !('reasonText' in data))
+          && isOptionalText(data, 'note', 200)
+          && data.matches is int && data.matches >= 1 && data.matches <= 10
+          && data.fixtureIds is list
+          && data.fixtureIds.size() <= data.matches
+          && data.byUid == request.auth.uid
+          && isOptionalText(data, 'byName', 80)
+          && data.at == request.time;
+      }
+
+      match /playerSuspensions/{suspensionId} {
+        allow get, list: if isFaAdmin() || isTeamAdminOf(resource.data.teamId);
+
+        allow create: if isFaAdmin()
+          && isValidPlayerSuspension(request.resource.data);
+
+        // Lifted early, once, with why ("Other" needs a note)
+        allow update: if isFaAdmin()
+          && !('liftedAt' in resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['liftedAt', 'liftReason', 'liftNote', 'liftedByUid', 'liftedByName'])
+          && request.resource.data.liftedAt == request.time
+          && request.resource.data.liftedByUid == request.auth.uid
+          && request.resource.data.liftReason in ['appealWon', 'givenByMistake', 'other']
+          && isOptionalText(request.resource.data, 'liftNote', 200)
+          && (request.resource.data.liftReason != 'other'
+              || isText(request.resource.data.get('liftNote', ''), 3, 200))
+          && isOptionalText(request.resource.data, 'liftedByName', 80);
       }
 
       // ---------- players/{playerId} ----------

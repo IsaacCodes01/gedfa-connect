@@ -110,6 +110,17 @@ enum NoteLook { ok, no, fa, team, ref }
       (NoteLook.no, Routes.teamFixtures, fixtures),
     NotificationKind.fixtureCancelled =>
       (NoteLook.no, Routes.teamFixtures, fixtures),
+    // Player suspensions (3.1e1, SP5): one player opens their page
+    NotificationKind.playerSuspended => switch (n.targetId) {
+        final id? when n.people == 1 =>
+          (NoteLook.no, Routes.player(id), 'Open the player'),
+        _ => (NoteLook.no, Routes.team, squad),
+      },
+    NotificationKind.playerSuspensionLifted => switch (n.targetId) {
+        final id? when n.people == 1 =>
+          (NoteLook.ok, Routes.player(id), 'Open the player'),
+        _ => (NoteLook.ok, Routes.team, squad),
+      },
   };
   return (look: look, target: target, button: button);
 }

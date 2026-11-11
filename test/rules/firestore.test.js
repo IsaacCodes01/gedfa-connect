@@ -4678,3 +4678,193 @@ describe('Team sheets (3.1a2)', () => {
     await assertSucceeds(getDoc(doc(dbAs('admin1'), `${D}/teamSheets/f1_royal`)));
   });
 });
+
+// ---------- Player suspensions (3.1e1) ----------
+
+describe('Player suspensions (3.1e1)', () => {
+  const now = () => Timestamp.now();
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      // Royal plays both competitions; the match kits are real so a normal
+      // FA change can be tested on a match with marks
+      await updateDoc(doc(db, `${D}/teams/royal`), {
+        categories: ['division', 'juvenile'], shortName: 'RUF', logoUrl: null, kits: ROYAL_KITS,
+      });
+      await updateDoc(doc(db, `${D}/teams/stars`), { shortName: 'GST', logoUrl: null, kits: STARS_KITS });
+      // Two approved Royal juveniles: j15 (U15, named for the Division), j17 (U17)
+      for (const [id, group, born] of [['j15', 'U15', 2012], ['j17', 'U17', 2010]]) {
+        await setDoc(doc(db, `${D}/players/${id}`), juvenileData({
+          fullName: `Kojo ${group}`, ageGroup: group, born, status: 'approved',
+          playerCode: `GJ26-00${born % 100}`, createdAt: now(), updatedAt: now(),
+        }));
+      }
+      await setDoc(doc(db, `${D}/squads/royal_divisionJuveniles`), {
+        teamId: 'royal', group: 'divisionJuveniles', players: { j15: 'U15' },
+        changed: 'j15', updatedAt: now(),
+      });
+      await setDoc(doc(db, `${D}/fixtures/f1`), fixtureData());
+      await setDoc(doc(db, `${D}/fixtures/f2`), fixtureData({
+        round: 5, kickoffAt: Timestamp.fromMillis(Date.now() + 10 * 86400000),
+      }));
+    });
+  });
+
+  /** Kwame Asante (p1, Royal, approved) for 2 Division matches. */
+  function ban(changes = {}) {
+    return {
+      playerId: 'p1', playerName: 'Kwame Asante', playerCode: 'GE26-0001',
+      teamId: 'royal', teamName: 'Royal Unique FC', season: '2026-27',
+      category: 'division', group: 'division', reason: 'redCard',
+      matches: 2, fixtureIds: ['f1', 'f2'],
+      byUid: 'off1', byName: 'Ama Boateng', at: serverTimestamp(), ...changes,
+    };
+  }
+  const banRef = (db, id = 'b1') => doc(db, `${D}/playerSuspensions/${id}`);
+
+  /** The way the app suspends: the page, a mark on each match, the note. */
+  function suspend(db, data = ban(), id = 'b1') {
+    const batch = writeBatch(db);
+    batch.set(banRef(db, id), data);
+    for (const f of data.fixtureIds) {
+      batch.update(doc(db, `${D}/fixtures/${f}`), { [`banned.${data.teamId}`]: arrayUnion(data.playerId) });
+    }
+    batch.set(doc(db, `${D}/notifications/team-royal_playerSuspended_royal_2026-11-11`), {
+      audience: 'team:royal', kind: 'playerSuspended', teamId: 'royal', teamName: 'Royal Unique FC',
+      names: arrayUnion('Kwame Asante suspended for 2 matches — Red card. Misses …'),
+      count: increment(1), day: '2026-11-11', updatedAt: serverTimestamp(), targetId: data.playerId,
+    }, { merge: true });
+    return batch.commit();
+  }
+
+  async function seedBan(changes = {}) {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(banRef(context.firestore()), { ...ban(changes), at: now() });
+    });
+  }
+  const lift = (db, changes = {}) => updateDoc(banRef(db), {
+    liftedAt: serverTimestamp(), liftReason: 'appealWon', liftedByUid: 'off1', ...changes,
+  });
+
+  it('any FA official suspends an approved player, marks the matches and tells the club', async () => {
+    await assertSucceeds(suspend(dbAs('off1')));
+    await assertSucceeds(suspend(dbAs('fa1'), ban({ byUid: 'fa1' }), 'b2'));
+  });
+
+  it('10 matches in one batch stay within the rules limits', async () => {
+    const ten = Array.from({ length: 10 }, (_, i) => `m${i}`);
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      for (const [i, id] of ten.entries()) {
+        await setDoc(doc(context.firestore(), `${D}/fixtures/${id}`), fixtureData({
+          round: i + 1, kickoffAt: Timestamp.fromMillis(Date.now() + (i + 1) * 7 * 86400000),
+        }));
+      }
+    });
+    await assertSucceeds(suspend(dbAs('off1'), ban({ matches: 10, fixtureIds: ten })));
+  });
+
+  it('a team admin, a referee or another person cannot suspend', async () => {
+    await assertFails(setDoc(banRef(dbAs('admin1')), ban({ byUid: 'admin1' })));
+    await assertFails(setDoc(banRef(dbAs('ref1')), ban({ byUid: 'ref1' })));
+    await assertFails(setDoc(banRef(dbAs('newbie')), ban({ byUid: 'newbie' })));
+  });
+
+  it('only an approved player, with their own name, ID and team', async () => {
+    await assertFails(setDoc(banRef(dbAs('off1')), ban({ playerId: 'p3', playerName: 'Kofi Owusu', playerCode: null })));
+    await assertFails(setDoc(banRef(dbAs('off1')), ban({ playerName: 'Someone Else' })));
+    await assertFails(setDoc(banRef(dbAs('off1')), ban({ playerCode: 'GE26-0099' })));
+    await assertFails(setDoc(banRef(dbAs('off1')), ban({ teamId: 'stars' })));
+  });
+
+  it('red card, violent conduct, yellow cards, or other with what for', async () => {
+    for (const reason of ['violentConduct', 'yellowCards']) {
+      await assertSucceeds(setDoc(banRef(dbAs('off1'), reason), ban({ reason })));
+    }
+    await assertSucceeds(setDoc(banRef(dbAs('off1'), 'o'), ban({ reason: 'other', reasonText: 'Abusing the referee' })));
+    await assertFails(setDoc(banRef(dbAs('off1'), 'x1'), ban({ reason: 'other' })));
+    await assertFails(setDoc(banRef(dbAs('off1'), 'x2'), ban({ reasonText: 'Not with a red card' })));
+    await assertFails(setDoc(banRef(dbAs('off1'), 'x3'), ban({ reason: 'diving' })));
+  });
+
+  it('1 to 10 matches, and never more matches to miss than that', async () => {
+    await assertSucceeds(setDoc(banRef(dbAs('off1'), 'a'), ban({ matches: 10 })));
+    await assertSucceeds(setDoc(banRef(dbAs('off1'), 'b'), ban({ matches: 3, fixtureIds: ['f1'] })));
+    await assertFails(setDoc(banRef(dbAs('off1'), 'c'), ban({ matches: 0, fixtureIds: [] })));
+    await assertFails(setDoc(banRef(dbAs('off1'), 'd'), ban({ matches: 11 })));
+    await assertFails(setDoc(banRef(dbAs('off1'), 'e'), ban({ matches: 1 })));
+  });
+
+  it('signed by the person saving, at server time; no other fields', async () => {
+    await assertFails(setDoc(banRef(dbAs('off1')), ban({ byUid: 'fa1' })));
+    await assertFails(setDoc(banRef(dbAs('off1')), ban({ at: now() })));
+    await assertFails(setDoc(banRef(dbAs('off1')), ban({ liftedAt: serverTimestamp() })));
+    await assertFails(setDoc(banRef(dbAs('off1')), ban({ extra: true })));
+  });
+
+  it('a juvenile in their own age group; in the Division only when named for it', async () => {
+    const kojo = (id, group) => ({
+      playerId: id, playerName: `Kojo ${group}`, playerCode: `GJ26-00${group === 'U15' ? 12 : 10}`,
+    });
+    await assertSucceeds(setDoc(banRef(dbAs('off1'), 'j1'), ban({ ...kojo('j15', 'U15'), category: 'juvenile', group: 'U15' })));
+    await assertSucceeds(setDoc(banRef(dbAs('off1'), 'j2'), ban({ ...kojo('j15', 'U15') })));
+    await assertFails(setDoc(banRef(dbAs('off1'), 'j3'), ban({ ...kojo('j15', 'U15'), category: 'juvenile', group: 'U17' })));
+    await assertFails(setDoc(banRef(dbAs('off1'), 'j4'), ban({ ...kojo('j17', 'U17') })));
+    await assertFails(setDoc(banRef(dbAs('off1'), 'j5'), ban({ category: 'juvenile', group: 'U17' })));
+  });
+
+  it('the FA lifts it once, with why; "Other" needs a note', async () => {
+    await seedBan();
+    await assertFails(lift(dbAs('off1'), { liftReason: 'other' }));
+    await assertFails(lift(dbAs('off1'), { liftReason: 'paidOff' }));
+    await assertSucceeds(lift(dbAs('off1'), { liftNote: 'Disciplinary committee, 12 Nov' }));
+    await assertFails(lift(dbAs('fa1'), { liftedByUid: 'fa1' }));
+  });
+
+  it('lifting changes nothing else; the team cannot lift; never deleted', async () => {
+    await seedBan();
+    await assertFails(lift(dbAs('off1'), { matches: 1 }));
+    await assertFails(lift(dbAs('admin1'), { liftedByUid: 'admin1' }));
+    await assertFails(deleteDoc(banRef(dbAs('off1'))));
+  });
+
+  it('the club and the FA read it; another team does not', async () => {
+    await seedBan();
+    await assertSucceeds(getDoc(banRef(dbAs('admin1'))));
+    await assertSucceeds(getDoc(banRef(dbAs('fa1'))));
+    await assertSucceeds(getDocs(query(collection(dbAs('admin1'), `${D}/playerSuspensions`), where('teamId', '==', 'royal'))));
+    await assertSucceeds(getDocs(query(collection(dbAs('fa1'), `${D}/playerSuspensions`), where('season', '==', '2026-27'))));
+    await assertFails(getDoc(banRef(dbAs('admin2'))));
+    await assertFails(getDocs(query(collection(dbAs('admin2'), `${D}/playerSuspensions`), where('teamId', '==', 'royal'))));
+  });
+
+  it('matches: only the FA marks a player, and nothing else with it', async () => {
+    const mark = (db, changes = {}) => updateDoc(doc(db, `${D}/fixtures/f1`), { 'banned.royal': ['p1'], ...changes });
+    await assertSucceeds(mark(dbAs('off1')));
+    await assertFails(mark(dbAs('admin1')));
+    await assertFails(mark(dbAs('off1'), { venue: 'Elsewhere Park' }));
+    await assertFails(updateDoc(doc(dbAs('off1'), `${D}/fixtures/f1`), { 'banned.royal': 'p1' }));
+    await assertFails(updateDoc(doc(dbAs('off1'), `${D}/fixtures/f1`), {
+      'banned.royal': Array.from({ length: 31 }, (_, i) => `x${i}`),
+    }));
+  });
+
+  it('matches: a new match has no marks; a normal change keeps them as they are', async () => {
+    await assertFails(addFixture(dbAs('fa1'), 'f9', fixtureData({ banned: { royal: ['p1'] } })));
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), `${D}/fixtures/f1`), { banned: { royal: ['p1'] } });
+    });
+    await assertSucceeds(changeFixture(dbAs('fa1'), 'f1', { venue: 'Gomoa Park' }));
+    await assertFails(changeFixture(dbAs('fa1'), 'f1', { venue: 'Apam Park', banned: {} }));
+  });
+
+  it('the club\'s note carries the player to open; never a number', async () => {
+    const note = (targetId) => setDoc(doc(dbAs('off1'), `${D}/notifications/team-royal_playerSuspensionLifted_royal_2026-11-11`), {
+      audience: 'team:royal', kind: 'playerSuspensionLifted', teamId: 'royal', teamName: 'Royal Unique FC',
+      names: ['Kwame Asante — Appeal won.'], count: 1, day: '2026-11-11',
+      updatedAt: serverTimestamp(), targetId,
+    });
+    await assertSucceeds(note('p1'));
+    await assertFails(note(42));
+  });
+});

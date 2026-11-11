@@ -38,6 +38,8 @@ import 'package:gedfa_connect/features/fixtures/presentation/season_draft_screen
 import 'package:gedfa_connect/features/fixtures/presentation/season_setup_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/team_fixtures_screen.dart';
 import 'package:gedfa_connect/features/players/domain/age_group.dart';
+import 'package:gedfa_connect/features/suspensions/presentation/suspend_player_screen.dart';
+import 'package:gedfa_connect/features/suspensions/presentation/suspended_players_screen.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/fa/presentation/fa_team_juvenile_screen.dart';
 import 'package:gedfa_connect/features/fa/presentation/fa_team_players_screen.dart';
@@ -258,6 +260,19 @@ final routerProvider = Provider<GoRouter>((ref) {
                     builder: (_, state) => FaPlayerReviewScreen(
                       playerId: state.pathParameters['playerId']!,
                     ),
+                  ),
+                  // Player suspensions (3.1e1): Suspend (SP1), Suspended (SP2)
+                  GoRoute(
+                    path: 'suspend/:playerId',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (_, state) => SuspendPlayerScreen(
+                      playerId: state.pathParameters['playerId']!,
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'suspended',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (_, _) => const SuspendedPlayersScreen(),
                   ),
                 ],
               ),

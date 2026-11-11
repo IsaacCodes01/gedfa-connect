@@ -30,6 +30,7 @@ class NotificationWriter {
     required String teamName,
     required String name,
     String? groupKey,
+    String? targetId,
   }) {
     final day = dayKey();
     final safeAudience = audience.replaceAll(':', '-');
@@ -47,17 +48,20 @@ class NotificationWriter {
         'count': FieldValue.increment(1),
         'day': day,
         'updatedAt': FieldValue.serverTimestamp(),
+        'targetId': ?targetId,
       },
     );
   }
 
-  /// For a team's bell (written by the FA).
+  /// For a team's bell (written by the FA). [targetId]: what the note's
+  /// button opens (3.1e1: a player).
   void forTeamInBatch(
     WriteBatch batch, {
     required NotificationKind kind,
     required String teamId,
     required String teamName,
     required String name,
+    String? targetId,
   }) {
     final e = _entry(
       audience: 'team:$teamId',
@@ -65,6 +69,7 @@ class NotificationWriter {
       teamId: teamId,
       teamName: teamName,
       name: name,
+      targetId: targetId,
     );
     batch.set(e.ref, e.data, SetOptions(merge: true));
   }

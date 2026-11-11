@@ -15,6 +15,7 @@ import 'package:gedfa_connect/features/fa/presentation/widgets/review_widgets.da
 import 'package:gedfa_connect/features/players/data/player_repository.dart';
 import 'package:gedfa_connect/features/players/domain/player.dart';
 import 'package:gedfa_connect/features/players/presentation/widgets/position_rows.dart';
+import 'package:gedfa_connect/features/suspensions/data/player_suspension_repository.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/players/presentation/widgets/division_juveniles_card.dart';
 
@@ -267,6 +268,12 @@ class _FaTeamPlayersScreenState extends ConsumerState<FaTeamPlayersScreen> {
                   selecting: _selecting,
                   picked: _picked,
                   onTap: _open,
+                  // Suspended players (3.1e1): the red strip
+                  extras: {
+                    for (final MapEntry(:key, :value)
+                        in ref.watch(faBansProvider).entries)
+                      key: CardExtra(banLeft: value.left),
+                  },
                 ),
               // The club's juveniles in the Division, read only (3.1d)
               if (hasBoth && !_selecting)

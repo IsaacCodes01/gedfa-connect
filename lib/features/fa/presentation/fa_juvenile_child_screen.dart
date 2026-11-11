@@ -16,6 +16,8 @@ import 'package:gedfa_connect/features/players/domain/player.dart';
 import 'package:gedfa_connect/features/players/presentation/widgets/player_photo.dart';
 import 'package:gedfa_connect/features/screening/data/screening_repository.dart';
 import 'package:gedfa_connect/features/screening/presentation/widgets/screening_countdown.dart';
+import 'package:gedfa_connect/features/suspensions/data/player_suspension_repository.dart';
+import 'package:gedfa_connect/features/suspensions/presentation/widgets/ban_widgets.dart';
 
 /// FA: one juvenile child, read only (Isaac, 3 Nov 2026). Opened from
 /// Players › Juvenile › a team. Shows what the FA needs on the screening
@@ -42,8 +44,13 @@ class FaJuvenileChildScreen extends ConsumerWidget {
         leading: BackButton(onPressed: back),
       ),
       // Board J6: "Screen player" while the child waits (2.14d)
-      bottomNavigationBar: player != null && player.isWaitingForScreening
+      // A passed child: Suspend, or Lift (3.1e1)
+      bottomNavigationBar: player == null
+          ? null
+          : player.isWaitingForScreening
           ? _ScreenButton(player: player)
+          : player.isApproved
+          ? FaBanBar(player: player)
           : null,
       body: playerAsync.when(
         loading: () => const LoadingView(),
@@ -154,6 +161,10 @@ class _Body extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (ref.watch(faBansProvider)[player.id] case final ban?) ...[
+                BanBanner(status: ban),
+                const SizedBox(height: 16),
+              ],
               Center(
                 child: PassportPhoto(
                   name: player.fullName,

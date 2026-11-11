@@ -17,6 +17,7 @@ import 'package:gedfa_connect/features/players/data/player_repository.dart';
 import 'package:gedfa_connect/features/players/domain/age_group.dart';
 import 'package:gedfa_connect/features/players/presentation/widgets/position_rows.dart';
 import 'package:gedfa_connect/features/screening/presentation/widgets/screening_card.dart';
+import 'package:gedfa_connect/features/suspensions/data/player_suspension_repository.dart';
 import 'package:gedfa_connect/features/teams/data/correction_request_repository.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/correction_banner.dart';
 import 'package:gedfa_connect/features/fa/presentation/widgets/suspension_widgets.dart';
@@ -491,6 +492,12 @@ class _SquadBody extends ConsumerWidget {
                       sections: sectionsByGroup(shown, isDark: isDark),
                       cardLine: CardLine.squad,
                       onTap: (player) => context.open(Routes.player(player.id)),
+                      // Suspended by the FA (3.1e1, SP3): the red strip
+                      extras: {
+                        for (final MapEntry(:key, :value)
+                            in ref.watch(myBansProvider).entries)
+                          key: CardExtra(banLeft: value.left),
+                      },
                     ),
                   if (isDivision && divisionJuvenilesTeam != null)
                     DivisionJuvenilesCard(

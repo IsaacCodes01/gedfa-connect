@@ -18,6 +18,8 @@ import 'package:gedfa_connect/features/players/domain/duplicates.dart';
 import 'package:gedfa_connect/features/players/domain/player.dart';
 import 'package:gedfa_connect/features/players/presentation/widgets/player_photo.dart';
 import 'package:gedfa_connect/features/settings/presentation/widgets/settings_widgets.dart';
+import 'package:gedfa_connect/features/suspensions/data/player_suspension_repository.dart';
+import 'package:gedfa_connect/features/suspensions/presentation/widgets/ban_widgets.dart';
 
 /// Youngest age for the Division (same as the Add player form).
 const _minDivisionAge = 13;
@@ -49,10 +51,13 @@ class FaPlayerReviewScreen extends ConsumerWidget {
         leading: BackButton(onPressed: () => _leave(context, player)),
       ),
       // Juvenile children are decided at screening, never here (2.14c)
-      bottomNavigationBar: player != null &&
-              !player.isJuvenile &&
-              player.status == ApprovalStatus.pending
+      // An approved player: Suspend, or Lift (3.1e1, SP1)
+      bottomNavigationBar: player == null || player.isJuvenile
+          ? null
+          : player.status == ApprovalStatus.pending
           ? _ReviewActions(player: player)
+          : player.isApproved
+          ? FaBanBar(player: player)
           : null,
       body: playerAsync.when(
         loading: () => const LoadingView(),
@@ -77,13 +82,14 @@ void _leave(BuildContext context, Player? player) => context.goBack(
           : Routes.adminTeamPlayers(player.teamId),
     );
 
-class _ReviewBody extends StatelessWidget {
+class _ReviewBody extends ConsumerWidget {
   const _ReviewBody({required this.player});
 
   final Player player;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ban = ref.watch(faBansProvider)[player.id];
     final sent = player.createdAt;
     final changed = player.updatedAt;
     final approvedAt = player.approvedAt;
@@ -96,6 +102,10 @@ class _ReviewBody extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (ban != null) ...[
+                BanBanner(status: ban),
+                const SizedBox(height: 16),
+              ],
               _Header(player: player),
               const SizedBox(height: 22),
 

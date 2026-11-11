@@ -14,6 +14,8 @@ import 'package:gedfa_connect/features/players/data/player_repository.dart';
 import 'package:gedfa_connect/features/players/domain/age_group.dart';
 import 'package:gedfa_connect/features/players/domain/player.dart';
 import 'package:gedfa_connect/features/players/presentation/widgets/player_photo.dart';
+import 'package:gedfa_connect/features/suspensions/data/player_suspension_repository.dart';
+import 'package:gedfa_connect/features/suspensions/presentation/widgets/ban_widgets.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/app/routes.dart';
 
@@ -149,6 +151,7 @@ class _Details extends StatelessWidget {
                     _FactTile(value: '${player.age}', label: 'Age'),
                   ],
                 ),
+                _TeamBan(playerId: player.id),
                 if (rejected) ...[
                   const SizedBox(height: 14),
                   Container(
@@ -308,6 +311,38 @@ class _Details extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// SP3 (3.1e1): the red box while the FA has the player suspended. Only
+/// the FA changes or lifts it.
+class _TeamBan extends ConsumerWidget {
+  const _TeamBan({required this.playerId});
+
+  final String playerId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ban = ref.watch(myBansProvider)[playerId];
+    if (ban == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          BanBanner(status: ban),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(6, 8, 6, 0),
+            child: Text(
+              'Only the FA can change or lift a suspension.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

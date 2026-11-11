@@ -23,6 +23,8 @@ enum NotificationKind {
   fixtureChanged,
   fixturePostponed,
   fixtureCancelled,
+  playerSuspended, // the FA suspends a player for matches (3.1e1)
+  playerSuspensionLifted,
   // For the FA (written by teams, clubs, invited people)
   teamRequest,
   playersSubmitted,
@@ -57,6 +59,7 @@ class AppNotification {
     required this.names,
     required this.count,
     this.updatedAt,
+    this.targetId,
   });
 
   final String id;
@@ -67,6 +70,23 @@ class AppNotification {
   final List<String> names; // e.g. "Kojo Arthur (GE26-0011)"
   final int count;
   final DateTime? updatedAt;
+
+  /// The thing the note is about, when it has one (3.1e1: the player).
+  /// A grouped note keeps the latest one.
+  final String? targetId;
+
+  /// Player suspension notes (3.1e1) store each name as
+  /// "headline — details": "Kofi Boateng suspended for 2 matches — Red
+  /// card. Misses …". Splits it in two (no " — ": all headline).
+  static (String, String) splitLine(String line) {
+    final at = line.indexOf(lineBreak);
+    return at < 0
+        ? (line, '')
+        : (line.substring(0, at), line.substring(at + lineBreak.length));
+  }
+
+  /// Between a suspension note's headline and its details.
+  static const lineBreak = ' — ';
 
   /// "Kojo Arthur, Nana Ofori and 2 more"
   String get namesText {
@@ -149,6 +169,13 @@ class AppNotification {
           people == 1 ? 'Match postponed' : '$people matches postponed',
         NotificationKind.fixtureCancelled =>
           people == 1 ? 'Match cancelled' : '$people matches cancelled',
+        NotificationKind.playerSuspended => people == 1
+            ? splitLine(names.firstOrNull ?? 'A player suspended').$1
+            : '$people players suspended',
+        NotificationKind.playerSuspensionLifted => people == 1
+            ? 'Suspension lifted: '
+                '${splitLine(names.firstOrNull ?? 'a player').$1}'
+            : '$people suspensions lifted',
       };
 
   /// The short text in the bell's list ("Kojo Arthur, Nana Ofori and 2
@@ -172,6 +199,9 @@ class AppNotification {
       NotificationKind.correctionSentBack ||
       NotificationKind.teamSuspended ||
       NotificationKind.suspensionLifted => false,
+      // One player: the details are the text; several: one line each
+      NotificationKind.playerSuspended ||
+      NotificationKind.playerSuspensionLifted => people > 1,
       _ => true,
     };
   }
@@ -259,6 +289,12 @@ class AppNotification {
       NotificationKind.fixtureChanged => withNames('See Fixtures.'),
       NotificationKind.fixturePostponed => withNames('See Fixtures.'),
       NotificationKind.fixtureCancelled => withNames('See Fixtures.'),
+      NotificationKind.playerSuspended ||
+      NotificationKind.playerSuspensionLifted => people == 1
+          ? splitLine(this.names.firstOrNull ?? '').$2
+          : names == null
+              ? 'Open Squad to see when each one returns.'
+              : '$names. Open Squad to see when each one returns.',
     };
   }
 
@@ -277,6 +313,7 @@ class AppNotification {
       ],
       count: (data['count'] as num?)?.toInt() ?? 1,
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
+      targetId: data['targetId'] as String?,
     );
   }
 }
