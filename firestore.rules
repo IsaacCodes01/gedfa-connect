@@ -2250,7 +2250,9 @@ service cloud.firestore {
               : (group == 'U15'
                   ? squadIds(teamId, 'U13').concat(squadIds(teamId, 'U15'))
                   : squadIds(teamId, 'U13').concat(squadIds(teamId, 'U15'))
-                      .concat(squadIds(teamId, 'U17'))));
+                      // One get, no exists(): a U17 sheet always has U17
+                      // players (1 U13 + 5 U15 is fewer than 7 starting)
+                      .concat(get(squadDoc(teamId, 'U17')).data.players.keys())));
       }
 
       // 3.1d2: on a Division sheet, every player not on the Division list
@@ -2308,16 +2310,12 @@ service cloud.firestore {
 
       // A sheet save is near the rules' limit of 10 document lookups (a
       // U17 match reads 3 age lists, and exists() + get() of one document
-      // count as 2). So the user and League settings are read with ONE
-      // get each: a missing document makes the get fail, which refuses the
-      // save (settings/league always exists once the season is set up).
+      // count as 2). So the user is read with ONE get (a signed-in team
+      // admin always has a user document). League settings may be missing
+      // (= the defaults), so they keep exists() + get() (leagueValue).
       function isSheetTeamAdmin(teamId) {
         let user = get(userDoc(request.auth.uid)).data;
         return user.get('role', '') == 'teamAdmin' && user.get('teamId', '') == teamId;
-      }
-
-      function sheetLeagueValue(field, fallback) {
-        return get(leagueDoc()).data.get(field, fallback);
       }
 
       function isValidTeamSheet(sheetId, sheet) {
@@ -2346,11 +2344,11 @@ service cloud.firestore {
           && sheet.get('ageGroup', null) == fixture.get('ageGroup', null)
           // 7 to 11 starting; a bench only with 11 starting; 18 at most
           && starters is list && bench is list
-          && starters.size() >= sheetLeagueValue('minPlayers', 7)
+          && starters.size() >= leagueValue('minPlayers', 7)
           && starters.size() <= 11
           && bench.size() <= 7
           && (bench.size() == 0 || starters.size() == 11)
-          && picked.size() <= sheetLeagueValue('matchdaySquad', 18)
+          && picked.size() <= leagueValue('matchdaySquad', 18)
           && picked.toSet().size() == picked.size()
           // Approved players of this team and competition only
           && (fixture.category == 'division'

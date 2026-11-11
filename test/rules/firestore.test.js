@@ -4391,8 +4391,6 @@ describe('Team sheets (3.1a2)', () => {
       await list('royal_U15', ids('k', 1, 11));
       await list('royal_U17', ['k17']);
       await setDoc(doc(db, `${D}/fixtures/f1`), fixtureData());
-      // League settings always exist once the season is set up
-      await setDoc(doc(db, `${D}/settings/league`), { matchdaySquad: 18, minPlayers: 7 });
       await setDoc(doc(db, `${D}/fixtures/fj`), fixtureData({
         competitionId: '2026-27_juvenile-league', category: 'juvenile', ageGroup: 'U15',
       }));
@@ -4537,8 +4535,19 @@ describe('Team sheets (3.1a2)', () => {
     });
     const five15 = ['k1', 'k2', 'k3', 'k4', 'k5'];
     await assertSucceeds(save(dbAs('admin1'), u17(['k17', 'k13', ...five15])));
+    // The heaviest save (3 age lists AND League settings): still within
+    // the rules' 10 lookups
+    await seedLeague({ matchdaySquad: 18, minPlayers: 7 });
+    await assertSucceeds(save(dbAs('admin1'), u17(['k17', 'k13', ...five15])));
     await assertFails(save(dbAs('admin1'), u17(['k17', 'k13', 'k13b', ...five15])));
     await assertFails(save(dbAs('admin1'), u17(['k17', 'k13', ...five15, 'k6'])));
+  });
+
+  it('a sheet saves when League settings were never saved (the defaults)', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await deleteDoc(doc(context.firestore(), LEAGUE));
+    });
+    await assertSucceeds(save(dbAs('admin1')));
   });
 
   // ----- 3.2: copies of the players; the opponent from the lock -----

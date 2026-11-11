@@ -231,8 +231,9 @@ Build one at a time, mockup first where it says so; details are in `docs/ROADMAP
 - **3.1d2** done (11 Nov 2026, 409 rules tests, 297 Dart tests): Division sheets pick from `division` + `divisionJuveniles`
   (rules `divisionPicksOk`), U17 sheets `playUpOk` (1 U13, 5 U15; `playUpLimit` in `sheet_picks.dart`). The Division list is kept
   exact via `isSquadRemoval` → `notInDivisionJuvenilesAfter` (not in the player rule: it is at the 1000-expression limit).
-  **Rules lookups: `exists()` + `get()` of one doc count as 2**; sheet saves are at 10 (U17), so they use `isSheetTeamAdmin` /
-  `sheetLeagueValue` (one get each). FA note kind `divisionJuveniles`. Rules changed: Isaac deploys to dev. Next: **3.1e**.
+  **Rules lookups: `exists()` + `get()` of one doc count as 2**; sheet saves are at 10 (U17), so they use `isSheetTeamAdmin`
+  (one get) and read the U17 list with one get. **`settings/league` may not exist** (defaults; only made on the first change):
+  never `get()` it without `exists()` (that broke every sheet save on dev, fixed 11 Nov). FA note kind `divisionJuveniles`. Rules changed: Isaac deploys to dev. Next: **3.1e**.
 - **3.2** done (11 Nov 2026, 411 rules tests, 301 Dart tests): `teamSheets.players` copies (`SheetPlayer`), `SheetPaper` draws
   `SheetPlayer`s; `TeamSheetViewScreen` (`Routes.adminMatchSheet` / `teamMatchSheet`), View in Match details (FA any time,
   opponent from the lock, rule `isOpponentAfterLock`). Rules changed: Isaac deploys to dev. Next: **3.1e** (mockup first).
