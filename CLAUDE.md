@@ -86,7 +86,7 @@ Build one at a time, mockup first where it says so; details are in `docs/ROADMAP
 | # | Step | What it is | Mockup | Notes |
 |---|------|------------|--------|-------|
 | ✓ | **3.2** Lock and visibility | The FA views any team sheet; the opponent from the lock | — | Done 11 Nov 2026 |
-| 2 | **3.1e** Player suspensions | The FA suspends a player for a number of matches with a reason; a suspended player can't be picked (locked row, MS2) | Yes, first | Ask: how the count goes down (each match played by the team?), who lifts it |
+| 2 | **3.1e** Player suspensions | **3.1e1** suspend / lift, FA "Suspended" list, the club's rows and bell (SP1–SP3, SP5); **3.1e2** locked row on the sheet (SP4) + moving a ban when a match is postponed | **Approved** (`3.1e-player-suspensions.html`) | Answers in `DATA_MODEL.md` Section 7. **Build 3.1e1 next** |
 | 3 | **3.5** Match officials + referee Home | The FA appoints referee, 2 assistants, 4th official, commissioner (FA admin or referee) per fixture (`officials` map, bell notes); referee dashboard RD1; officials see both sheets from the lock | Yes, first | Referees' accounts exist (invites) |
 | 4 | **3.3** Official sheet as a PDF | Both teams' sheets, kits top-left, signatures; `pdf` / `printing`; **no QR code** (Isaac) | Yes, first | |
 | 5 | **3.6** Player check | The commissioner ticks each player against the sheet (photos) before kick-off | Yes, first | Commissioner only |
@@ -237,6 +237,16 @@ Build one at a time, mockup first where it says so; details are in `docs/ROADMAP
 - **3.2** done (11 Nov 2026, 411 rules tests, 301 Dart tests): `teamSheets.players` copies (`SheetPlayer`), `SheetPaper` draws
   `SheetPlayer`s; `TeamSheetViewScreen` (`Routes.adminMatchSheet` / `teamMatchSheet`), View in Match details (FA any time,
   opponent from the lock, rule `isOpponentAfterLock`). Rules changed: Isaac deploys to dev. Next: **3.1e** (mockup first).
+- **Rules fix** (11 Nov 2026, `c568de6`, 412 rules tests): sheets couldn't save on dev because `settings/league` didn't exist.
+- **Next conversation: build 3.1e1** (Isaac, 11 Nov 2026). Mockup `docs/mockups/3.1e-player-suspensions.html` approved (SP1–SP5).
+  Isaac's answers: a suspension counts **matches**, not days (the app finds the club's next N scheduled matches in that
+  competition and shows "returns Sat 5 Dec, against Ojobi Rangers"); **any FA official** suspends or lifts (reasons: red card,
+  violent conduct, yellow cards, other); the club sees the reason and matches left; it applies **only in the competition where
+  it was given** (a Division ban: Division matches only, also for a juvenile named for the Division). Planned data:
+  `suspensions/{id}` (player, team, competition / age group, reason, note, `matches`, `fixtureIds` to miss, by, at,
+  `liftedAt`?); the rules check sheets with NO extra lookups through a `banned` map on each fixture (team ID → player IDs),
+  written in the same batch. Beware: fixture saves are near the 1000-expression limit, and sheet saves at 10 lookups.
+  Before starting, check that Isaac deployed the `c568de6` rules and that sheets save on dev.
 - Calendar backdrop (`_CalendarBackdrop` in `match_calendar_card.dart`): GEDFA logo as a one-colour watermark (its letters are white,
   so tint it with `color` + `BlendMode.srcIn`). `assets/images/gedfa_logo.png` is now committed.
 - **Plan agreed 9 Nov 2026 (deadline Thu 12 Nov, 12:30 pm; Isaac's prompts in that conversation):** next, in order:
