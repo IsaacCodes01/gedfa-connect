@@ -65,6 +65,9 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
 - In a `bottomNavigationBar`, wrap a centred button in `Center(heightFactor: 1, …)`;
   a plain `Center` / `ResponsiveCenter` fills the whole screen there.
 - `file_picker ^13.3.0` (12.x clashes with `connectivity_plus`).
+- The theme's Filled / Outlined buttons are **full-width** (`minimumSize: Size.fromHeight`). A button in a `Row` (not in
+  `Expanded`) needs `style: …styleFrom(minimumSize: const Size(0, 40))`, or the row breaks on the web. Screen tests use
+  `AppTheme.light()` / `dark()` so this is caught.
 
 ## Running it
 

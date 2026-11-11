@@ -29,6 +29,8 @@ import 'package:gedfa_connect/features/teams/domain/kit.dart';
 import 'package:gedfa_connect/features/teams/domain/kit_slot.dart';
 import 'package:gedfa_connect/features/teams/domain/team.dart';
 import 'package:gedfa_connect/features/team_sheets/data/team_sheet_repository.dart';
+import 'package:gedfa_connect/app/theme.dart';
+import 'package:gedfa_connect/features/team_sheets/domain/team_sheet.dart';
 
 KitChoice _kit(KitSlot slot, Color c) => KitChoice(
       slot: slot,
@@ -196,6 +198,17 @@ Future<void> _pump(
         sharedPreferencesProvider.overrideWithValue(prefs),
         seasonFixturesProvider.overrideWith((ref) => Stream.value(_fixtures)),
         myTeamSheetsProvider.overrideWith((ref) => Stream.value(const {})),
+        // The team's sheet for m1 is saved (3.1c: View and Change)
+        teamSheetProvider.overrideWith((ref, key) => Stream.value(
+            key.$1 == 'm1' && key.$2 == 'aps'
+                ? TeamSheet(
+                    fixtureId: 'm1',
+                    teamId: 'aps',
+                    category: Competition.division,
+                    starters: const ['a', 'b', 'c', 'd', 'e', 'f', 'g'],
+                    savedAt: DateTime(2026, 11, 10, 16, 12),
+                  )
+                : null)),
         myFixturesProvider.overrideWith((ref) => Stream.value(_fixtures)),
         appUserProvider.overrideWith(
           (ref) => Stream.value(
@@ -256,7 +269,8 @@ Future<void> _pump(
         myAudienceProvider.overrideWithValue('team:aps'),
       ],
       child: MaterialApp(
-        theme: ThemeData(useMaterial3: true, brightness: brightness),
+        // The app's own theme: its full-width buttons once broke a row
+        theme: brightness == Brightness.dark ? AppTheme.dark() : AppTheme.light(),
         builder: (context, child) => MediaQuery(
           data: MediaQuery.of(context)
               .copyWith(textScaler: TextScaler.linear(textScale)),
@@ -473,6 +487,13 @@ void main() {
       });
     }
   }
+
+  testWidgets("a team's Match details: View and Change on its saved sheet", (tester) async {
+    await _pump(tester, const MatchDetailsScreen(fixtureId: 'm1'),
+        const Size(360, 3000), Brightness.light);
+    expect(find.text('View'), findsOneWidget);
+    expect(find.text('Change'), findsOneWidget);
+  });
 
   testWidgets('Match details with large text (130%) on a small phone', (tester) async {
     await _pump(tester, const MatchDetailsScreen(fixtureId: 'm1'),

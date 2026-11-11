@@ -840,6 +840,11 @@ class _BuilderState extends ConsumerState<_Builder> {
             if (onUseLast != null) ...[
               const SizedBox(width: 8),
               OutlinedButton.icon(
+                // The theme's buttons are full-width; in a row that breaks
+                // the layout (the search box vanished on the web)
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, 48),
+                ),
                 onPressed: onUseLast,
                 icon: const Icon(Icons.content_copy, size: 17),
                 label: const Text('Use last sheet'),

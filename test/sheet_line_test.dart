@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gedfa_connect/app/theme.dart';
 import 'package:gedfa_connect/features/team_sheets/domain/sheet_status.dart';
 import 'package:gedfa_connect/features/team_sheets/domain/team_sheet.dart';
 import 'package:gedfa_connect/features/team_sheets/presentation/widgets/sheet_line.dart';
@@ -24,6 +25,7 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
       MaterialApp(
+        theme: AppTheme.light(),
         home: Scaffold(
           body: SheetLine(
             status: status,

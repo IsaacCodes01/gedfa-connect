@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gedfa_connect/app/theme.dart';
 import 'package:go_router/go_router.dart';
 import 'package:gedfa_connect/app/theme_mode_provider.dart';
 import 'package:gedfa_connect/core/constants/approval_status.dart';
@@ -221,7 +222,8 @@ Future<void> _pump(
         ),
       ],
       child: MaterialApp.router(
-        theme: ThemeData(useMaterial3: true, brightness: b),
+        // The app's own theme: its full-width buttons once broke a row
+        theme: b == Brightness.dark ? AppTheme.dark() : AppTheme.light(),
         // AppBackButton needs go_router
         routerConfig: GoRouter(
           initialLocation: '/sheet',

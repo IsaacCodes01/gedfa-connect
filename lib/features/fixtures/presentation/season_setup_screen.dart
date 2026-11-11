@@ -326,6 +326,11 @@ class _SeasonSetupScreenState extends ConsumerState<SeasonSetupScreen> {
                 ),
                 const SizedBox(width: 10),
                 OutlinedButton.icon(
+                  // The theme's buttons are full-width; in a row that
+                  // breaks the layout
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(0, 48),
+                  ),
                   onPressed: _pickKickoff,
                   icon: const Icon(Icons.schedule_outlined),
                   label: Text(_kickoff.format(context)),

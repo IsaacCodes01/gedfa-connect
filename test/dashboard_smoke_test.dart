@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gedfa_connect/app/theme.dart';
 import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/auth/domain/app_user.dart';
@@ -83,7 +84,8 @@ Future<void> _pump(
         myAudienceProvider.overrideWithValue('fa'),
       ],
       child: MaterialApp(
-        theme: ThemeData(useMaterial3: true, brightness: brightness),
+        // The app's own theme: its full-width buttons once broke a row
+        theme: brightness == Brightness.dark ? AppTheme.dark() : AppTheme.light(),
         // Large text on the phone (Settings › Display), when asked
         builder: (context, child) => MediaQuery(
           data: MediaQuery.of(

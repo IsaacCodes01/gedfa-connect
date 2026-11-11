@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gedfa_connect/app/theme.dart';
 import 'package:gedfa_connect/app/theme_mode_provider.dart';
 import 'package:gedfa_connect/core/constants/approval_status.dart';
 import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
@@ -206,7 +207,8 @@ Future<void> _pump(
         myAudienceProvider.overrideWithValue('team'),
       ],
       child: MaterialApp(
-        theme: ThemeData(useMaterial3: true, brightness: b),
+        // The app's own theme: its full-width buttons once broke a row
+        theme: b == Brightness.dark ? AppTheme.dark() : AppTheme.light(),
         builder: (context, child) => MediaQuery(
           data: MediaQuery.of(
             context,

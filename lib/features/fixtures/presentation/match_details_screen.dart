@@ -788,6 +788,11 @@ class _Kits extends StatelessWidget {
 class _Sheets extends ConsumerWidget {
   const _Sheets({required this.fixture, required this.now, required this.isFa});
 
+  static final _compact = FilledButton.styleFrom(
+    minimumSize: const Size(0, 40),
+    padding: const EdgeInsets.symmetric(horizontal: 14),
+  );
+
   final Fixture fixture;
   final DateTime now;
   final bool isFa;
@@ -825,17 +830,28 @@ class _Sheets extends ConsumerWidget {
         leading: FixtureCrest(side: side),
         title: mine ? '${side.name} (you)' : side.name,
         detail: detail,
-        trailing: mine && open
-            ? FilledButton.tonal(
-                onPressed: () => context.open(Routes.teamSheet(f.id)),
-                child: Text(sheet == null ? 'Make team sheet' : 'Change'),
-              )
-            // Locked: the team can still look at what it saved (3.1c)
-            : mine && savedAt != null
-            ? FilledButton.tonal(
-                onPressed: () =>
-                    context.open(Routes.teamSheet(f.id, check: true)),
-                child: const Text('View'),
+        // Our sheet: View (saved), Make team sheet / Change (until the
+        // lock). The theme's buttons are full-width, so these get a small
+        // minimum size: in a row a full-width button can't lay out.
+        trailing: mine && (open || savedAt != null)
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (savedAt != null)
+                    FilledButton.tonal(
+                      style: _compact,
+                      onPressed: () =>
+                          context.open(Routes.teamSheet(f.id, check: true)),
+                      child: const Text('View'),
+                    ),
+                  if (savedAt != null && open) const SizedBox(width: 6),
+                  if (open)
+                    FilledButton.tonal(
+                      style: _compact,
+                      onPressed: () => context.open(Routes.teamSheet(f.id)),
+                      child: Text(sheet == null ? 'Make team sheet' : 'Change'),
+                    ),
+                ],
               )
             : savedAt != null
                 ? const FixtureTag('Saved', tone: AccentTone.green)
@@ -900,10 +916,13 @@ class _Line extends StatelessWidget {
             ),
           ),
           // A button or tag shrinks a little with very large text
+          // (at most half the row on a small phone)
           if (trailing case final t?)
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 150),
-              child: FittedBox(fit: BoxFit.scaleDown, child: t),
+            Flexible(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 230),
+                child: FittedBox(fit: BoxFit.scaleDown, child: t),
+              ),
             ),
         ],
       ),
