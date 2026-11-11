@@ -120,6 +120,13 @@ class Routes {
   static String adminMatch(String id) => '$adminFixtures/match/$id';
   static String teamMatch(String id) => '$teamFixtures/match/$id';
 
+  /// One team's sheet, read only (3.2): the FA any time, the opponent from
+  /// the lock.
+  static String adminMatchSheet(String id, String teamId) =>
+      '$adminFixtures/match/$id/sheet/$teamId';
+  static String teamMatchSheet(String id, String teamId) =>
+      '$teamFixtures/match/$id/sheet/$teamId';
+
   /// Team: the team sheet for one match (3.1a2), full screen.
   /// A team sheet; [check] opens it on the Check step ("View sheet").
   static String teamSheet(String fixtureId, {bool check = false}) =>

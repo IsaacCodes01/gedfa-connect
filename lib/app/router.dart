@@ -32,6 +32,7 @@ import 'package:gedfa_connect/features/fixtures/presentation/fa_fixtures_screen.
 import 'package:gedfa_connect/features/fixtures/presentation/fixture_form_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/fixture_kits_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/match_details_screen.dart';
+import 'package:gedfa_connect/features/team_sheets/presentation/team_sheet_view_screen.dart';
 import 'package:gedfa_connect/features/team_sheets/presentation/team_sheet_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/season_draft_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/season_setup_screen.dart';
@@ -345,6 +346,16 @@ final routerProvider = Provider<GoRouter>((ref) {
                       canEdit: true,
                     ),
                   ),
+                  // One team's sheet, read only (3.2)
+                  GoRoute(
+                    path: 'match/:id/sheet/:teamId',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (_, state) => TeamSheetViewScreen(
+                      fixtureId: state.pathParameters['id']!,
+                      teamId: state.pathParameters['teamId']!,
+                      isFa: true,
+                    ),
+                  ),
                   GoRoute(
                     path: 'match/:id',
                     parentNavigatorKey: rootNavigatorKey,
@@ -539,6 +550,16 @@ final routerProvider = Provider<GoRouter>((ref) {
                     parentNavigatorKey: rootNavigatorKey,
                     builder: (_, state) => FixtureKitsScreen(
                       fixtureId: state.pathParameters['id']!,
+                    ),
+                  ),
+                  // The other team's sheet, from the lock (3.2)
+                  GoRoute(
+                    path: 'match/:id/sheet/:teamId',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (_, state) => TeamSheetViewScreen(
+                      fixtureId: state.pathParameters['id']!,
+                      teamId: state.pathParameters['teamId']!,
+                      isFa: false,
                     ),
                   ),
                   GoRoute(

@@ -4418,6 +4418,8 @@ describe('Team sheets (3.1a2)', () => {
       captainId: base.starters[0], goalkeeperId: base.starters[0],
       numbers: Object.fromEntries(picked.map((p, i) => [p, i + 1])),
       officials: OFFICIALS,
+      players: Object.fromEntries(picked.map((p, i) =>
+        [p, { name: `Player ${p}`, position: 'CM', usual: i + 1 }])),
       ...base,
     };
   }
@@ -4537,6 +4539,39 @@ describe('Team sheets (3.1a2)', () => {
     await assertSucceeds(save(dbAs('admin1'), u17(['k17', 'k13', ...five15])));
     await assertFails(save(dbAs('admin1'), u17(['k17', 'k13', 'k13b', ...five15])));
     await assertFails(save(dbAs('admin1'), u17(['k17', 'k13', ...five15, 'k6'])));
+  });
+
+  // ----- 3.2: copies of the players; the opponent from the lock -----
+
+  it('3.2: a copy of each picked player, nobody else', async () => {
+    const copies = sheet().players;
+    const missing = { ...copies };
+    delete missing.s16;
+    await assertFails(save(dbAs('admin1'), sheet({ players: missing })));
+    await assertFails(save(dbAs('admin1'), sheet({
+      players: { ...copies, s20: { name: 'X', position: 'ST', usual: 20 } },
+    })));
+    const noCopies = sheet();
+    delete noCopies.players;
+    await assertFails(save(dbAs('admin1'), noCopies));
+  });
+
+  it('3.2: the opponent reads it from the lock, not before; others never', async () => {
+    await save(dbAs('admin1'));
+    const read = (db) => getDoc(doc(db, `${D}/teamSheets/f1_royal`));
+    await assertFails(read(dbAs('admin2')));
+    await assertSucceeds(read(dbAs('fa1')));
+    // 50 minutes before kick-off: locked
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), `${D}/fixtures/f1`),
+        { kickoffAt: Timestamp.fromMillis(Date.now() + 50 * 60000) });
+    });
+    await assertSucceeds(read(dbAs('admin2')));
+    // A team not in the match: never
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), `${D}/fixtures/f1`), { teamIds: ['royal', 'other'] });
+    });
+    await assertFails(read(dbAs('admin2')));
   });
 
   // ----- 3.1c: a team lists its own sheets -----

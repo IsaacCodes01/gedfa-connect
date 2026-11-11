@@ -3,7 +3,7 @@ import 'package:gedfa_connect/app/theme.dart';
 import 'package:gedfa_connect/features/dashboard/presentation/widgets/dashboard_card.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/widgets/fixture_row.dart';
 import 'package:gedfa_connect/features/players/domain/age_group.dart';
-import 'package:gedfa_connect/features/players/domain/player.dart';
+import 'package:gedfa_connect/features/team_sheets/domain/team_sheet.dart';
 import 'package:gedfa_connect/features/team_sheets/domain/sheet_roles.dart';
 import 'package:gedfa_connect/features/teams/domain/kit.dart';
 import 'package:gedfa_connect/features/teams/domain/official.dart';
@@ -31,8 +31,8 @@ class SheetPaper extends StatelessWidget {
   final String title;
   final String subtitle;
   final Kit kit;
-  final List<Player> starters;
-  final List<Player> bench;
+  final List<SheetPlayer> starters;
+  final List<SheetPlayer> bench;
   final int maxBench;
 
   /// Every picked player's number for this match.
@@ -64,8 +64,8 @@ class SheetPaper extends StatelessWidget {
       ),
     );
 
-    Widget line(Player p) {
-      final number = numbers[p.id] ?? p.jerseyNo;
+    Widget line(SheetPlayer p) {
+      final number = numbers[p.id] ?? p.usual;
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 3),
         child: Row(
@@ -86,7 +86,7 @@ class SheetPaper extends StatelessWidget {
                 runSpacing: 2,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  Text(p.fullName, style: const TextStyle(fontSize: 13)),
+                  Text(p.name, style: const TextStyle(fontSize: 13)),
                   if (p.id == roles.captainId) const _Mark('C', captain: true),
                   if (p.id == roles.viceCaptainId) const _Mark('VC'),
                   if (p.id == roles.goalkeeperId) const _Mark('GK'),
@@ -95,15 +95,12 @@ class SheetPaper extends StatelessWidget {
                       matchGroup == null ? g.label : '${g.label} ↑',
                       tone: AccentTone.violet,
                     ),
-                  if (number != p.jerseyNo)
-                    FixtureTag('usual ${p.jerseyNo}', tone: AccentTone.grey),
+                  if (number != p.usual)
+                    FixtureTag('usual ${p.usual}', tone: AccentTone.grey),
                 ],
               ),
             ),
-            Text(
-              p.position.code,
-              style: TextStyle(fontSize: 11.5, color: muted),
-            ),
+            Text(p.position, style: TextStyle(fontSize: 11.5, color: muted)),
           ],
         ),
       );

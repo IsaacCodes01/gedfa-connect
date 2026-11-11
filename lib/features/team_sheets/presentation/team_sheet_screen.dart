@@ -191,6 +191,7 @@ class _BuilderState extends ConsumerState<_Builder> {
     required SheetRoles roles,
     required Map<String, int> numbers,
     required List<Official> officials,
+    required List<SheetPlayer> players,
   }) async {
     final uid = ref.read(appUserProvider).value?.uid;
     if (uid == null) return;
@@ -205,6 +206,7 @@ class _BuilderState extends ConsumerState<_Builder> {
             roles: roles,
             numbers: numbers,
             officials: officials,
+            players: players,
             uid: uid,
           );
       if (!mounted) return;
@@ -416,8 +418,8 @@ class _BuilderState extends ConsumerState<_Builder> {
               f.venue,
             ].join(' · '),
       kit: f.kitOf(team.id).kit,
-      starters: starters,
-      bench: bench,
+      starters: [for (final p in starters) SheetPlayer.fromPlayer(p)],
+      bench: [for (final p in bench) SheetPlayer.fromPlayer(p)],
       maxBench: widget.limits.maxBench,
       numbers: numbers,
       roles: roles,
@@ -515,6 +517,10 @@ class _BuilderState extends ConsumerState<_Builder> {
               roles: roles,
               numbers: numbers,
               officials: sheetOfficials,
+              players: [
+                for (final p in [...starters, ...bench])
+                  SheetPlayer.fromPlayer(p),
+              ],
             ),
       icon: _busy
           ? const SizedBox.square(

@@ -810,8 +810,11 @@ class _Sheets extends ConsumerWidget {
             : 'Due in ${left.inHours} h ${left.inMinutes % 60} min';
     final myTeamId = isFa ? null : ref.watch(myTeamProvider).value?.id;
 
+    // The lock passed (or the match is off): the opponent may look (3.2)
+    final locked = due != null && !due.isAfter(now);
+
     Widget row(FixtureSide side) {
-      final canSee = isFa || side.id == myTeamId;
+      final canSee = isFa || side.id == myTeamId || locked;
       final sheet = canSee
           ? ref.watch(teamSheetProvider((f.id, side.id))).value
           : null;
@@ -853,8 +856,17 @@ class _Sheets extends ConsumerWidget {
                     ),
                 ],
               )
+            // The FA any time, the opponent from the lock: View (3.2)
             : savedAt != null
-                ? const FixtureTag('Saved', tone: AccentTone.green)
+                ? FilledButton.tonal(
+                    style: _compact,
+                    onPressed: () => context.open(
+                      isFa
+                          ? Routes.adminMatchSheet(f.id, side.id)
+                          : Routes.teamMatchSheet(f.id, side.id),
+                    ),
+                    child: const Text('View'),
+                  )
                 : open
                     ? FixtureTag(when, tone: AccentTone.gold)
                     : null,

@@ -79,6 +79,28 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
 - After a step, make sure no flutter test / analyze run is left running. If one was stopped
   partway, end its dart processes before finishing.
 
+## Steps left (Isaac, 11 Nov 2026), in order
+
+Build one at a time, mockup first where it says so; details are in `docs/ROADMAP.md` and `docs/DATA_MODEL.md`.
+
+| # | Step | What it is | Mockup | Notes |
+|---|------|------------|--------|-------|
+| ✓ | **3.2** Lock and visibility | The FA views any team sheet; the opponent from the lock | — | Done 11 Nov 2026 |
+| 2 | **3.1e** Player suspensions | The FA suspends a player for a number of matches with a reason; a suspended player can't be picked (locked row, MS2) | Yes, first | Ask: how the count goes down (each match played by the team?), who lifts it |
+| 3 | **3.5** Match officials + referee Home | The FA appoints referee, 2 assistants, 4th official, commissioner (FA admin or referee) per fixture (`officials` map, bell notes); referee dashboard RD1; officials see both sheets from the lock | Yes, first | Referees' accounts exist (invites) |
+| 4 | **3.3** Official sheet as a PDF | Both teams' sheets, kits top-left, signatures; `pdf` / `printing`; **no QR code** (Isaac) | Yes, first | |
+| 5 | **3.6** Player check | The commissioner ticks each player against the sheet (photos) before kick-off | Yes, first | Commissioner only |
+| 6 | **M1, M2** Sending and loading states | One shared look for "saving…" and loading everywhere | Yes, first | Part of the UI/UX refresh |
+| 7 | **Refresh (light)** | App icon (`flutter_launcher_icons`), splash (`flutter_native_splash`) + intro before "Get started" | Yes, first | Never mixed with feature work |
+| 8 | **Phase 4** Match reports | Referee report form (offline draft), signed sheet photo, FA approval; goals, cards, assists (4th official); **protests** (fee GH₵ 500 in League settings, chairman-editable) | Yes, first | Ask GEDFA: protest answer time, public holidays |
+| 9 | **Phase 5** Standings | Table from approved reports, **tie-breakers as the English Premier League**, top scorers, fair play, automatic suspensions from cards | Yes, first | |
+| 10 | **Push notifications** | FCM (Blaze is on), 3-day fee reminders | — | Before the pilot |
+| 11 | **Production setup** | Prod Firebase project, rules deploy, store listing | — | Only when Isaac says so |
+| 12 | **Pilot**, then refresh 2 | Real clubs use it; a second refresh from their feedback | — | |
+| 13 | **JA** Juvenile age groups | A club enters 1–3 age groups at registration / by a change request, only before the season is published | Yes, first | GEDFA, 10 Nov 2026 |
+| 14 | **JF** Fees by competition | Division and Juvenile affiliation fees (+ referee fee) | Yes, first | GEDFA, 10 Nov 2026 |
+| — | Parked until after Phase 5 | 3.0c2 live draw, 3.0c3 bracket, 3.0c4 groups, 3.0c5 two legs / replays; 3.0d next matchday card (D1, J1); 3.0e posters; 3.4 formation; Season records (past seasons, stats screen); 5.5 feed; 6 formation tool; 7 live updates / fan view; 8 release (crash reports, backup, Play Store, user guide, more districts) | | Ask GEDFA first: cup pots before results, juvenile sides in an open cup, final one match, gala match length; U13 play-up limit in a U15 match |
+
 ## Where we left off (7 Nov 2026)
 
 - 2.10a (`9aa5b31`) is pushed and its rules are deployed to dev (Isaac, 7 Nov 2026).
@@ -211,6 +233,9 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
   exact via `isSquadRemoval` → `notInDivisionJuvenilesAfter` (not in the player rule: it is at the 1000-expression limit).
   **Rules lookups: `exists()` + `get()` of one doc count as 2**; sheet saves are at 10 (U17), so they use `isSheetTeamAdmin` /
   `sheetLeagueValue` (one get each). FA note kind `divisionJuveniles`. Rules changed: Isaac deploys to dev. Next: **3.1e**.
+- **3.2** done (11 Nov 2026, 411 rules tests, 301 Dart tests): `teamSheets.players` copies (`SheetPlayer`), `SheetPaper` draws
+  `SheetPlayer`s; `TeamSheetViewScreen` (`Routes.adminMatchSheet` / `teamMatchSheet`), View in Match details (FA any time,
+  opponent from the lock, rule `isOpponentAfterLock`). Rules changed: Isaac deploys to dev. Next: **3.1e** (mockup first).
 - Calendar backdrop (`_CalendarBackdrop` in `match_calendar_card.dart`): GEDFA logo as a one-colour watermark (its letters are white,
   so tint it with `color` + `BlendMode.srcIn`). `assets/images/gedfa_logo.png` is now committed.
 - **Plan agreed 9 Nov 2026 (deadline Thu 12 Nov, 12:30 pm; Isaac's prompts in that conversation):** next, in order:

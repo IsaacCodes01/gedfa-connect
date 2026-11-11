@@ -262,7 +262,7 @@ Mockup `3.0-fixtures-and-sheet.html` (approved 8 Nov 2026).
   - [x] 3.1d1 **Juveniles in the Division**: the club's list of up to 7 (Squad › Division card with U13 / U15 / U17 counters and Remove, the picker with limits, rules, bell note to the FA; at most 1 U13 and 3 U15) (mockup DJ1, DJ2). `squads/{teamId}_divisionJuveniles`. 405 rules tests, 293 Dart tests *(done 11 Nov 2026)*
   - [x] 3.1d2 **The Division sheet takes the 7** (section "Juveniles (Division list)" with age pills, pills on the Check step, DJ3, DJ4) and the **juvenile play-up limits** (U17 match: 1 U13 and 5 U15, counters, "U13 limit reached" lock, MS6); a corrected juvenile leaves the Division list in the same save. Fixed: U17 sheets were over the rules' lookup limit. 409 rules tests, 297 Dart tests *(done 11 Nov 2026)*
   - [ ] 3.1e Player suspensions by the FA (a number of matches, a reason); suspended players can't be picked
-- [ ] 3.2 Submit and lock 1 hour before kick-off; the FA and the referee see it; the opponent sees it at lock time (V2)
+- [x] 3.2 **Lock and visibility**: the lock 1 hour before kick-off (in the rules since 3.1a2); the sheet keeps a copy of each picked player; **View** in Match details opens a team's sheet read only (`TeamSheetViewScreen`, the MS5 look): the FA any time, the opponent from the lock. The referee and commissioner come with 3.5. 411 rules tests, 301 Dart tests *(done 11 Nov 2026)*
 - [ ] 3.3 The paper sheet as a PDF: the team's real kits top-left, captain's signature, QR code to check it (V1)
 - [ ] 3.4 Formation on a pitch (optional)
 
@@ -361,6 +361,7 @@ Work backwards from the GEDFA season start date to decide what the pilot must co
 | 12 Oct 2026 | Renamed to GEDFA Connect; dev/prod projects created |
 | 13 Oct 2026 | Phase 0 complete; added 0.8 design foundation, 1.0 emulators, 1.1a toasts/connectivity/responsive; invite-only roles (2.6); FA announcements (2.7); new Phase 5.5 League feed; navigation, connectivity and responsive standards; pre-pilot checklist |
 | 17 Oct 2026 | 1.1b, 1.2, 1.3 done; new 1.3b Competitions (Division / Juvenile, one registration per club); 1.4 split into Division first, Juvenile after GEDFA answers |
+| 11 Nov 2026 | 3.2 done: the FA views any saved team sheet, the opponent from the lock; sheets carry copies of the players. Steps left listed in a table in CLAUDE.md (Isaac). 411 rules tests, 301 Dart tests |
 | 11 Nov 2026 | 3.1d2 done: Division sheets take the club's juveniles with pills; U17 sheets: 1 U13 and 5 U15 at most; U17 sheets saved again (they were over the rules' 10-lookup limit since 3.1a2). 409 rules tests, 297 Dart tests |
 | 11 Nov 2026 | Fix (Isaac): the FA's note for juveniles in the Division said "updated their profile" and opened the team. New note kind `divisionJuveniles` ("Royal Unique FC: juveniles in the Division", one line per change: "+ Kojo Brew (U15)", "− Yaw Sam (U17)"), opening the team's players page, which now lists the club's 7 (read only). 406 rules tests |
 | 11 Nov 2026 | 3.1d1 done: a club in both competitions names up to 7 juveniles for the Division on its Squad tab (1 U13 and 3 U15 at most), checked by the rules; the FA is told. 405 rules tests, 293 Dart tests |

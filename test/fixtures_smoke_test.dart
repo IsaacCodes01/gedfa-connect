@@ -488,6 +488,12 @@ void main() {
     }
   }
 
+  testWidgets("the FA's Match details: View on a saved sheet (3.2)", (tester) async {
+    await _pump(tester, const MatchDetailsScreen(fixtureId: 'm1', isFa: true),
+        const Size(360, 3000), Brightness.light);
+    expect(find.text('View'), findsOneWidget);
+  });
+
   testWidgets("a team's Match details: View and Change on its saved sheet", (tester) async {
     await _pump(tester, const MatchDetailsScreen(fixtureId: 'm1'),
         const Size(360, 3000), Brightness.light);

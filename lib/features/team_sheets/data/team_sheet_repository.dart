@@ -45,6 +45,7 @@ class TeamSheetRepository {
     required SheetRoles roles,
     required Map<String, int> numbers,
     required List<Official> officials,
+    required List<SheetPlayer> players,
     required String uid,
   }) {
     // Checked here first so the team is told why; the rules refuse it too
@@ -76,6 +77,8 @@ class TeamSheetRepository {
                 'licence': ?o.licence,
               },
           ],
+          // Copies for the FA and the opponent (3.2): no photo, no birth date
+          'players': {for (final p in players) p.id: p.toMap()},
           'savedBy': uid,
           'savedAt': FieldValue.serverTimestamp(),
         })
