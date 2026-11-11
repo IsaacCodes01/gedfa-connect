@@ -24,15 +24,21 @@ import 'package:gedfa_connect/features/players/domain/position.dart';
 import 'package:gedfa_connect/features/players/presentation/widgets/player_photo.dart';
 import 'package:gedfa_connect/features/team_sheets/data/team_sheet_repository.dart';
 import 'package:gedfa_connect/features/team_sheets/domain/sheet_picks.dart';
+import 'package:gedfa_connect/features/team_sheets/domain/sheet_roles.dart';
 import 'package:gedfa_connect/features/team_sheets/domain/team_sheet.dart';
+import 'package:gedfa_connect/features/team_sheets/presentation/widgets/sheet_roles_step.dart';
+import 'package:gedfa_connect/features/team_sheets/presentation/widgets/shirt_numbers.dart';
+import 'package:gedfa_connect/features/teams/data/team_profile_repository.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
+import 'package:gedfa_connect/features/teams/domain/official.dart';
 import 'package:gedfa_connect/features/teams/domain/team.dart';
 
-/// Team sheet, step 1 Players (3.1a2, mockups MS2 and MS3): the team picks
-/// who starts and who sits on the bench for one match, from its approved
-/// players, and saves. Saving again replaces the sheet, until it locks
-/// 1 hour before kick-off. Roles and numbers (3.1b) and the Check step
-/// (3.1c) come next.
+/// Team sheet for one match (3.1). Step 1 Players (3.1a2, MS2, MS3): who
+/// starts and who sits on the bench, from the approved players. Step 2
+/// Roles & numbers (3.1b, MS4): captain, vice-captain, goalkeeper, shirt
+/// numbers for this match (MS4b, MS4c) and officials, then Save. Saving
+/// again replaces the sheet, until it locks 1 hour before kick-off. The
+/// Check step comes in 3.1c.
 class TeamSheetScreen extends ConsumerWidget {
   const TeamSheetScreen({super.key, required this.fixtureId});
 
@@ -109,6 +115,15 @@ class _Builder extends ConsumerStatefulWidget {
 class _BuilderState extends ConsumerState<_Builder> {
   /// What the team changed; null = the saved sheet as it is.
   SheetPicks? _picks;
+
+  /// Captain, vice-captain, goalkeeper and changed numbers the team chose;
+  /// null = the saved sheet's, or the armbands in Profiles.
+  SheetRoles? _roles;
+
+  /// The ticked officials (indexes into Team profile's list); null = the
+  /// saved sheet's, or all of them.
+  Set<int>? _officialPicks;
+  _View _view = _View.players;
   String _search = '';
   bool _busy = false;
 
@@ -123,14 +138,51 @@ class _BuilderState extends ConsumerState<_Builder> {
     return group != null && group.index <= f.ageGroup!.index;
   }
 
-  Future<void> _save(SheetPicks picks) async {
+  /// Team manager first, head coach second, then the other ticked ones in
+  /// Team profile's order (the rules check the first two).
+  static List<Official> _ordered(List<Official> all, Set<int> ticked) {
+    final picked = [
+      for (final (i, o) in all.indexed)
+        if (ticked.contains(i)) o,
+    ];
+    Official? first(OfficialRole role) {
+      for (final o in picked) {
+        if (o.role == role) return o;
+      }
+      return null;
+    }
+
+    final manager = first(OfficialRole.teamManager);
+    final coach = first(OfficialRole.headCoach);
+    return [
+      ?manager,
+      ?coach,
+      for (final o in picked)
+        if (!identical(o, manager) && !identical(o, coach)) o,
+    ];
+  }
+
+  Future<void> _save({
+    required SheetPicks picks,
+    required SheetRoles roles,
+    required Map<String, int> numbers,
+    required List<Official> officials,
+  }) async {
     final uid = ref.read(appUserProvider).value?.uid;
     if (uid == null) return;
     setState(() => _busy = true);
     try {
       await ref
           .read(teamSheetRepositoryProvider)
-          .save(fixture: f, teamId: widget.team.id, picks: picks, uid: uid);
+          .save(
+            fixture: f,
+            teamId: widget.team.id,
+            picks: picks,
+            roles: roles,
+            numbers: numbers,
+            officials: officials,
+            uid: uid,
+          );
       if (!mounted) return;
       final due = f.sheetDueAt;
       AppToast.success(
@@ -140,7 +192,11 @@ class _BuilderState extends ConsumerState<_Builder> {
             : 'Team sheet saved. You can change it until '
                   '${formatShortDate(due)}, ${formatTime(due)}.',
       );
-      setState(() => _picks = null);
+      setState(() {
+        _picks = null;
+        _roles = null;
+        _officialPicks = null;
+      });
     } catch (error) {
       if (mounted) AppToast.error(context, appErrorMessage(error));
     } finally {
@@ -155,6 +211,8 @@ class _BuilderState extends ConsumerState<_Builder> {
     final profiles = ref.watch(teamProfilesProvider).value ?? const {};
     final armbands =
         ref.watch(armbandsProvider(f.category.name)).value ?? const Armbands();
+    final teamOfficials =
+        ref.watch(myTeamDetailsProvider).value?.officials ?? const <Official>[];
 
     final mine = [
       for (final p in widget.players)
@@ -165,16 +223,66 @@ class _BuilderState extends ConsumerState<_Builder> {
         if (p.isApproved) p,
     ]..sort((a, b) => a.jerseyNo.compareTo(b.jerseyNo));
     final waiting = mine.length - pickable.length;
-    final pickableIds = {for (final p in pickable) p.id};
+    final byId = {for (final p in pickable) p.id: p};
+    final usual = {for (final p in pickable) p.id: p.jerseyNo};
+    final keepers = {
+      for (final p in pickable)
+        if (p.position == Position.gk) p.id,
+    };
 
     // A player picked on the saved sheet who is no longer approved drops off
     final savedPicks = saved == null
         ? const SheetPicks()
         : SheetPicks(starters: saved.starters, bench: saved.bench);
-    final fromSaved = savedPicks.keepOnly(pickableIds);
+    final fromSaved = savedPicks.keepOnly(byId.keys.toSet());
     final dropped = savedPicks.size - fromSaved.size;
     final picks = _picks ?? fromSaved;
-    final dirty = _picks != null || dropped > 0;
+
+    // Roles: the team's choice, else the saved sheet's, else Profiles
+    final savedRoles = saved == null || saved.captainId == null
+        ? SheetRoles(
+            captainId: armbands.captainId,
+            viceCaptainId: armbands.viceCaptainId,
+          )
+        : SheetRoles(
+            captainId: saved.captainId,
+            viceCaptainId: saved.viceCaptainId,
+            goalkeeperId: saved.goalkeeperId,
+            numbers: {
+              for (final e in saved.numbers.entries)
+                if (usual[e.key] != e.value) e.key: e.value,
+            },
+          );
+    final chosen = _roles ?? savedRoles;
+    final roles = chosen.fitTo(picks, keepers: keepers);
+    final numbers = roles.numbersFor(picks, usual);
+
+    // Officials: the team's ticks, else the saved sheet's, else everyone.
+    // The team manager and head coach are always ticked.
+    String key(Official o) => '${o.role.name}|${o.name.trim()}';
+    final savedOfficials = {
+      for (final o in saved?.officials ?? const <Official>[]) key(o),
+    };
+    final ticked = {
+      for (final (i, o) in teamOfficials.indexed)
+        if (o.role.isRequired ||
+            (_officialPicks?.contains(i) ??
+                (savedOfficials.isEmpty || savedOfficials.contains(key(o)))))
+          i,
+    };
+    final sheetOfficials = _ordered(teamOfficials, ticked);
+    final officialsReady =
+        sheetOfficials.length >= 2 &&
+        sheetOfficials[0].role == OfficialRole.teamManager &&
+        sheetOfficials[1].role == OfficialRole.headCoach;
+
+    // A sheet saved before roles existed (3.1a2) needs saving again
+    final dirty =
+        _picks != null ||
+        _roles != null ||
+        _officialPicks != null ||
+        dropped > 0 ||
+        (saved != null && saved.captainId == null);
 
     final due = f.sheetDueAt;
     final locked =
@@ -183,10 +291,9 @@ class _BuilderState extends ConsumerState<_Builder> {
     final check = SheetCheck.of(
       picks,
       widget.limits,
-      goalkeepers: {
-        for (final p in pickable)
-          if (p.position == Position.gk) p.id,
-      },
+      roles: roles,
+      numbers: numbers,
+      officialsReady: officialsReady,
       notAvailable: {
         for (final p in pickable)
           if (!(profiles[p.id]?.isAvailable ?? true)) p.id: p.fullName,
@@ -204,6 +311,218 @@ class _BuilderState extends ConsumerState<_Builder> {
       setState(() => _picks = result.picks);
     }
 
+    void setRoles(SheetRoles next) => setState(() => _roles = next);
+
+    void back() => setState(
+      () => _view = _view == _View.numbers ? _View.roles : _View.players,
+    );
+
+    final subtitle = _view == _View.numbers
+        ? 'v ${f.opponentOf(team.id).name} · this match only'
+        : '${team.sideName(f.category)} · ${f.competitionLabel}';
+
+    final Widget body;
+    final Widget foot;
+    switch (_view) {
+      case _View.players:
+        body = _playersList(
+          picks: picks,
+          pickable: pickable,
+          waiting: waiting,
+          dropped: dropped,
+          locked: locked,
+          roles: roles,
+          numbers: numbers,
+          armbands: armbands,
+          profiles: profiles,
+          tap: tap,
+        );
+        foot = _Foot(
+          message: _message(
+            locked: locked,
+            problems: check.problems,
+            warnings: check.warnings,
+            saved: saved,
+            dirty: dirty,
+            ready: 'Players ready: next, roles and numbers',
+          ),
+          children: [
+            FilledButton.icon(
+              onPressed: check.canGoOn
+                  ? () => setState(() => _view = _View.roles)
+                  : null,
+              iconAlignment: IconAlignment.end,
+              icon: const Icon(Icons.arrow_forward),
+              label: const Text('Next: Roles & numbers'),
+            ),
+          ],
+        );
+      case _View.roles:
+        body = RolesStep(
+          players: byId,
+          picks: picks,
+          roles: roles,
+          keeperPickedForYou: roles.keeperPickedFor(chosen),
+          armbands: armbands,
+          numbers: numbers,
+          usual: usual,
+          officials: teamOfficials,
+          officialPicks: ticked,
+          enabled: !locked && !_busy,
+          onCaptain: (id) => setRoles(chosen.withCaptain(id)),
+          onVice: (id) => setRoles(chosen.withVice(id)),
+          onGoalkeeper: (id) => setRoles(chosen.withGoalkeeper(id)),
+          onNumbers: () => setState(() => _view = _View.numbers),
+          onOfficial: (i) => setState(
+            () => _officialPicks = ticked.contains(i)
+                ? ({...ticked}..remove(i))
+                : {...ticked, i},
+          ),
+        );
+        foot = _Foot(
+          message: _message(
+            locked: locked,
+            problems: [...check.problems, ...check.roleProblems],
+            warnings: check.warnings,
+            saved: saved,
+            dirty: dirty,
+            ready: 'Ready to save',
+          ),
+          children: [
+            FilledButton.tonalIcon(
+              onPressed: _busy ? null : back,
+              icon: const Icon(Icons.arrow_back),
+              label: const Text('Players'),
+            ),
+            FilledButton.icon(
+              onPressed:
+                  locked || _busy || !check.canSave || (!dirty && saved != null)
+                  ? null
+                  : () => _save(
+                      picks: picks,
+                      roles: roles,
+                      numbers: numbers,
+                      officials: sheetOfficials,
+                    ),
+              icon: _busy
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.save_outlined),
+              label: Text(saved == null ? 'Save team sheet' : 'Save changes'),
+            ),
+          ],
+        );
+      case _View.numbers:
+        final clash = SheetRoles.clashesIn(numbers).isNotEmpty;
+        body = ShirtNumbersView(
+          starters: [for (final id in picks.starters) ?byId[id]],
+          bench: [for (final id in picks.bench) ?byId[id]],
+          numbers: numbers,
+          enabled: !locked && !_busy,
+          onNumber: (p, n) =>
+              setRoles(chosen.withNumber(p.id, n, usual: p.jerseyNo)),
+        );
+        foot = _Foot(
+          message: clash
+              ? (AccentTone.red, Icons.error_outline, 'Fix the clash to go on')
+              : (
+                  AccentTone.grey,
+                  Icons.info_outline,
+                  'Tap a player to give another number for this match.',
+                ),
+          children: [
+            FilledButton(
+              onPressed: clash ? null : back,
+              child: const Text('Done'),
+            ),
+          ],
+        );
+    }
+
+    return PopScope(
+      canPop: _view == _View.players,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) back();
+      },
+      child: Scaffold(
+        appBar: GedfaAppBar(
+          title: _view == _View.numbers ? 'Shirt numbers' : 'Team sheet',
+          subtitle: subtitle,
+          leading: _view == _View.players
+              ? AppBackButton(fallback: Routes.teamMatch(f.id))
+              : IconButton(
+                  tooltip: 'Back',
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: back,
+                ),
+        ),
+        body: Column(
+          children: [
+            if (_view != _View.numbers) ...[
+              _MatchBar(fixture: f, teamId: team.id, locked: locked),
+              _Steps(
+                on: _view == _View.players ? 1 : 2,
+                canGoOn: check.canGoOn,
+                onTap: (step) => setState(
+                  () => _view = step == 1 ? _View.players : _View.roles,
+                ),
+              ),
+            ],
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
+                children: [ResponsiveCenter(maxWidth: 720, child: body)],
+              ),
+            ),
+          ],
+        ),
+        bottomNavigationBar: foot,
+      ),
+    );
+  }
+
+  /// The first problem (red), a warning (gold), saved (green) or [ready].
+  (AccentTone, IconData, String) _message({
+    required bool locked,
+    required List<String> problems,
+    required List<String> warnings,
+    required TeamSheet? saved,
+    required bool dirty,
+    required String ready,
+  }) {
+    final savedAt = saved?.savedAt;
+    return locked
+        ? (AccentTone.grey, Icons.lock_outline, 'Locked: no more changes.')
+        : problems.isNotEmpty
+        ? (AccentTone.red, Icons.error_outline, problems.first)
+        : warnings.isNotEmpty
+        ? (AccentTone.gold, Icons.info_outline, warnings.first)
+        : !dirty && savedAt != null
+        ? (
+            AccentTone.green,
+            Icons.task_alt,
+            'Saved ${formatShortDate(savedAt)}, '
+                '${formatTime(savedAt)} · '
+                '${saved!.playerCount} players',
+          )
+        : (AccentTone.green, Icons.check_circle_outline, ready);
+  }
+
+  /// Step 1: counters, checks, search and the players (MS2, MS3).
+  Widget _playersList({
+    required SheetPicks picks,
+    required List<Player> pickable,
+    required int waiting,
+    required int dropped,
+    required bool locked,
+    required SheetRoles roles,
+    required Map<String, int> numbers,
+    required Armbands armbands,
+    required Map<String, PlayerProfile> profiles,
+    required void Function(Player p, Pick target) tap,
+  }) {
     final query = _search.trim().toLowerCase();
     bool matches(Player p) =>
         query.isEmpty ||
@@ -244,148 +563,122 @@ class _BuilderState extends ConsumerState<_Builder> {
       }
     }
 
-    final subtitle = '${team.sideName(f.category)} · ${f.competitionLabel}';
-    return Scaffold(
-      appBar: GedfaAppBar(
-        title: 'Team sheet',
-        subtitle: subtitle,
-        leading: AppBackButton(fallback: Routes.teamMatch(f.id)),
-      ),
-      body: Column(
-        children: [
-          _MatchBar(fixture: f, teamId: team.id, locked: locked),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
+    // On the sheet: this match's armbands; off it: the season's (Profiles)
+    String? badge(String id) => picks.pickOf(id) == Pick.out
+        ? armbands.badgeFor(id)
+        : id == roles.captainId
+        ? 'C'
+        : id == roles.viceCaptainId
+        ? 'VC'
+        : null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (locked)
+          const _Banner(
+            tone: AccentTone.grey,
+            icon: Icons.lock_outline,
+            text:
+                'This sheet is locked: it closed 1 hour before '
+                'kick-off, or the match is no longer scheduled.',
+          ),
+        if (dropped > 0)
+          _Banner(
+            tone: AccentTone.gold,
+            icon: Icons.info_outline,
+            text: dropped == 1
+                ? '1 player on your saved sheet is no longer '
+                      'approved and was taken off. Save again.'
+                : '$dropped players on your saved sheet are no '
+                      'longer approved and were taken off. Save '
+                      'again.',
+          ),
+        _Counters(picks: picks, limits: widget.limits),
+        const SizedBox(height: 8),
+        _Checks(
+          picks: picks,
+          limits: widget.limits,
+          hasKeeper: roles.goalkeeperId != null,
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          onChanged: (v) => setState(() => _search = v),
+          decoration: const InputDecoration(
+            prefixIcon: Icon(Icons.search),
+            hintText: 'Name, number or ID',
+            isDense: true,
+          ),
+        ),
+        if (pickable.isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(top: 24),
+            child: EmptyView(
+              icon: Icons.group_off_outlined,
+              title: 'No approved players yet',
+              message:
+                  'Only players approved by GEDFA can go on '
+                  'a team sheet.',
+            ),
+          ),
+        for (final (title, list) in sections) ...[
+          _SectionHead(
+            title: title,
+            note:
+                '${list.where((p) => picks.pickOf(p.id) == Pick.start).length} starting',
+          ),
+          DashboardCard(
+            padding: EdgeInsets.zero,
+            child: Column(
               children: [
-                ResponsiveCenter(
-                  maxWidth: 720,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (locked)
-                        const _Banner(
-                          tone: AccentTone.grey,
-                          icon: Icons.lock_outline,
-                          text:
-                              'This sheet is locked: it closed 1 hour before '
-                              'kick-off, or the match is no longer scheduled.',
-                        ),
-                      if (dropped > 0)
-                        _Banner(
-                          tone: AccentTone.gold,
-                          icon: Icons.info_outline,
-                          text: dropped == 1
-                              ? '1 player on your saved sheet is no longer '
-                                    'approved and was taken off. Save again.'
-                              : '$dropped players on your saved sheet are no '
-                                    'longer approved and were taken off. Save '
-                                    'again.',
-                        ),
-                      _Counters(picks: picks, limits: widget.limits),
-                      const SizedBox(height: 8),
-                      _Checks(
-                        picks: picks,
-                        limits: widget.limits,
-                        check: check,
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        onChanged: (v) => setState(() => _search = v),
-                        decoration: const InputDecoration(
-                          prefixIcon: Icon(Icons.search),
-                          hintText: 'Name, number or ID',
-                          isDense: true,
-                        ),
-                      ),
-                      if (pickable.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 24),
-                          child: EmptyView(
-                            icon: Icons.group_off_outlined,
-                            title: 'No approved players yet',
-                            message:
-                                'Only players approved by GEDFA can go on '
-                                'a team sheet.',
-                          ),
-                        ),
-                      for (final (title, list) in sections) ...[
-                        _SectionHead(
-                          title: title,
-                          note:
-                              '${list.where((p) => picks.pickOf(p.id) == Pick.start).length} starting',
-                        ),
-                        DashboardCard(
-                          padding: EdgeInsets.zero,
-                          child: Column(
-                            children: [
-                              for (final p in list)
-                                _PlayerRow(
-                                  player: p,
-                                  pick: picks.pickOf(p.id),
-                                  badge: armbands.badgeFor(p.id),
-                                  profile: profiles[p.id],
-                                  playingUp:
-                                      f.ageGroup != null &&
-                                      p.ageGroup != f.ageGroup,
-                                  benchOpen:
-                                      picks.starters.length >=
-                                          SheetLimits.eleven ||
-                                      picks.pickOf(p.id) == Pick.start,
-                                  enabled: !locked && !_busy,
-                                  onTap: (target) => tap(p, target),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ],
-                      if (waiting > 0)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 12),
-                          child: DashboardCard(
-                            onTap: () => context.open(Routes.team),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.hourglass_top_outlined),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    waiting == 1
-                                        ? "1 player not approved yet can't be picked"
-                                        : "$waiting players not approved yet "
-                                              "can't be picked",
-                                    style: const TextStyle(fontSize: 12.5),
-                                  ),
-                                ),
-                                Text(
-                                  'Squad ›',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.primary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                    ],
+                for (final p in list)
+                  _PlayerRow(
+                    player: p,
+                    number: numbers[p.id] ?? p.jerseyNo,
+                    pick: picks.pickOf(p.id),
+                    badge: badge(p.id),
+                    profile: profiles[p.id],
+                    playingUp: f.ageGroup != null && p.ageGroup != f.ageGroup,
+                    benchOpen:
+                        picks.starters.length >= SheetLimits.eleven ||
+                        picks.pickOf(p.id) == Pick.start,
+                    enabled: !locked && !_busy,
+                    onTap: (target) => tap(p, target),
                   ),
-                ),
               ],
             ),
           ),
         ],
-      ),
-      bottomNavigationBar: _SaveBar(
-        check: check,
-        saved: saved,
-        dirty: dirty,
-        busy: _busy,
-        locked: locked,
-        onSave: () => _save(picks),
-      ),
+        if (waiting > 0)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: DashboardCard(
+              onTap: () => context.open(Routes.team),
+              child: Row(
+                children: [
+                  const Icon(Icons.hourglass_top_outlined),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      waiting == 1
+                          ? "1 player not approved yet can't be picked"
+                          : "$waiting players not approved yet "
+                                "can't be picked",
+                      style: const TextStyle(fontSize: 12.5),
+                    ),
+                  ),
+                  Text(
+                    'Squad ›',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -396,6 +689,10 @@ class _BuilderState extends ConsumerState<_Builder> {
     PositionGroup.fwd => 'Forwards',
   };
 }
+
+/// Which part of the sheet is on screen: step 1, step 2, or the shirt
+/// numbers page opened from step 2.
+enum _View { players, roles, numbers }
 
 // ---------- Pieces ----------
 
@@ -562,31 +859,38 @@ class _Counters extends StatelessWidget {
   }
 }
 
-/// Green, red or grey chips: goalkeeper starts, at least 7, bench room.
+/// Green or gold chips: goalkeeper, at least 7, bench room.
 class _Checks extends StatelessWidget {
   const _Checks({
     required this.picks,
     required this.limits,
-    required this.check,
+    required this.hasKeeper,
   });
 
   final SheetPicks picks;
   final SheetLimits limits;
-  final SheetCheck check;
+
+  /// A goalkeeper starts: picked in step 2, or the only registered
+  /// goalkeeper in the 11.
+  final bool hasKeeper;
 
   @override
   Widget build(BuildContext context) {
-    final noKeeper = check.problems.contains('A goalkeeper must start.');
     final enough = picks.starters.length >= limits.minPlayers;
     final room = limits.maxBench - picks.bench.length;
     return Wrap(
       spacing: 6,
       runSpacing: 6,
       children: [
-        _Chip(
-          ok: !noKeeper && picks.starters.isNotEmpty,
-          text: noKeeper ? 'No goalkeeper starts' : 'Goalkeeper starts',
-        ),
+        if (hasKeeper)
+          const _Chip(ok: true, text: 'Goalkeeper starts')
+        else
+          FixtureTag(
+            picks.starters.isEmpty
+                ? 'No goalkeeper yet'
+                : 'Goalkeeper: pick one in step 2',
+            tone: AccentTone.gold,
+          ),
         _Chip(ok: enough, text: 'At least ${limits.minPlayers} starting'),
         if (picks.starters.length >= SheetLimits.eleven)
           FixtureTag(
@@ -642,6 +946,7 @@ class _SectionHead extends StatelessWidget {
 class _PlayerRow extends StatelessWidget {
   const _PlayerRow({
     required this.player,
+    required this.number,
     required this.pick,
     required this.badge,
     required this.profile,
@@ -652,6 +957,9 @@ class _PlayerRow extends StatelessWidget {
   });
 
   final Player player;
+
+  /// The shirt number for this match (the usual one unless changed).
+  final int number;
   final Pick pick;
   final String? badge;
   final PlayerProfile? profile;
@@ -674,7 +982,7 @@ class _PlayerRow extends StatelessWidget {
           SizedBox(
             width: 32,
             child: Text(
-              '${p.jerseyNo}',
+              '$number',
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
             ),
@@ -843,43 +1151,91 @@ class _PickSwitch extends StatelessWidget {
   }
 }
 
-/// The message (first problem, a warning, or ready / saved) and Save.
-class _SaveBar extends StatelessWidget {
-  const _SaveBar({
-    required this.check,
-    required this.saved,
-    required this.dirty,
-    required this.busy,
-    required this.locked,
-    required this.onSave,
-  });
+/// "1 · Players   2 · Roles & numbers" (the Check step comes in 3.1c).
+class _Steps extends StatelessWidget {
+  const _Steps({required this.on, required this.canGoOn, required this.onTap});
 
-  final SheetCheck check;
-  final TeamSheet? saved;
-  final bool dirty;
-  final bool busy;
-  final bool locked;
-  final VoidCallback onSave;
+  final int on;
+  final bool canGoOn;
+  final ValueChanged<int> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    Widget step(int n, String label) {
+      final current = n == on;
+      final done = n < on;
+      final colour = current
+          ? scheme.primary
+          : done
+          ? scheme.onSurface
+          : scheme.onSurfaceVariant;
+      return Expanded(
+        child: InkWell(
+          onTap: current || (n == 2 && !canGoOn) ? null : () => onTap(n),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: current ? scheme.primary : scheme.outlineVariant,
+                  width: current ? 2.5 : 1,
+                ),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (done)
+                  Icon(Icons.check_circle, size: 16, color: colour)
+                else
+                  Text(
+                    '$n ·',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: colour,
+                    ),
+                  ),
+                const SizedBox(width: 5),
+                // A large text size on a small phone ends in "…"
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: colour,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Material(
+      color: scheme.surface,
+      child: Row(children: [step(1, 'Players'), step(2, 'Roles & numbers')]),
+    );
+  }
+}
+
+/// The bottom bar: a message (red, gold, green or grey) and the buttons.
+class _Foot extends StatelessWidget {
+  const _Foot({required this.message, required this.children});
+
+  final (AccentTone, IconData, String) message;
+  final List<Widget> children;
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final savedAt = saved?.savedAt;
-    final (tone, icon, text) = locked
-        ? (AccentTone.grey, Icons.lock_outline, 'Locked: no more changes.')
-        : check.problems.isNotEmpty
-        ? (AccentTone.red, Icons.error_outline, check.problems.first)
-        : check.warnings.isNotEmpty
-        ? (AccentTone.gold, Icons.info_outline, check.warnings.first)
-        : !dirty && savedAt != null
-        ? (
-            AccentTone.green,
-            Icons.task_alt,
-            'Saved ${formatShortDate(savedAt)}, '
-                '${formatTime(savedAt)} · '
-                '${saved!.playerCount} players',
-          )
-        : (AccentTone.green, Icons.check_circle_outline, 'Ready to save');
+    final (tone, icon, text) = message;
     return Material(
       color: Theme.of(context).colorScheme.surface,
       elevation: 3,
@@ -911,23 +1267,16 @@ class _SaveBar extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  FilledButton.icon(
-                    onPressed:
-                        locked ||
-                            busy ||
-                            !check.canSave ||
-                            (!dirty && saved != null)
-                        ? null
-                        : onSave,
-                    icon: busy
-                        ? const SizedBox.square(
-                            dimension: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.save_outlined),
-                    label: Text(
-                      saved == null ? 'Save team sheet' : 'Save changes',
-                    ),
+                  Row(
+                    children: [
+                      for (final (i, child) in children.indexed) ...[
+                        if (i > 0) const SizedBox(width: 10),
+                        Expanded(
+                          flex: i == 0 && children.length > 1 ? 2 : 3,
+                          child: child,
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),

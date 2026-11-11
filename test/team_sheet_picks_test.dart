@@ -60,19 +60,19 @@ void main() {
   });
 
   group('checks', () {
-    test('11 with a goalkeeper and a bench: ready', () {
-      final c = SheetCheck.of(
-        full(bench: ['p12']),
-        limits,
-        goalkeepers: {'p1'},
-      );
-      expect(c.canSave, isTrue);
+    test('11 and a bench: step 1 is done', () {
+      final c = SheetCheck.of(full(bench: ['p12']), limits);
+      expect(c.canGoOn, isTrue);
       expect(c.warnings, isEmpty);
     });
 
-    test('a goalkeeper must start', () {
-      final c = SheetCheck.of(full(), limits, goalkeepers: {'p12'});
-      expect(c.problems, contains('A goalkeeper must start.'));
+    test('no goalkeeper yet: step 1 is done, the save waits for step 2', () {
+      final c = SheetCheck.of(full(), limits);
+      expect(c.problems, isEmpty);
+      expect(
+        c.roleProblems,
+        contains('Pick a goalkeeper from the starting 11.'),
+      );
       expect(c.canSave, isFalse);
     });
 
@@ -80,9 +80,8 @@ void main() {
       final c = SheetCheck.of(
         SheetPicks(starters: eleven.take(6).toList()),
         limits,
-        goalkeepers: {'p1'},
       );
-      expect(c.canSave, isFalse);
+      expect(c.canGoOn, isFalse);
       expect(c.problems.first, contains('1 more'));
     });
 
@@ -90,15 +89,14 @@ void main() {
       final c = SheetCheck.of(
         SheetPicks(starters: eleven.take(9).toList()),
         limits,
-        goalkeepers: {'p1'},
       );
-      expect(c.canSave, isTrue);
+      expect(c.canGoOn, isTrue);
       expect(c.warnings.first, contains('9 starting'));
     });
 
     test('a bench left behind with fewer than 11 starting is a problem', () {
       final picks = full(bench: ['p12']).tapStart('p11').picks;
-      final c = SheetCheck.of(picks, limits, goalkeepers: {'p1'});
+      final c = SheetCheck.of(picks, limits);
       expect(c.problems.single, contains('bench needs 11'));
     });
 
@@ -106,10 +104,9 @@ void main() {
       final c = SheetCheck.of(
         full(),
         limits,
-        goalkeepers: {'p1'},
         notAvailable: {'p4': 'Kofi Boateng', 'x': 'Not picked'},
       );
-      expect(c.canSave, isTrue);
+      expect(c.canGoOn, isTrue);
       expect(
         c.warnings.single,
         'Kofi Boateng is marked injured or unavailable.',

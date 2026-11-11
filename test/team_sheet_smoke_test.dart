@@ -18,15 +18,58 @@ import 'package:gedfa_connect/features/players/domain/player_profile.dart';
 import 'package:gedfa_connect/features/players/domain/position.dart';
 import 'package:gedfa_connect/features/team_sheets/data/team_sheet_repository.dart';
 import 'package:gedfa_connect/features/team_sheets/presentation/team_sheet_screen.dart';
+import 'package:gedfa_connect/features/teams/data/team_profile_repository.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/teams/domain/kit.dart';
 import 'package:gedfa_connect/features/teams/domain/kit_slot.dart';
+import 'package:gedfa_connect/features/teams/domain/official.dart';
 import 'package:gedfa_connect/features/teams/domain/team.dart';
+import 'package:gedfa_connect/features/teams/domain/team_request.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// The team sheet's Players step (3.1a2) on a small phone and a laptop,
-/// light and dark: no overflow, and picking 11 makes it ready to save.
+/// The team sheet (3.1a2, 3.1b) on a small phone and a laptop, light and
+/// dark: no overflow; picking 11 opens step 2; with a goalkeeper picked
+/// it is ready to save; the shirt numbers page.
+
+const _kitColours = Kit(
+  primary: Colors.red,
+  shorts: Colors.white,
+  socks: Colors.red,
+);
+
+// Team profile: the team manager is listed after the head coach on
+// purpose (the sheet puts the manager first).
+const _details = TeamRequest(
+  uid: 'req',
+  teamName: 'Royal Unique Football Club of Apam',
+  shortName: 'RUF',
+  town: 'Apam',
+  homeGround: 'Apam Park',
+  homeKit: _kitColours,
+  awayKit: _kitColours,
+  goalkeeperKit: _kitColours,
+  officials: [
+    Official(
+      role: OfficialRole.headCoach,
+      name: 'Kofi Mensah',
+      phone: '0240000001',
+      licence: 'CAF D',
+    ),
+    Official(
+      role: OfficialRole.teamManager,
+      name: 'Kojo Antwi',
+      phone: '0240000002',
+    ),
+    Official(
+      role: OfficialRole.kitManager,
+      name: 'Ama Serwaa',
+      phone: '0240000003',
+    ),
+  ],
+  status: ApprovalStatus.approved,
+  categories: {Competition.division, Competition.juvenile},
+);
 
 const _team = Team(
   id: 'ruf',
@@ -143,6 +186,7 @@ Future<void> _pump(
       overrides: [
         sharedPreferencesProvider.overrideWithValue(prefs),
         myTeamProvider.overrideWith((ref) => Stream.value(_team)),
+        myTeamDetailsProvider.overrideWith((ref) => Stream.value(_details)),
         appUserProvider.overrideWith(
           (ref) => Stream.value(
             const AppUser(uid: 'u', role: null, displayName: 'Isaac Otabil'),
@@ -218,20 +262,92 @@ void main() {
     _noError(tester);
   });
 
-  testWidgets('picking 11 with a goalkeeper makes it ready to save', (
-    tester,
-  ) async {
-    await _pump(tester, const Size(1280, 2400), Brightness.light);
+  Future<void> pickEleven(WidgetTester tester) async {
+    // The first 11 on screen: both goalkeepers (p0, p11), six defenders
+    // (p3 is the captain in Profiles) and three midfielders (p5 is VC)
     final elevens = find.text('11');
     for (var i = 0; i < 11; i++) {
       await tester.tap(elevens.at(i));
       await tester.pump();
     }
+  }
+
+  FilledButton button(WidgetTester tester, String label) =>
+      tester.widget<FilledButton>(
+        find.ancestor(
+          of: find.text(label),
+          matching: find.byWidgetPredicate((w) => w is FilledButton),
+        ),
+      );
+
+  testWidgets('picking 11 opens step 2; with a goalkeeper it can be saved', (
+    tester,
+  ) async {
+    await _pump(tester, const Size(1280, 2400), Brightness.light);
+    await pickEleven(tester);
     _noError(tester);
-    // p3 is injured: picked with a warning, still saveable
+    // p3 is injured: picked with a warning, still fine
     expect(find.textContaining('injured or unavailable'), findsOneWidget);
-    final save = tester.widget<FilledButton>(find.byType(FilledButton));
-    expect(save.onPressed, isNotNull);
+    // Two goalkeepers start: the team picks one in step 2
+    expect(find.text('Goalkeeper: pick one in step 2'), findsOneWidget);
+
+    await tester.tap(find.text('Next: Roles & numbers'));
+    await tester.pumpAndSettle();
+    _noError(tester);
+    expect(find.text('ARMBANDS AND GOALKEEPER'), findsOneWidget);
+    // Captain and vice-captain from Profiles; the manager and coach ticked
+    expect(find.text('#4 Kwabena Mensah-Bonsu Asamoah 3'), findsOneWidget);
+    expect(find.text('#6 Kwabena Mensah-Bonsu Asamoah 5'), findsOneWidget);
+    expect(find.text('3 of 7'), findsOneWidget);
+    expect(
+      find.text('Pick a goalkeeper from the starting 11.'),
+      findsOneWidget,
+    );
+    expect(button(tester, 'Save team sheet').onPressed, isNull);
+
+    // Goalkeeper: Change, then the second goalkeeper (p11, number 12)
+    await tester.tap(find.text('Change').at(2));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Kwabena Mensah-Bonsu Asamoah 11').last);
+    await tester.pumpAndSettle();
+    _noError(tester);
+    expect(find.text('#12 Kwabena Mensah-Bonsu Asamoah 11'), findsOneWidget);
+    expect(button(tester, 'Save team sheet').onPressed, isNotNull);
+  });
+
+  testWidgets('shirt numbers: the page and the picker fit a small phone', (
+    tester,
+  ) async {
+    // Phone width, tall enough for every row to be tapped
+    await _pump(tester, const Size(360, 2600), Brightness.dark);
+    await pickEleven(tester);
+    await tester.tap(find.text('Next: Roles & numbers'));
+    await tester.pumpAndSettle();
+    _noError(tester);
+    expect(find.text('11 numbers · 0 changed'), findsOneWidget);
+
+    await tester.tap(find.text('11 numbers · 0 changed'));
+    await tester.pumpAndSettle();
+    _noError(tester);
+    expect(find.text('Shirt numbers'), findsOneWidget);
+    expect(find.text('STARTING 11'), findsOneWidget);
+
+    await tester.tap(find.text('Kwabena Mensah-Bonsu Asamoah 0'));
+    await tester.pumpAndSettle();
+    _noError(tester);
+    expect(
+      find.text('Shirt for Kwabena Mensah-Bonsu Asamoah 0'),
+      findsOneWidget,
+    );
+    // Wear 30, then Done goes back to step 2 with 1 changed
+    await tester.tap(find.text('30'));
+    await tester.pump();
+    await tester.tap(find.text('Wear 30'));
+    await tester.pumpAndSettle();
+    expect(find.text('usual 1'), findsOneWidget);
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+    expect(find.text('11 numbers · 1 changed'), findsOneWidget);
   });
 
   testWidgets('juvenile U15: the squad, then playing up from U13', (

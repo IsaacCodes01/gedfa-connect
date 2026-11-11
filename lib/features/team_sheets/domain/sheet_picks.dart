@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import 'package:gedfa_connect/features/team_sheets/domain/sheet_roles.dart';
+
 /// Where a player is on the sheet.
 enum Pick { out, start, bench }
 
@@ -103,26 +105,40 @@ class SheetPicks {
   );
 }
 
-/// What the checks say about a sheet: [problems] stop the save (red),
-/// [warnings] don't (gold).
+/// What the checks say about a sheet. [problems] stop step 1 (Players),
+/// [roleProblems] stop step 2 (Roles & numbers); both stop the save (red).
+/// [warnings] never do (gold).
 class SheetCheck {
-  const SheetCheck({this.problems = const [], this.warnings = const []});
+  const SheetCheck({
+    this.problems = const [],
+    this.roleProblems = const [],
+    this.warnings = const [],
+  });
 
   final List<String> problems;
+  final List<String> roleProblems;
   final List<String> warnings;
 
-  bool get canSave => problems.isEmpty;
+  /// Step 1 is done: on to Roles & numbers.
+  bool get canGoOn => problems.isEmpty;
 
-  /// Checks [picks] against [limits]. [goalkeepers] are the IDs of the
-  /// players registered as goalkeepers; [notAvailable] maps a picked
-  /// player's ID to their name (injured or unavailable in Profiles).
+  bool get canSave => problems.isEmpty && roleProblems.isEmpty;
+
+  /// Checks [picks] against [limits], and step 2: [roles] (already fitted
+  /// with `SheetRoles.fitTo`), the shirt [numbers] of the picked players
+  /// for this match, and whether the team manager and head coach are on
+  /// the sheet ([officialsReady]). [notAvailable] maps a picked player's
+  /// ID to their name (injured or unavailable in Profiles).
   static SheetCheck of(
     SheetPicks picks,
     SheetLimits limits, {
-    required Set<String> goalkeepers,
+    SheetRoles roles = const SheetRoles(),
+    Map<String, int> numbers = const {},
+    bool officialsReady = true,
     Map<String, String> notAvailable = const {},
   }) {
     final problems = <String>[];
+    final roleProblems = <String>[];
     final warnings = <String>[];
     final starting = picks.starters.length;
 
@@ -134,9 +150,6 @@ class SheetCheck {
                   '${limits.minPlayers - starting} more.',
       );
     }
-    if (starting > 0 && !picks.starters.any(goalkeepers.contains)) {
-      problems.add('A goalkeeper must start.');
-    }
     if (picks.bench.isNotEmpty && starting < SheetLimits.eleven) {
       problems.add(
         'The bench needs 11 starting: pick '
@@ -146,6 +159,32 @@ class SheetCheck {
     if (picks.bench.length > limits.maxBench) {
       problems.add('Bench: ${limits.maxBench} at most.');
     }
+
+    if (roles.captainId == null) {
+      roleProblems.add('Pick a captain from the starting 11.');
+    }
+    if (roles.goalkeeperId == null) {
+      roleProblems.add('Pick a goalkeeper from the starting 11.');
+    }
+    if (numbers.values.any((n) => !SheetRoles.isValidNumber(n))) {
+      roleProblems.add('Shirt numbers go from 1 to 99.');
+    }
+    final clashes = SheetRoles.clashesIn(numbers);
+    if (clashes.isNotEmpty) {
+      final n = clashes.keys.first;
+      final count = clashes[n]!.length;
+      roleProblems.add(
+        '${count == 2 ? 'Two' : '$count'} players wear $n. '
+        'Give one of them another number.',
+      );
+    }
+    if (!officialsReady) {
+      roleProblems.add(
+        'The team manager and head coach must be on the sheet: '
+        'add them in Team profile.',
+      );
+    }
+
     if (starting >= limits.minPlayers && starting < SheetLimits.eleven) {
       warnings.add(
         '$starting starting: you can play with '
@@ -163,6 +202,10 @@ class SheetCheck {
         'or unavailable.',
       );
     }
-    return SheetCheck(problems: problems, warnings: warnings);
+    return SheetCheck(
+      problems: problems,
+      roleProblems: roleProblems,
+      warnings: warnings,
+    );
   }
 }

@@ -5,7 +5,9 @@ import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/features/fixtures/domain/fixture.dart';
 import 'package:gedfa_connect/features/team_sheets/domain/sheet_picks.dart';
+import 'package:gedfa_connect/features/team_sheets/domain/sheet_roles.dart';
 import 'package:gedfa_connect/features/team_sheets/domain/team_sheet.dart';
+import 'package:gedfa_connect/features/teams/domain/official.dart';
 
 const _timeout = Duration(seconds: 15);
 
@@ -25,11 +27,16 @@ class TeamSheetRepository {
       });
 
   /// Saves the whole sheet (saving again replaces it). The rules check
-  /// the match, the limits and that every player is approved.
+  /// the match, the limits, that every player is approved, and the roles:
+  /// [roles] fitted to [picks], [numbers] for every picked player, and
+  /// [officials] with the team manager first and the head coach second.
   Future<void> save({
     required Fixture fixture,
     required String teamId,
     required SheetPicks picks,
+    required SheetRoles roles,
+    required Map<String, int> numbers,
+    required List<Official> officials,
     required String uid,
   }) {
     // Checked here first so the team is told why; the rules refuse it too
@@ -46,6 +53,21 @@ class TeamSheetRepository {
           'ageGroup': ?fixture.ageGroup?.label,
           'starters': picks.starters,
           'bench': picks.bench,
+          'captainId': roles.captainId,
+          'viceCaptainId': ?roles.viceCaptainId,
+          'goalkeeperId': roles.goalkeeperId,
+          'numbers': numbers,
+          // Copies: the sheet keeps them even if Team profile changes later.
+          // No phone numbers (the opponent sees the sheet after the lock).
+          'officials': [
+            for (final o in officials)
+              {
+                'role': o.role.name,
+                'name': o.name.trim(),
+                'title': ?o.title?.trim(),
+                'licence': ?o.licence,
+              },
+          ],
           'savedBy': uid,
           'savedAt': FieldValue.serverTimestamp(),
         })

@@ -4269,11 +4269,26 @@ describe('Team sheets (3.1a2)', () => {
     });
   });
 
+  const OFFICIALS = [
+    { role: 'teamManager', name: 'Kojo Antwi' },
+    { role: 'headCoach', name: 'Kofi Mensah', licence: 'CAF D' },
+    { role: 'kitManager', name: 'Ama Serwaa' },
+  ];
+
+  // A valid sheet; roles (3.1b) follow the players unless given:
+  // the first starter captains and keeps goal, numbers 1, 2, 3…
   function sheet(changes = {}) {
-    return {
+    const base = {
       fixtureId: 'f1', teamId: 'royal', category: 'division',
       starters: ELEVEN, bench: ids('s', 12, 16),
       savedBy: 'admin1', savedAt: serverTimestamp(), ...changes,
+    };
+    const picked = [...base.starters, ...base.bench];
+    return {
+      captainId: base.starters[0], goalkeeperId: base.starters[0],
+      numbers: Object.fromEntries(picked.map((p, i) => [p, i + 1])),
+      officials: OFFICIALS,
+      ...base,
     };
   }
   const save = (db, data = sheet(), id = `${data.fixtureId}_${data.teamId}`) =>
@@ -4358,6 +4373,70 @@ describe('Team sheets (3.1a2)', () => {
         { status: 'postponed', kickoffAt: null, note: 'Rain' });
     });
     await assertFails(save(dbAs('admin1')));
+  });
+
+  // ----- 3.1b roles and numbers -----
+
+  it('3.1b: a full sheet with captain, vice-captain, goalkeeper, numbers and officials', async () => {
+    await assertSucceeds(save(dbAs('admin1'), sheet({
+      captainId: 's4', viceCaptainId: 's14', goalkeeperId: 's1',
+    })));
+  });
+
+  it('3.1b: the captain must start', async () => {
+    await assertFails(save(dbAs('admin1'), sheet({ captainId: 's12' })));
+    await assertFails(save(dbAs('admin1'), sheet({ captainId: 'p3' })));
+    const noCaptain = sheet();
+    delete noCaptain.captainId;
+    await assertFails(save(dbAs('admin1'), noCaptain));
+  });
+
+  it('3.1b: the vice-captain is on the sheet and is not the captain; none is fine', async () => {
+    await assertSucceeds(save(dbAs('admin1'), sheet({ viceCaptainId: 's16' })));
+    await assertFails(save(dbAs('admin1'), sheet({ viceCaptainId: 's17' })));
+    await assertFails(save(dbAs('admin1'), sheet({ viceCaptainId: 's1' })));
+  });
+
+  it('3.1b: any starter may keep goal; a bench player may not; one is required', async () => {
+    await assertSucceeds(save(dbAs('admin1'), sheet({ goalkeeperId: 's7' })));
+    await assertFails(save(dbAs('admin1'), sheet({ goalkeeperId: 's12' })));
+    const noKeeper = sheet();
+    delete noKeeper.goalkeeperId;
+    await assertFails(save(dbAs('admin1'), noKeeper));
+  });
+
+  it('3.1b: shirt numbers 1 to 99, no two the same', async () => {
+    const numbers = (changes) => ({ ...sheet().numbers, ...changes });
+    await assertSucceeds(save(dbAs('admin1'), sheet({ numbers: numbers({ s16: 99 }) })));
+    await assertFails(save(dbAs('admin1'), sheet({ numbers: numbers({ s16: 100 }) })));
+    await assertFails(save(dbAs('admin1'), sheet({ numbers: numbers({ s16: 0 }) })));
+    await assertFails(save(dbAs('admin1'), sheet({ numbers: numbers({ s16: 2.5 }) })));
+    await assertFails(save(dbAs('admin1'), sheet({ numbers: numbers({ s16: '13' }) })));
+    // s16 wears 2, like s2
+    await assertFails(save(dbAs('admin1'), sheet({ numbers: numbers({ s16: 2 }) })));
+  });
+
+  it('3.1b: a number for every picked player and nobody else', async () => {
+    const all = sheet().numbers;
+    const missing = { ...all };
+    delete missing.s16;
+    await assertFails(save(dbAs('admin1'), sheet({ numbers: missing })));
+    await assertFails(save(dbAs('admin1'), sheet({ numbers: { ...missing, s20: 16 } })));
+    await assertFails(save(dbAs('admin1'), sheet({ numbers: { ...all, s20: 40 } })));
+  });
+
+  it('3.1b: 2 to 7 officials, the team manager first and the head coach second', async () => {
+    const seven = [...OFFICIALS, ...ids('o', 1, 4).map((n) => ({ role: 'other', name: n, title: 'Welfare' }))];
+    await assertSucceeds(save(dbAs('admin1'), sheet({ officials: OFFICIALS.slice(0, 2) })));
+    await assertSucceeds(save(dbAs('admin1'), sheet({ officials: seven })));
+    await assertFails(save(dbAs('admin1'), sheet({ officials: [...seven, { role: 'secretary', name: 'X' }] })));
+    await assertFails(save(dbAs('admin1'), sheet({ officials: OFFICIALS.slice(0, 1) })));
+    await assertFails(save(dbAs('admin1'), sheet({ officials: [OFFICIALS[1], OFFICIALS[0]] })));
+    await assertFails(save(dbAs('admin1'), sheet({ officials: [OFFICIALS[0], OFFICIALS[2]] })));
+  });
+
+  it('3.1b: no other fields', async () => {
+    await assertFails(save(dbAs('admin1'), sheet({ note: 'hello' })));
   });
 
   it('signed by the person saving, at server time', async () => {
