@@ -888,32 +888,52 @@ class _Sheets extends ConsumerWidget {
     final card = DashboardCard(
       child: Column(children: [row(f.home), row(f.away)]),
     );
-    // The FA prints the official sheet once a team has saved (3.3)
+    // The FA prints the official sheet once a team has saved (3.3); a team
+    // prints its own once saved (3.3b)
     final anySaved =
         isFa &&
         [f.home, f.away].any(
           (side) => ref.watch(teamSheetProvider((f.id, side.id))).value != null,
         );
-    if (!anySaved) return card;
+    final myId = f.home.id == myTeamId || f.away.id == myTeamId
+        ? myTeamId
+        : null;
+    final mySaved =
+        myId != null &&
+        ref.watch(teamSheetProvider((f.id, myId))).value != null;
+    if (!anySaved && !mySaved) return card;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         card,
         const SizedBox(height: 8),
-        _OfficialSheetCard(route: Routes.adminMatchPdf(f.id), locked: locked),
+        if (isFa)
+          _OfficialSheetCard(route: Routes.adminMatchPdf(f.id), locked: locked)
+        else
+          _OfficialSheetCard(
+            route: Routes.teamMatchPdf(f.id),
+            locked: locked,
+            ownTeam: true,
+          ),
       ],
     );
   }
 }
 
-/// Official team sheet (3.3, MC4): opens the PDF to print or share.
+/// Official team sheet (3.3, MC4): opens the PDF to print or share. For a
+/// team ([ownTeam], 3.3b), its own sheet.
 class _OfficialSheetCard extends StatelessWidget {
-  const _OfficialSheetCard({required this.route, required this.locked});
+  const _OfficialSheetCard({
+    required this.route,
+    required this.locked,
+    this.ownTeam = false,
+  });
 
   final String route;
 
-  /// Before the lock the FA's paper says DRAFT.
+  /// Before the lock the paper says DRAFT.
   final bool locked;
+  final bool ownTeam;
 
   @override
   Widget build(BuildContext context) {
@@ -921,8 +941,12 @@ class _OfficialSheetCard extends StatelessWidget {
       onTap: () => context.open(route),
       child: _Line(
         icon: Icons.picture_as_pdf_outlined,
-        title: 'Official team sheet',
-        detail: locked
+        title: ownTeam ? 'Print your team sheet' : 'Official team sheet',
+        detail: ownTeam
+            ? locked
+                  ? 'Your players with their IDs and kits · print or share'
+                  : 'A draft until the lock: you can still change it'
+            : locked
             ? 'Both teams with player IDs, kits and officials · print or share'
             : 'A draft until the lock: the teams can still change',
         trailing: FilledButton.tonal(

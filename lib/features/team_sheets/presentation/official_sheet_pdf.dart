@@ -6,8 +6,10 @@ import 'package:gedfa_connect/core/utils/color_hex.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/features/team_sheets/domain/official_sheet.dart';
 import 'package:gedfa_connect/features/teams/domain/kit.dart';
+import 'package:gedfa_connect/features/teams/domain/kit_photos.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart' show networkImage;
 
 /// The fonts of the paper: Noto Sans, bundled in `assets/fonts/` so the
 /// PDF works with no internet at the ground, and Twi letters (ɛ, ɔ) print.
@@ -39,16 +41,42 @@ const _green = PdfColor.fromInt(0xFF00703F);
 const _gold = PdfColor.fromInt(0xFFFFF4D6);
 const _goldInk = PdfColor.fromInt(0xFF7A5200);
 
+/// Kit photos for the PDF (3.3b): the photo's URL → the image, loaded
+/// before drawing ([loadKitPhotos]).
+typedef KitPictures = Map<String, pw.ImageProvider>;
+
+/// Downloads the photos of every kit made from photos on [s]. A photo that
+/// can't load is left out (its kit says "photos in the app").
+Future<KitPictures> loadKitPhotos(OfficialSheet s) async {
+  final urls = {
+    for (final t in s.teams)
+      for (final kit in [t.kit, t.goalkeeperKit])
+        if (kit.photos case final p?)
+          for (final part in [p.shirt, p.shorts, p.socks]) ?part.url,
+  };
+  final loaded = await Future.wait([
+    for (final url in urls)
+      networkImage(url).then<(String, pw.ImageProvider?)>(
+        (image) => (url, image),
+        onError: (Object _) => (url, null),
+      ),
+  ]);
+  return {for (final (url, image) in loaded) url: ?image};
+}
+
 /// The official team sheet as A4 PDF bytes (3.3, MC4): one page, both
 /// teams side by side, then the match officials and the captains'
-/// signature lines. No QR code (Isaac).
+/// signature lines. A team's own copy (3.3b) has its one team across the
+/// page. Kits made from photos show the photos ([photos]). No QR code
+/// (Isaac).
 Future<Uint8List> officialSheetPdf(
   OfficialSheet s, {
   required OfficialSheetFonts fonts,
   required DateTime printedAt,
+  KitPictures photos = const {},
 }) {
   final doc = pw.Document(
-    title: '${s.matchLine}, official team sheet',
+    title: '${s.matchLine}, ${s.title.toLowerCase()}',
     author: 'GEDFA Connect',
   );
   doc.addPage(
@@ -89,14 +117,17 @@ Future<Uint8List> officialSheetPdf(
             ),
           ],
           pw.SizedBox(height: 10),
-          pw.Row(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Expanded(child: _team(s.home)),
-              pw.SizedBox(width: 12),
-              pw.Expanded(child: _team(s.away)),
-            ],
-          ),
+          if (s.isOneTeam)
+            _team(s.teams.single, photos)
+          else
+            pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Expanded(child: _team(s.teams.first, photos)),
+                pw.SizedBox(width: 12),
+                pw.Expanded(child: _team(s.teams.last, photos)),
+              ],
+            ),
           pw.SizedBox(height: 10),
           _officials(s.officials),
           pw.SizedBox(height: 26),
@@ -132,7 +163,7 @@ pw.Widget _header(OfficialSheet s) => pw.Row(
           ),
           pw.SizedBox(height: 2),
           pw.Text(
-            'Official team sheet',
+            s.title,
             style: pw.TextStyle(fontSize: 17, fontWeight: pw.FontWeight.bold),
           ),
           pw.SizedBox(height: 2),
@@ -172,7 +203,7 @@ pw.Widget _label(String text) => pw.Container(
   ),
 );
 
-pw.Widget _team(OfficialSheetTeam t) => pw.Container(
+pw.Widget _team(OfficialSheetTeam t, KitPictures photos) => pw.Container(
   padding: const pw.EdgeInsets.all(8),
   decoration: pw.BoxDecoration(
     border: pw.Border.all(color: _line, width: 0.8),
@@ -184,15 +215,10 @@ pw.Widget _team(OfficialSheetTeam t) => pw.Container(
       pw.Row(
         crossAxisAlignment: pw.CrossAxisAlignment.end,
         children: [
-          // A kit made from photos has no colours to draw
-          if (!t.kit.isPhotos) ...[
-            pw.SvgImage(svg: kitSvg(t.kit), height: 42),
-            pw.SizedBox(width: 3),
-          ],
-          if (!t.goalkeeperKit.isPhotos) ...[
-            pw.SvgImage(svg: kitSvg(t.goalkeeperKit), height: 28),
-            pw.SizedBox(width: 8),
-          ],
+          _kitBox(t.kit, 42, photos),
+          pw.SizedBox(width: 3),
+          _kitBox(t.goalkeeperKit, 28, photos),
+          pw.SizedBox(width: 8),
           pw.Expanded(
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -206,12 +232,14 @@ pw.Widget _team(OfficialSheetTeam t) => pw.Container(
                 ),
                 pw.Text(
                   '${t.sideLabel} · ${t.kitLabel}'
-                  '${t.kit.isPhotos ? ' (photos in the app)' : ''}',
+                  '${_photosMissing(t.kit, photos) ? ' (photos in the app)' : ''}',
                   style: const pw.TextStyle(fontSize: 8, color: _grey),
                 ),
                 pw.Text(
                   t.goalkeeperKitLabel +
-                      (t.goalkeeperKit.isPhotos ? ' (photos in the app)' : ''),
+                      (_photosMissing(t.goalkeeperKit, photos)
+                          ? ' (photos in the app)'
+                          : ''),
                   style: const pw.TextStyle(fontSize: 8, color: _grey),
                 ),
               ],
@@ -414,11 +442,77 @@ pw.Widget _signatures(OfficialSheet s) {
   return pw.Row(
     crossAxisAlignment: pw.CrossAxisAlignment.start,
     children: [
-      pw.Expanded(child: one(s.home)),
+      pw.Expanded(child: one(s.teams.first)),
       pw.SizedBox(width: 24),
-      pw.Expanded(child: one(s.away)),
+      pw.Expanded(child: s.isOneTeam ? pw.SizedBox() : one(s.teams.last)),
     ],
   );
+}
+
+/// The kit box: the drawn kit, or a kit made from photos with its shirt,
+/// shorts and socks stacked in the same box (3.3b), each photo scaled to
+/// fit its part. [height] is the box's height; its width follows the drawn
+/// kit (40 : 61).
+pw.Widget _kitBox(Kit kit, double height, KitPictures photos) {
+  final p = kit.photos;
+  if (p == null) return pw.SvgImage(svg: kitSvg(kit), height: height);
+  pw.ImageProvider? image(KitPhoto part) =>
+      part.url == null ? null : photos[part.url];
+  final width = height * 40 / 61;
+  if (_photosMissing(kit, photos)) {
+    // Not loaded (no internet): a grey kit, and the label says so
+    return pw.SvgImage(
+      svg: kitSvg(
+        const Kit(
+          primary: Color(0xFFE6E6E6),
+          shorts: Color(0xFFE6E6E6),
+          socks: Color(0xFFE6E6E6),
+        ),
+      ),
+      height: height,
+    );
+  }
+  // A thin box around the photos, the same size as a drawn kit; inside,
+  // the same parts as the drawing (shirt 35, shorts 11, socks 11 of 61)
+  const pad = 1.5;
+  final inner = height - 2 * pad;
+  pw.Widget part(KitPhoto photo, double share) => pw.SizedBox(
+    width: width - 2 * pad,
+    height: inner * share,
+    child: switch (image(photo)) {
+      final img? => pw.Image(img, fit: pw.BoxFit.contain),
+      null => pw.SizedBox(),
+    },
+  );
+  return pw.Container(
+    width: width,
+    height: height,
+    padding: const pw.EdgeInsets.all(pad),
+    decoration: pw.BoxDecoration(
+      border: pw.Border.all(color: _line, width: 0.6),
+      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3)),
+    ),
+    child: pw.Column(
+      children: [
+        part(p.shirt, 35 / 61),
+        pw.SizedBox(height: inner * 2 / 61),
+        part(p.shorts, 11 / 61),
+        pw.SizedBox(height: inner * 2 / 61),
+        part(p.socks, 11 / 61),
+      ],
+    ),
+  );
+}
+
+/// A kit made from photos whose photos didn't load (or has none).
+bool _photosMissing(Kit kit, KitPictures photos) {
+  final p = kit.photos;
+  if (p == null) return false;
+  return ![
+    p.shirt,
+    p.shorts,
+    p.socks,
+  ].any((part) => part.url != null && photos.containsKey(part.url));
 }
 
 /// A small drawing of [kit] (shirt with its pattern, shorts, socks) as SVG

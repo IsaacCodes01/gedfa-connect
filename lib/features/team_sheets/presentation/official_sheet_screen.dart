@@ -17,22 +17,35 @@ import 'package:gedfa_connect/features/team_sheets/data/team_sheet_repository.da
 import 'package:gedfa_connect/features/team_sheets/domain/official_sheet.dart';
 import 'package:gedfa_connect/features/team_sheets/domain/team_sheet.dart';
 import 'package:gedfa_connect/features/team_sheets/presentation/official_sheet_pdf.dart';
+import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:printing/printing.dart';
 
-/// The official team sheet as a PDF (3.3, mockup MC4): both teams with
-/// player IDs, kits, the match officials and the captains' signature
-/// lines, ready to print or share. The FA any time (a DRAFT before the
-/// lock); the appointed officials from the lock, when they can read both
-/// sheets (3.5c).
+/// Who opened the PDF: what they may read decides what it shows.
+enum SheetViewer {
+  /// Both teams any time (a DRAFT before the lock).
+  fa,
+
+  /// The appointed officials: both teams from the lock (3.5c).
+  official,
+
+  /// A team: its own sheet only (3.3b); the officials' names from 24 h
+  /// before, like Match details.
+  team,
+}
+
+/// The team sheet as a PDF (3.3, mockup MC4), ready to print or share:
+/// the official sheet with both teams for the FA and the officials, or a
+/// team's own sheet (3.3b). Player IDs, kits (drawn or their photos), the
+/// match officials and the captains' signature lines.
 class OfficialSheetScreen extends ConsumerStatefulWidget {
   const OfficialSheetScreen({
     super.key,
     required this.fixtureId,
-    required this.isFa,
+    required this.viewer,
   });
 
   final String fixtureId;
-  final bool isFa;
+  final SheetViewer viewer;
 
   @override
   ConsumerState<OfficialSheetScreen> createState() =>
@@ -47,11 +60,19 @@ class _OfficialSheetScreenState extends ConsumerState<OfficialSheetScreen> {
   Future<Uint8List>? _pdf;
   bool _busy = false;
 
-  String get _fallback => widget.isFa
-      ? Routes.adminMatch(widget.fixtureId)
-      : Routes.refereeMatch(widget.fixtureId);
+  String get _fallback => switch (widget.viewer) {
+    SheetViewer.fa => Routes.adminMatch(widget.fixtureId),
+    SheetViewer.official => Routes.refereeMatch(widget.fixtureId),
+    SheetViewer.team => Routes.teamMatch(widget.fixtureId),
+  };
 
-  void _make(Fixture f, TeamSheet? home, TeamSheet? away, MatchOfficials? o) {
+  void _make(
+    Fixture f,
+    TeamSheet? home,
+    TeamSheet? away,
+    MatchOfficials? o, {
+    String? onlyTeamId,
+  }) {
     final last = _madeFrom;
     if (last != null &&
         identical(last.$1, f) &&
@@ -67,12 +88,23 @@ class _OfficialSheetScreenState extends ConsumerState<OfficialSheetScreen> {
       awaySheet: away,
       officials: o,
       now: now,
+      onlyTeamId: onlyTeamId,
     );
     _madeFrom = (f, home, away, o);
     _sheet = sheet;
-    _pdf = OfficialSheetFonts.load().then(
-      (fonts) => officialSheetPdf(sheet, fonts: fonts, printedAt: now),
-    );
+    _pdf = () async {
+      // Fonts and kit photos first, then the page
+      final (fonts, photos) = await (
+        OfficialSheetFonts.load(),
+        loadKitPhotos(sheet),
+      ).wait;
+      return officialSheetPdf(
+        sheet,
+        fonts: fonts,
+        photos: photos,
+        printedAt: now,
+      );
+    }();
   }
 
   Future<void> _run(Future<void> Function(Uint8List bytes) action) async {
@@ -94,31 +126,54 @@ class _OfficialSheetScreenState extends ConsumerState<OfficialSheetScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final viewer = widget.viewer;
+    final isTeam = viewer == SheetViewer.team;
     final fixture = ref.watch(fixtureProvider(widget.fixtureId));
+    final myTeam = isTeam ? ref.watch(myTeamProvider) : null;
     final f = fixture.value;
+    final now = DateTime.now();
     final due = f?.sheetDueAt;
-    final locked = due != null && !DateTime.now().isBefore(due);
+    final locked = due != null && !now.isBefore(due);
 
-    // Officials read the sheets only from the lock (rules, 3.5c)
-    final mayRead = f != null && (widget.isFa || locked);
-    final home = mayRead
+    // A team reads only its own sheet; the officials only from the lock
+    final myTeamId = myTeam?.value?.id;
+    final mine = f == null || myTeamId == null
+        ? null
+        : f.home.id == myTeamId || f.away.id == myTeamId
+        ? myTeamId
+        : null;
+    final mayRead =
+        f != null &&
+        switch (viewer) {
+          SheetViewer.fa => true,
+          SheetViewer.official => locked,
+          SheetViewer.team => mine != null,
+        };
+    bool reads(FixtureSide side) => mayRead && (!isTeam || side.id == mine);
+    final home = f != null && reads(f.home)
         ? ref.watch(teamSheetProvider((f.id, f.home.id)))
         : null;
-    final away = mayRead
+    final away = f != null && reads(f.away)
         ? ref.watch(teamSheetProvider((f.id, f.away.id)))
         : null;
-    final officials = mayRead
+    // The clubs see the officials only from 24 h before (3.5a)
+    final officials = mayRead && (!isTeam || MatchOfficials.clubsMaySee(f, now))
         ? ref.watch(matchOfficialsProvider(widget.fixtureId))
         : null;
+    final ownSheet = isTeam ? (home ?? away)?.value : null;
 
     final error =
-        fixture.error ?? home?.error ?? away?.error ?? officials?.error;
+        fixture.error ??
+        myTeam?.error ??
+        home?.error ??
+        away?.error ??
+        officials?.error;
     Widget body;
     if (error != null) {
       body = ErrorView(message: appErrorMessage(error));
-    } else if (fixture.isLoading) {
+    } else if (fixture.isLoading || (myTeam?.isLoading ?? false)) {
       body = const LoadingView();
-    } else if (f == null) {
+    } else if (f == null || (isTeam && mine == null)) {
       body = const EmptyView(
         icon: Icons.event_busy_outlined,
         title: 'Match not found',
@@ -133,10 +188,24 @@ class _OfficialSheetScreenState extends ConsumerState<OfficialSheetScreen> {
             : 'The official sheet opens at ${formatTime(due)} on '
                   '${formatShortDate(due)}, 1 hour before kick-off.',
       );
-    } else if (home!.isLoading || away!.isLoading || officials!.isLoading) {
+    } else if ((home?.isLoading ?? false) ||
+        (away?.isLoading ?? false) ||
+        (officials?.isLoading ?? false)) {
       body = const LoadingView();
+    } else if (isTeam && ownSheet == null) {
+      body = const EmptyView(
+        icon: Icons.assignment_outlined,
+        title: 'No team sheet yet',
+        message: 'Save your team sheet first, then print it from here.',
+      );
     } else {
-      _make(f, home.value, away.value, officials.value);
+      _make(
+        f,
+        home?.value,
+        away?.value,
+        officials?.value,
+        onlyTeamId: isTeam ? mine : null,
+      );
       final pdf = _pdf!;
       body = PdfPreview(
         // The same function while nothing changed, so the preview is not
@@ -155,10 +224,15 @@ class _OfficialSheetScreenState extends ConsumerState<OfficialSheetScreen> {
     }
 
     final sheet = _sheet;
-    final ready = sheet != null && _pdf != null && mayRead && error == null;
+    final ready =
+        sheet != null &&
+        _pdf != null &&
+        mayRead &&
+        error == null &&
+        (!isTeam || ownSheet != null);
     return Scaffold(
       appBar: GedfaAppBar(
-        title: 'Official team sheet',
+        title: isTeam ? 'Team sheet' : 'Official team sheet',
         subtitle: 'PDF · A4',
         leading: AppBackButton(fallback: _fallback, close: true),
       ),

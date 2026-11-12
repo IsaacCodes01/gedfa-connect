@@ -149,6 +149,10 @@ class Routes {
   static String refereeMatchPdf(String id) =>
       '$refereeMatches/match/$id/official-sheet';
 
+  /// Team: its own sheet as a PDF (3.3b), once saved.
+  static String teamMatchPdf(String id) =>
+      '$teamFixtures/match/$id/official-sheet';
+
   /// Team: the team sheet for one match (3.1a2), full screen.
   /// A team sheet; [check] opens it on the Check step ("View sheet").
   static String teamSheet(String fixtureId, {bool check = false}) =>

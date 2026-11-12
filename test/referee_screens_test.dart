@@ -306,7 +306,10 @@ void main() {
   ) async {
     await pump(
       tester,
-      const OfficialSheetScreen(fixtureId: 'm1', isFa: false),
+      const OfficialSheetScreen(
+        fixtureId: 'm1',
+        viewer: SheetViewer.official,
+      ),
       const Size(360, 800),
       Brightness.light,
     );

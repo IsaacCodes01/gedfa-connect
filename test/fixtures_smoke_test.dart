@@ -729,6 +729,9 @@ void main() {
       Brightness.light,
     );
     expect(find.text('View'), findsOneWidget);
+    // 3.3: the official sheet as a PDF, a draft before the lock
+    expect(find.text('Official team sheet'), findsOneWidget);
+    expect(find.textContaining('A draft until the lock'), findsOneWidget);
   });
 
   testWidgets("3.5a (MO1, MO2): the FA's officials, and the picker", (
@@ -793,6 +796,9 @@ void main() {
     );
     expect(find.text('View'), findsOneWidget);
     expect(find.text('Change'), findsOneWidget);
+    // 3.3b: the team prints its own sheet
+    expect(find.text('Print your team sheet'), findsOneWidget);
+    expect(find.text('Open PDF'), findsOneWidget);
   });
 
   testWidgets('Match details with large text (130%) on a small phone', (

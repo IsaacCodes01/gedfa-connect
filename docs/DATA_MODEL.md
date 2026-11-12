@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.41, matches the rules after step 3.3, the official team sheet as a PDF (12 Nov 2026)
+**Status:** v2.42, matches the rules after step 3.3b, the team sheet PDFs (12 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -981,6 +981,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 12 Nov 2026 | v2.42 (3.3b): no new data. A team prints its own sheet from what it already reads (its `teamSheets` doc; `fixtureOfficials` from 24 h before); kit photos are downloaded from their saved URLs. 446 rules tests. |
 | 12 Nov 2026 | v2.41 (3.3): no new data. The official sheet PDF is made in the app from what the FA and the officials can already read (`fixtures`, both `teamSheets` with their `players` copies and IDs, `fixtureOfficials`); nothing is stored. 446 rules tests. |
 | 12 Nov 2026 | v2.40 (3.5c): `teamSheets` read by the match's appointed officials from the lock (1 h before kick-off). 446 rules tests. |
 | 12 Nov 2026 | v2.39 (3.5b): `fixtureOfficials.cantMake` (the official's own line; the FA keeps or clears it), FA note kind `cantMakeIt` (written by the official, with `targetId` = the match). 445 rules tests. |

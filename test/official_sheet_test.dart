@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as img;
+import 'package:pdf/widgets.dart' as pw;
 import 'package:gedfa_connect/features/fixtures/domain/fixture.dart';
 import 'package:gedfa_connect/features/officials/domain/match_officials.dart';
 import 'package:gedfa_connect/features/players/domain/age_group.dart';
@@ -10,6 +12,7 @@ import 'package:gedfa_connect/features/team_sheets/domain/team_sheet.dart';
 import 'package:gedfa_connect/features/team_sheets/presentation/official_sheet_pdf.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/teams/domain/kit.dart';
+import 'package:gedfa_connect/features/teams/domain/kit_photos.dart';
 import 'package:gedfa_connect/features/teams/domain/kit_slot.dart';
 import 'package:gedfa_connect/features/teams/domain/official.dart';
 
@@ -20,7 +23,7 @@ final _kickoff = DateTime(2026, 11, 14, 15);
 KitChoice _kit(KitSlot slot, Kit kit) =>
     KitChoice(slot: slot, kit: kit, raw: const {});
 
-Fixture _match({AgeGroup? ageGroup}) => Fixture(
+Fixture _match({AgeGroup? ageGroup, Kit? homeKit}) => Fixture(
   id: 'm1',
   season: '2026-27',
   competitionId: ageGroup == null
@@ -44,13 +47,14 @@ Fixture _match({AgeGroup? ageGroup}) => Fixture(
   kits: MatchKits(
     home: _kit(
       KitSlot.home,
-      const Kit(
-        primary: Color(0xFFB3122A),
-        secondary: Colors.white,
-        pattern: KitPattern.stripes,
-        shorts: Colors.white,
-        socks: Color(0xFFB3122A),
-      ),
+      homeKit ??
+          const Kit(
+            primary: Color(0xFFB3122A),
+            secondary: Colors.white,
+            pattern: KitPattern.stripes,
+            shorts: Colors.white,
+            socks: Color(0xFFB3122A),
+          ),
     ),
     away: _kit(
       KitSlot.away,
@@ -191,11 +195,11 @@ void main() {
         officials: _officials(),
         now: afterLock,
       );
-      final home = s.home;
+      final home = s.teams[0];
       expect(home.saved, isTrue);
       expect(home.sideLabel, 'Home');
       expect(home.kitLabel, 'Home kit');
-      expect(s.away.sideLabel, 'Away');
+      expect(s.teams[1].sideLabel, 'Away');
       expect(home.starters, hasLength(11));
       expect(home.bench, hasLength(5));
 
@@ -222,6 +226,23 @@ void main() {
       ]);
     });
 
+    test("3.3b: a team's own copy has only that team", () {
+      final s = OfficialSheet.of(
+        fixture: _match(),
+        homeSheet: null,
+        awaySheet: _sheet('ast'),
+        officials: null,
+        now: _kickoff.subtract(const Duration(days: 1)),
+        onlyTeamId: 'ast',
+      );
+      expect(s.isOneTeam, isTrue);
+      expect(s.teams.single.name, 'Asebu Stars');
+      expect(s.title, 'Team sheet');
+      expect(s.draftNote, startsWith('DRAFT · you can change this sheet'));
+      expect(s.fileName, 'gedfa-teamsheet-RUF-v-AST-B-2026-11-14.pdf');
+      expect(s.officials.every((o) => o.$2 == null), isTrue);
+    });
+
     test('a team with no sheet says so; officials leave blanks', () {
       final s = OfficialSheet.of(
         fixture: _match(),
@@ -230,9 +251,9 @@ void main() {
         officials: _officials(),
         now: afterLock,
       );
-      expect(s.away.saved, isFalse);
-      expect(s.away.starters, isEmpty);
-      expect(s.away.captain, isNull);
+      expect(s.teams[1].saved, isFalse);
+      expect(s.teams[1].starters, isEmpty);
+      expect(s.teams[1].captain, isNull);
       expect(s.officials, [
         ('Referee', 'Eric Owusu'),
         ('Assistant 1', null),
@@ -267,6 +288,51 @@ void main() {
       // To look at it: OFFICIAL_SHEET_OUT=some/file.pdf flutter test ...
       final out = Platform.environment['OFFICIAL_SHEET_OUT'];
       if (out != null) File(out).writeAsBytesSync(bytes);
+    });
+
+    test('3.3b: kit photos fit in the kit box (team copy)', () async {
+      // A wide shirt photo, a tall socks photo: each must fit its part
+      img.Image photo(int w, int h, int r, int g, int b) =>
+          img.Image(width: w, height: h)..clear(img.ColorRgb8(r, g, b));
+      final pictures = <String, pw.ImageProvider>{
+        'u/shirt': pw.MemoryImage(img.encodePng(photo(600, 300, 179, 18, 42))),
+        'u/shorts': pw.MemoryImage(
+          img.encodePng(photo(300, 200, 240, 240, 240)),
+        ),
+        'u/socks': pw.MemoryImage(img.encodePng(photo(100, 400, 179, 18, 42))),
+      };
+      const photos = Kit.fromPhotos(
+        KitPhotos(
+          shirt: KitPhoto(url: 'u/shirt'),
+          shorts: KitPhoto(url: 'u/shorts'),
+          socks: KitPhoto(url: 'u/socks'),
+        ),
+      );
+      final sheet = OfficialSheet.of(
+        fixture: _match(homeKit: photos),
+        homeSheet: _sheet('ruf', players: 18),
+        awaySheet: null,
+        officials: _officials(),
+        now: _kickoff.subtract(const Duration(minutes: 30)),
+        onlyTeamId: 'ruf',
+      );
+      final bytes = await officialSheetPdf(
+        sheet,
+        fonts: await OfficialSheetFonts.load(),
+        photos: pictures,
+        printedAt: DateTime(2026, 11, 14, 14, 40),
+      );
+      expect(String.fromCharCodes(bytes.take(5)), '%PDF-');
+      final out = Platform.environment['OFFICIAL_TEAM_OUT'];
+      if (out != null) File(out).writeAsBytesSync(bytes);
+
+      // Photos that didn't load: still one page, the grey kit
+      final offline = await officialSheetPdf(
+        sheet,
+        fonts: await OfficialSheetFonts.load(),
+        printedAt: DateTime(2026, 11, 14, 14, 40),
+      );
+      expect(String.fromCharCodes(offline.take(5)), '%PDF-');
     });
 
     test('kit drawing: pattern clipped to the shirt', () {

@@ -392,7 +392,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                     parentNavigatorKey: rootNavigatorKey,
                     builder: (_, state) => OfficialSheetScreen(
                       fixtureId: state.pathParameters['id']!,
-                      isFa: true,
+                      viewer: SheetViewer.fa,
                     ),
                   ),
                   GoRoute(
@@ -601,6 +601,15 @@ final routerProvider = Provider<GoRouter>((ref) {
                       isFa: false,
                     ),
                   ),
+                  // The team prints its own sheet as a PDF (3.3b)
+                  GoRoute(
+                    path: 'match/:id/official-sheet',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (_, state) => OfficialSheetScreen(
+                      fixtureId: state.pathParameters['id']!,
+                      viewer: SheetViewer.team,
+                    ),
+                  ),
                   GoRoute(
                     path: 'match/:id',
                     parentNavigatorKey: rootNavigatorKey,
@@ -757,7 +766,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                     parentNavigatorKey: rootNavigatorKey,
                     builder: (_, state) => OfficialSheetScreen(
                       fixtureId: state.pathParameters['id']!,
-                      isFa: false,
+                      viewer: SheetViewer.official,
                     ),
                   ),
                   GoRoute(

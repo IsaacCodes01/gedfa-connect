@@ -5,21 +5,28 @@ import 'package:gedfa_connect/features/team_sheets/domain/team_sheet.dart';
 import 'package:gedfa_connect/features/teams/domain/kit.dart';
 
 /// The official team sheet of a match (3.3, mockup MC4): what the paper
-/// says, worked out from the match, both saved sheets and the officials.
+/// says, worked out from the match, the saved sheets and the officials.
 /// Pure (no Flutter, no PDF), so the tests read it line by line;
 /// `official_sheet_pdf.dart` draws it.
+///
+/// Two kinds: the official sheet with both teams (the FA and the match
+/// officials), or one team's own sheet ([of] with `onlyTeamId`, 3.3b), which
+/// a team prints for itself.
 class OfficialSheet {
   const OfficialSheet({
+    required this.title,
     required this.heading,
     required this.roundLabel,
     required this.matchLine,
     required this.whenWhere,
-    required this.home,
-    required this.away,
+    required this.teams,
     required this.officials,
     required this.fileName,
     this.draftNote,
   });
+
+  /// "Official team sheet", or "Team sheet" for one team's own copy.
+  final String title;
 
   /// "GOMOA EAST DFA · DIVISION LEAGUE"
   final String heading;
@@ -33,11 +40,14 @@ class OfficialSheet {
   /// "Sat 14 Nov 2026, 3:00 pm · Apam Park"
   final String whenWhere;
 
-  /// Before the lock (the FA only): the teams can still change their
-  /// sheets, so the paper says DRAFT.
+  /// Before the lock the sheets can still change, so the paper says DRAFT.
   final String? draftNote;
-  final OfficialSheetTeam home;
-  final OfficialSheetTeam away;
+
+  /// Home then away; just the one team on a team's own copy.
+  final List<OfficialSheetTeam> teams;
+
+  /// True on a team's own copy (one team, one captain's line).
+  bool get isOneTeam => teams.length == 1;
 
   /// The five places in order, with the appointed name or null (a blank
   /// line to write on).
@@ -52,6 +62,7 @@ class OfficialSheet {
     required TeamSheet? awaySheet,
     required MatchOfficials? officials,
     required DateTime now,
+    String? onlyTeamId,
   }) {
     final f = fixture;
     final kickoff = f.kickoffAt;
@@ -65,7 +76,16 @@ class OfficialSheet {
     String short(FixtureSide s) =>
         s.shortName.trim().replaceAll(RegExp(r'\s+'), '-');
     final day = kickoff?.toLocal();
+    final one = onlyTeamId != null;
+    final name = [
+      one ? 'gedfa-teamsheet' : 'gedfa-sheet',
+      short(f.home),
+      'v',
+      short(f.away),
+      if (day != null) '${day.year}-${two(day.month)}-${two(day.day)}',
+    ].join('-').replaceAll(RegExp(r'[^A-Za-z0-9-]'), '');
     return OfficialSheet(
+      title: one ? 'Team sheet' : 'Official team sheet',
       heading: [
         'GOMOA EAST DFA',
         '${f.category.label} league'.toUpperCase(),
@@ -78,17 +98,23 @@ class OfficialSheet {
         if (f.venue.trim().isNotEmpty) f.venue.trim(),
       ].join(' · '),
       draftNote: due != null && now.isBefore(due)
-          ? 'DRAFT · the teams can change their sheets until '
-                '${formatShortDate(due)}, ${formatTime(due)}'
+          ? one
+                ? 'DRAFT · you can change this sheet until '
+                      '${formatShortDate(due)}, ${formatTime(due)}'
+                : 'DRAFT · the teams can change their sheets until '
+                      '${formatShortDate(due)}, ${formatTime(due)}'
           : null,
-      home: OfficialSheetTeam.of(f, f.home, homeSheet),
-      away: OfficialSheetTeam.of(f, f.away, awaySheet),
+      teams: [
+        if (!one || onlyTeamId == f.home.id)
+          OfficialSheetTeam.of(f, f.home, homeSheet),
+        if (!one || onlyTeamId == f.away.id)
+          OfficialSheetTeam.of(f, f.away, awaySheet),
+      ],
       officials: [
         for (final place in OfficialPlace.values)
           (place.label, officials?[place]?.name),
       ],
-      fileName:
-          '${['gedfa-sheet', short(f.home), 'v', short(f.away), if (day != null) '${day.year}-${two(day.month)}-${two(day.day)}'].join('-').replaceAll(RegExp(r'[^A-Za-z0-9-]'), '')}.pdf',
+      fileName: '$name.pdf',
     );
   }
 }
