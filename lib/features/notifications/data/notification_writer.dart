@@ -131,7 +131,9 @@ class NotificationWriter {
       teamName: teamName,
       name: name,
       groupKey: switch (kind) {
-        NotificationKind.teamRequest || NotificationKind.cantMakeIt => 'all',
+        NotificationKind.teamRequest ||
+        NotificationKind.cantMakeIt ||
+        NotificationKind.playerMismatch => 'all',
         _ => null,
       },
       targetId: targetId,

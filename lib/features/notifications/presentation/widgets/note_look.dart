@@ -49,6 +49,7 @@ IconData noteKindIcon(NotificationKind kind) => switch (kind) {
   NotificationKind.appointed => Icons.sports_rounded,
   NotificationKind.appointmentRemoved => Icons.person_remove_rounded,
   NotificationKind.cantMakeIt => Icons.do_not_disturb_on_rounded,
+  NotificationKind.playerMismatch => Icons.face_retouching_off_rounded,
   NotificationKind.teamRequest => Icons.shield_rounded,
   NotificationKind.playersSubmitted => Icons.person_add_alt_1_rounded,
   NotificationKind.playersResubmitted => Icons.restart_alt_rounded,
@@ -239,6 +240,14 @@ const announcementIcon = Icons.campaign_rounded;
       'Open my matches',
     ),
     NotificationKind.cantMakeIt => (
+      NoteLook.no,
+      n.people == 1 && n.targetId != null
+          ? Routes.adminMatch(n.targetId!)
+          : Routes.adminFixtures,
+      n.people == 1 ? 'Open the match' : 'Open Fixtures',
+    ),
+    // 3.6c: the match, where the players check shows
+    NotificationKind.playerMismatch => (
       NoteLook.no,
       n.people == 1 && n.targetId != null
           ? Routes.adminMatch(n.targetId!)

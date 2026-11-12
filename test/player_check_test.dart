@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gedfa_connect/features/fixtures/domain/fixture.dart';
+import 'package:gedfa_connect/features/notifications/domain/app_notification.dart';
+import 'package:gedfa_connect/features/player_checks/data/player_check_repository.dart';
 import 'package:gedfa_connect/features/player_checks/domain/player_check.dart';
 import 'package:gedfa_connect/features/players/domain/age_group.dart';
 import 'package:gedfa_connect/features/team_sheets/domain/team_sheet.dart';
@@ -155,5 +157,76 @@ void main() {
     expect(results.keys, ['a']);
     expect((results['a'] as Map)['note'], 'Looks older');
     expect((results['a'] as Map)['result'], 'mismatch');
+  });
+
+  group('3.6c the FA sees what the check found (MC5)', () {
+    final lines = CheckLine.forSheet(_sheet, _match);
+
+    test('nothing checked yet', () {
+      expect(CheckSummary.of(lines, null).counts, 'Not checked yet');
+    });
+
+    test('everyone matched', () {
+      final all = MatchPlayerChecks(
+        fixtureId: 'm1',
+        results: {
+          for (final l in lines)
+            l.playerId: const PlayerCheck(
+              result: CheckResult.match,
+              teamId: 'ruf',
+            ),
+        },
+      );
+      final sum = CheckSummary.of(lines, all);
+      expect(sum.allMatched, isTrue);
+      expect(sum.counts, '3 of 3 matched');
+      expect(sum.mismatchLines, isEmpty);
+    });
+
+    test("part checked, one absent, one who didn't match with the note", () {
+      final sum = CheckSummary.of(
+        lines,
+        MatchPlayerChecks(
+          fixtureId: 'm1',
+          results: {
+            'b': const PlayerCheck(result: CheckResult.absent, teamId: 'ruf'),
+            'a': PlayerCheck(
+              result: CheckResult.mismatch,
+              teamId: 'ruf',
+              note: 'Face different from photo',
+              at: DateTime(2026, 11, 14, 13, 52),
+            ),
+          },
+        ),
+      );
+      expect(
+        sum.counts,
+        "2 of 3 checked · 0 matched · 1 absent · 1 didn't match",
+      );
+      expect(sum.mismatchLines, [
+        '#9 Nana Agyei · "Face different from photo"',
+      ]);
+      expect(sum.lastAt, DateTime(2026, 11, 14, 13, 52));
+    });
+
+    test("the FA's note: who, which team, the match and the note", () {
+      final line = lines.firstWhere((l) => l.playerId == 'a');
+      final text = mismatchNoteLine(_match, line, 'Face different');
+      final n = AppNotification(
+        id: 'n',
+        audience: 'fa',
+        kind: NotificationKind.playerMismatch,
+        teamId: '',
+        teamName: 'Kwesi Arthur',
+        names: [text],
+        count: 1,
+        targetId: 'm1',
+      );
+      expect(n.title, "#9 Nana Agyei (Royal) doesn't match");
+      expect(n.body, contains('Royal v Asebu'));
+      expect(n.body, contains('"Face different"'));
+      expect(n.body, contains('not struck off'));
+      expect(n.sender, 'Kwesi Arthur');
+    });
   });
 }

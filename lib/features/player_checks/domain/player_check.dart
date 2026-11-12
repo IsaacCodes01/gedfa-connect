@@ -228,3 +228,79 @@ class CheckLine {
     return null;
   }
 }
+
+/// One team's players check in a few words (3.6c, MC5): for the FA's and
+/// the officials' Match details.
+class CheckSummary {
+  const CheckSummary({
+    required this.total,
+    required this.matched,
+    required this.absent,
+    required this.mismatches,
+    this.lastAt,
+  });
+
+  /// Players on the sheet.
+  final int total;
+  final int matched;
+  final int absent;
+
+  /// Who didn't match, with what the commissioner saw.
+  final List<(CheckLine, String?)> mismatches;
+
+  /// The team's latest check.
+  final DateTime? lastAt;
+
+  int get checked => matched + absent + mismatches.length;
+  bool get isDone => total > 0 && checked == total;
+  bool get allMatched => isDone && matched == total;
+
+  static CheckSummary of(List<CheckLine> lines, MatchPlayerChecks? checks) {
+    var matched = 0, absent = 0;
+    DateTime? last;
+    final mismatches = <(CheckLine, String?)>[];
+    for (final l in lines) {
+      final c = checks?[l.playerId];
+      if (c == null) continue;
+      final at = c.at;
+      if (at != null && (last == null || at.isAfter(last))) last = at;
+      switch (c.result) {
+        case CheckResult.match:
+          matched++;
+        case CheckResult.absent:
+          absent++;
+        case CheckResult.mismatch:
+          mismatches.add((l, c.note));
+      }
+    }
+    return CheckSummary(
+      total: lines.length,
+      matched: matched,
+      absent: absent,
+      mismatches: mismatches,
+      lastAt: last,
+    );
+  }
+
+  /// "16 of 16 matched", or "12 of 16 checked · 10 matched · 1 absent ·
+  /// 1 didn't match", or "Not checked yet".
+  String get counts {
+    if (checked == 0) return 'Not checked yet';
+    if (allMatched) return '$total of $total matched';
+    return [
+      '$checked of $total checked',
+      '$matched matched',
+      if (absent > 0) '$absent absent',
+      if (mismatches.isNotEmpty) "${mismatches.length} didn't match",
+    ].join(' · ');
+  }
+
+  /// "#9 Nana Agyei · "face different from photo"", one per mismatch.
+  List<String> get mismatchLines => [
+    for (final (line, note) in mismatches)
+      [
+        '${line.number == null ? '' : '#${line.number} '}${line.name}',
+        if (note != null) '"$note"',
+      ].join(' · '),
+  ];
+}

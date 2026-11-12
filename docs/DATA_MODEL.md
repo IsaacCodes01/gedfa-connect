@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.44, matches the rules after step 3.6b, the commissioner's players check (12 Nov 2026)
+**Status:** v2.45, matches the rules after step 3.6c, the FA's view of the players check and its note (12 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -817,7 +817,8 @@ The face check of one match (mockup MC2): each player on a saved sheet gets **Ma
 - **Written only by the match's commissioner** (`fixtureOfficials.officials.commissioner.uid`), **one player per write** (`changed`; the other players' entries stay as they are), and the player must be on that team's saved sheet (`teamSheets/{fixtureId}_{teamId}`, starters or bench).
 - **When:** from the lock (1 h before kick-off) until **2 h after kick-off** (Isaac, 12 Nov 2026). A result may be changed in that time.
 - **Read:** the FA and the match's appointed officials. Not the clubs.
-- Photos come from `playerPhotos` (3.6a). The FA's view and a note to the FA on a mismatch: 3.6c.
+- Photos come from `playerPhotos` (3.6a).
+- **3.6c:** the FA and the match's officials see a summary per team on Match details from the lock ("16 of 16 matched · by …", or who didn't match with the note). A **Doesn't match** sends the FA a bell note (kind `playerMismatch`, audience `fa`, grouped per day, `targetId` = the match) **in the same batch**; the rules allow that note only when the same batch saves a mismatch by this commissioner (`isMismatchJustRecorded`).
 
 ## 3. Who can do what (summary)
 
@@ -1018,6 +1019,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 12 Nov 2026 | v2.45 (3.6c): notification kind `playerMismatch` (written by the match's commissioner, only with a Doesn't match saved in the same batch). 463 rules tests. |
 | 12 Nov 2026 | v2.44 (3.6b): new `playerChecks/{fixtureId}` (the commissioner only, one player per write, a player on the saved sheet, a note for Doesn't match, from the lock to 2 h after kick-off; read by the FA and the match officials). 458 rules tests. |
 | 12 Nov 2026 | v2.43 (3.6a): new `playerPhotos/{playerId}` (FA writes with the approval / pass / Repair, only the player's own links; read by the FA and referees). Section 7: Isaac's answers on the face check. 452 rules tests. |
 | 12 Nov 2026 | v2.42 (3.3b): no new data. A team prints its own sheet from what it already reads (its `teamSheets` doc; `fixtureOfficials` from 24 h before); kit photos are downloaded from their saved URLs. 446 rules tests. |

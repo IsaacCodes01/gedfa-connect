@@ -44,6 +44,11 @@ service cloud.firestore {
         return /databases/$(database)/documents/districts/$(districtId)/fixtureOfficials/$(fixtureId);
       }
 
+      // A match's players check (3.6b); here because the bell's rules use it
+      function playerCheckDoc(fixtureId) {
+        return /databases/$(database)/documents/districts/$(districtId)/playerChecks/$(fixtureId);
+      }
+
       function userDoc(uid) {
         return /databases/$(database)/documents/districts/$(districtId)/users/$(uid);
       }
@@ -489,7 +494,8 @@ service cloud.firestore {
                            'fixtureAdded', 'fixtureChanged', 'fixturePostponed',
                            'fixtureCancelled', 'divisionJuveniles',
                            'playerSuspended', 'playerSuspensionLifted',
-                           'appointed', 'appointmentRemoved', 'cantMakeIt']
+                           'appointed', 'appointmentRemoved', 'cantMakeIt',
+                           'playerMismatch']
           // What the note's button opens (3.1e1: a player)
           && isOptionalText(data, 'targetId', 60)
           && data.teamId is string
@@ -498,6 +504,14 @@ service cloud.firestore {
           && data.count is int && data.count >= 1
           && data.day is string && data.day.size() == 10
           && data.updatedAt == request.time;
+      }
+
+      // 3.6c: the batch saves a "Doesn't match" by this commissioner now
+      function isMismatchJustRecorded(data) {
+        let check = getAfter(playerCheckDoc(data.get('targetId', '-'))).data;
+        return check.get('by', '') == request.auth.uid
+          && check.get('updatedAt', null) == request.time
+          && check.results[check.changed].result == 'mismatch';
       }
 
       // Who may write a notification for the FA's bell
@@ -514,7 +528,10 @@ service cloud.firestore {
               // their own reason on the match's officials, same batch
               || (data.kind == 'cantMakeIt'
                   && getAfter(fixtureOfficialDoc(data.get('targetId', '-'))).data
-                       .get('cantMake', {}).keys().hasAny([request.auth.uid])));
+                       .get('cantMake', {}).keys().hasAny([request.auth.uid]))
+              // The commissioner records a player who doesn't match (3.6c):
+              // only with that "Doesn't match" saved by them, same batch
+              || (data.kind == 'playerMismatch' && isMismatchJustRecorded(data)));
       }
 
       match /notifications/{notificationId} {

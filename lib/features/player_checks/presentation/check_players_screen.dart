@@ -68,6 +68,7 @@ class _CheckPlayersScreenState extends ConsumerState<CheckPlayersScreen> {
   }
 
   Future<void> _record(
+    Fixture fixture,
     CheckLine line,
     CheckResult result,
     List<CheckLine> lines,
@@ -85,7 +86,7 @@ class _CheckPlayersScreenState extends ConsumerState<CheckPlayersScreen> {
       await ref
           .read(playerCheckRepositoryProvider)
           .record(
-            fixtureId: widget.fixtureId,
+            fixture: fixture,
             line: line,
             result: result,
             note: note,
@@ -215,7 +216,7 @@ class _CheckPlayersScreenState extends ConsumerState<CheckPlayersScreen> {
             : 'The check closed 2 hours after kick-off.',
         onRecord: !canRecord || _saving
             ? null
-            : (line, result) => _record(line, result, lines, c),
+            : (line, result) => _record(f, line, result, lines, c),
       );
     }
 

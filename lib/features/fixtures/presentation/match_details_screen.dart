@@ -187,6 +187,11 @@ class _DetailsState extends ConsumerState<_Details> {
                         now: now,
                         isFa: widget.isFa,
                       ),
+                    // What the check found, from the lock (3.6c, MC5)
+                    if ((widget.isOfficial || widget.isFa) &&
+                        f.sheetDueAt != null &&
+                        !now.isBefore(f.sheetDueAt!))
+                      _PlayersCheckResults(fixture: f),
                     // The FA appoints; the clubs see them 24 h before (3.5a)
                     OfficialsSection(
                       fixture: f,
@@ -1108,6 +1113,67 @@ class _PlayersCheckCard extends ConsumerWidget {
                 ),
         ),
       ),
+    );
+  }
+}
+
+/// The players check, team by team (3.6c, MC5): for the FA and the
+/// match's officials from the lock. "16 of 16 matched · by Kwesi Arthur,
+/// 1:52 pm", or who didn't match, with the commissioner's note.
+class _PlayersCheckResults extends ConsumerWidget {
+  const _PlayersCheckResults({required this.fixture});
+
+  final Fixture fixture;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final f = fixture;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final checks = ref.watch(playerChecksProvider(f.id)).value;
+
+    Widget row(FixtureSide side) {
+      final sheet = ref.watch(teamSheetProvider((f.id, side.id))).value;
+      final lines = sheet == null ? const <CheckLine>[] : CheckLine.forSheet(sheet, f);
+      final sum = CheckSummary.of(lines, checks);
+      final (icon, tone) = sheet == null || sum.checked == 0
+          ? (Icons.schedule, AccentTone.grey)
+          : sum.mismatches.isNotEmpty
+          ? (Icons.report_outlined, AccentTone.red)
+          : sum.allMatched
+          ? (Icons.how_to_reg_outlined, AccentTone.green)
+          : (Icons.how_to_reg_outlined, AccentTone.gold);
+      final last = sum.lastAt;
+      final by = checks?.byName;
+      return _Line(
+        leading: Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: tone.background(isDark),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, size: 20, color: tone.foreground(isDark)),
+        ),
+        title: side.name,
+        detail: sheet == null
+            ? 'No sheet saved'
+            : [
+                [
+                  sum.counts,
+                  if (last != null && by != null)
+                    'by $by (commissioner), ${formatTime(last)}',
+                ].join(' · '),
+                ...sum.mismatchLines,
+              ].join('\n'),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const DashboardSectionTitle(title: 'Players check'),
+        DashboardCard(child: Column(children: [row(f.home), row(f.away)])),
+      ],
     );
   }
 }

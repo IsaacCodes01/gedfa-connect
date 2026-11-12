@@ -40,6 +40,7 @@ enum NotificationKind {
   paymentSent, // a team added a payment (2.13c)
   divisionJuveniles, // a club named or removed juveniles for the Division (3.1d)
   cantMakeIt, // an appointed official can't come (3.5b)
+  playerMismatch, // the commissioner: a player doesn't match (3.6c)
   registrationChanged; // an FA official opened or closed registration
 
   static NotificationKind? fromString(String? value) {
@@ -191,6 +192,10 @@ class AppNotification {
         NotificationKind.cantMakeIt => people == 1
             ? "${splitLine(names.firstOrNull ?? 'An official').$1} can't make it"
             : "$people officials can't make it",
+        // "#9 Nana Agyei (Asebu Stars) doesn't match"
+        NotificationKind.playerMismatch => people == 1
+            ? "${splitLine(names.firstOrNull ?? 'A player').$1} doesn't match"
+            : "$people players don't match",
       };
 
   /// The short text in the bell's list ("Kojo Arthur, Nana Ofori and 2
@@ -219,7 +224,8 @@ class AppNotification {
       NotificationKind.playerSuspensionLifted ||
       NotificationKind.appointed ||
       NotificationKind.appointmentRemoved ||
-      NotificationKind.cantMakeIt => people > 1,
+      NotificationKind.cantMakeIt ||
+      NotificationKind.playerMismatch => people > 1,
       _ => true,
     };
   }
@@ -233,6 +239,7 @@ class AppNotification {
       NotificationKind.inviteAccepted ||
       NotificationKind.registrationChanged => 'GEDFA',
       NotificationKind.cantMakeIt when people > 1 => '$people officials',
+      NotificationKind.playerMismatch when people > 1 => 'Players check',
       _ => teamName.isEmpty ? 'GEDFA' : teamName,
     };
   }
@@ -326,6 +333,14 @@ class AppNotification {
           ? '${splitLine(this.names.firstOrNull ?? '').$2} Appoint someone '
                 'else.'
           : withNames('Appoint someone else in each match.'),
+      NotificationKind.playerMismatch => people == 1
+          ? '${splitLine(this.names.firstOrNull ?? '').$2} Recorded by the '
+                'commissioner for the FA and the match report; the player was '
+                'not struck off the sheet.'
+          : withNames(
+              'Recorded by the commissioners for the FA and the match '
+              'reports.',
+            ),
     };
   }
 

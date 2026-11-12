@@ -34,7 +34,7 @@ class _FakeChecks implements PlayerCheckRepository {
 
   @override
   Future<void> record({
-    required String fixtureId,
+    required Fixture fixture,
     required CheckLine line,
     required CheckResult result,
     String? note,
@@ -185,6 +185,7 @@ void main() {
     Brightness b, {
     Map<String, MatchOfficials>? officials,
     _FakeChecks? checks,
+    MatchPlayerChecks? found,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -236,7 +237,8 @@ void main() {
           myAudienceProvider.overrideWithValue('person:r1'),
           // 3.6b: the check so far (none) and no registered photos
           playerChecksProvider.overrideWith(
-            (ref, id) => Stream.value(MatchPlayerChecks(fixtureId: id)),
+            (ref, id) =>
+                Stream.value(found ?? MatchPlayerChecks(fixtureId: id)),
           ),
           playerPhotoProvider.overrideWith((ref, id) async => null),
           playerCheckRepositoryProvider.overrideWithValue(
@@ -338,10 +340,7 @@ void main() {
   ) async {
     await pump(
       tester,
-      const OfficialSheetScreen(
-        fixtureId: 'm1',
-        viewer: SheetViewer.official,
-      ),
+      const OfficialSheetScreen(fixtureId: 'm1', viewer: SheetViewer.official),
       const Size(360, 800),
       Brightness.light,
     );
@@ -505,5 +504,51 @@ void main() {
       );
       expect(find.text('Not yet'), findsOneWidget);
     });
+  });
+
+  testWidgets("3.6c (MC5): the FA's Match details shows what the check found", (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      const MatchDetailsScreen(fixtureId: 'live', isFa: true),
+      const Size(360, 3600),
+      Brightness.light,
+      officials: {
+        ...mine,
+        'live': const MatchOfficials(
+          fixtureId: 'live',
+          places: {
+            OfficialPlace.commissioner: AppointedOfficial(
+              uid: 'f1',
+              name: 'Kwesi Arthur',
+            ),
+          },
+        ),
+      },
+      found: MatchPlayerChecks(
+        fixtureId: 'live',
+        byName: 'Kwesi Arthur',
+        results: {
+          for (var i = 1; i <= 12; i++)
+            'a$i': const PlayerCheck(result: CheckResult.match, teamId: 'ast'),
+          'h1': const PlayerCheck(result: CheckResult.match, teamId: 'ruf'),
+          'h2': PlayerCheck(
+            result: CheckResult.mismatch,
+            teamId: 'ruf',
+            note: 'Looks older',
+            at: DateTime(2026, 11, 14, 13, 52),
+          ),
+        },
+      ),
+    );
+    expect(find.text('Players check'), findsOneWidget);
+    expect(find.textContaining("1 didn't match"), findsOneWidget);
+    expect(
+      find.textContaining('#2 ruf player 2 · "Looks older"'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('12 of 12 matched'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

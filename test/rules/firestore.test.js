@@ -5334,3 +5334,64 @@ describe('Players check (3.6b)', () => {
     await assertFails(getDoc(ref(dbAs('ref3'))));
   });
 });
+
+describe("A player who doesn't match: the FA's note (3.6c)", () => {
+  const MIN = 60000;
+  const checkRef = (db) => doc(db, `${D}/playerChecks/f1`);
+  const noteRef = (db) => doc(db, `${D}/notifications/fa_playerMismatch_all_2026-11-12`);
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, `${D}/users/ref2`), { role: 'referee', name: 'Esi Owusu' });
+      await setDoc(doc(db, `${D}/fixtures/f1`),
+        fixtureData({ kickoffAt: Timestamp.fromMillis(Date.now() + 30 * MIN) }));
+      await setDoc(doc(db, `${D}/fixtureOfficials/f1`), {
+        fixtureId: 'f1', season: '2026-27',
+        officials: { referee: { uid: 'ref1', name: 'Ebo Quaye' }, commissioner: { uid: 'ref2', name: 'Esi Owusu' } },
+        officialIds: ['ref1', 'ref2'], updatedBy: 'fa1', updatedAt: Timestamp.now(),
+      });
+      await setDoc(doc(db, `${D}/teamSheets/f1_royal`), {
+        fixtureId: 'f1', teamId: 'royal', starters: ['p1'], bench: ['p3'], savedBy: 'admin1', savedAt: Timestamp.now(),
+      });
+    });
+  });
+
+  const note = (targetId = 'f1') => ({
+    audience: 'fa', kind: 'playerMismatch', teamId: '', teamName: 'Esi Owusu',
+    names: arrayUnion('#10 Kwame Asante (Royal Unique FC). "Face different from the photo"'),
+    count: increment(1), day: '2026-11-12', updatedAt: serverTimestamp(), targetId,
+  });
+
+  function record(db, { by = 'ref2', result = 'mismatch', withNote = true, targetId = 'f1' } = {}) {
+    const batch = writeBatch(db);
+    batch.set(checkRef(db), {
+      fixtureId: 'f1',
+      results: {
+        p1: {
+          result, teamId: 'royal', at: serverTimestamp(),
+          ...(result === 'mismatch' ? { note: 'Face different from the photo' } : {}),
+        },
+      },
+      changed: 'p1', by, byName: 'Esi Owusu', updatedAt: serverTimestamp(),
+    }, { merge: true });
+    if (withNote) batch.set(noteRef(db), note(targetId), { merge: true });
+    return batch.commit();
+  }
+
+  it("the commissioner's Doesn't match tells the FA in the same batch", async () => {
+    await assertSucceeds(record(dbAs('ref2')));
+  });
+
+  it('no note for Matches or Absent, nor for another match', async () => {
+    await assertFails(record(dbAs('ref2'), { result: 'match' }));
+    await assertFails(record(dbAs('ref2'), { result: 'absent' }));
+    await assertFails(record(dbAs('ref2'), { targetId: 'f9' }));
+  });
+
+  it('the note alone is refused, and nobody else may send it', async () => {
+    await assertFails(setDoc(noteRef(dbAs('ref2')), note(), { merge: true }));
+    await assertFails(record(dbAs('ref1'), { by: 'ref1' }));
+    await assertFails(setDoc(noteRef(dbAs('admin1')), note(), { merge: true }));
+  });
+});
