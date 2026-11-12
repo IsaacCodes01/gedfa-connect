@@ -47,7 +47,7 @@ class _AnnouncementScreenState extends ConsumerState<AnnouncementScreen> {
     return Scaffold(
       appBar: const GedfaAppBar(title: 'Announcement'),
       body: async.when(
-        loading: () => const LoadingView(),
+        loading: () => const LoadingView(message: 'Loading the announcement…'),
         error: (error, _) => ErrorView(message: appErrorMessage(error)),
         data: (a) {
           if (a == null) {

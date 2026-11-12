@@ -15,6 +15,7 @@ import 'package:gedfa_connect/core/utils/initials.dart';
 import 'package:gedfa_connect/core/utils/short_name.dart';
 import 'package:gedfa_connect/core/utils/team_name_key.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
+import 'package:gedfa_connect/core/widgets/sending.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/league/data/league_settings_repository.dart';
@@ -943,6 +944,7 @@ class _RegisterTeamScreenState extends ConsumerState<RegisterTeamScreen> {
                       ? 'Review and submit'
                       : 'Next: ${_stepTitles[_step + 1].toLowerCase()}',
           busy: _busy || _checking,
+          busyLabel: _busy ? 'Sending to GEDFA…' : 'Checking…',
           onBack: _back,
           onNext: isLast ? (_agreed ? _submit : null) : _next,
         ),
@@ -1030,6 +1032,7 @@ class _BottomBar extends StatelessWidget {
     required this.backLabel,
     required this.nextLabel,
     required this.busy,
+    required this.busyLabel,
     required this.onBack,
     required this.onNext,
   });
@@ -1037,6 +1040,9 @@ class _BottomBar extends StatelessWidget {
   final String backLabel;
   final String nextLabel;
   final bool busy;
+
+  /// "Checking…" or "Sending to GEDFA…" (M2).
+  final String busyLabel;
   final VoidCallback onBack;
   final VoidCallback? onNext;
 
@@ -1068,18 +1074,12 @@ class _BottomBar extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   flex: 2,
-                  child: FilledButton(
-                    onPressed: busy ? null : onNext,
-                    child: busy
-                        ? SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              color: scheme.primary,
-                            ),
-                          )
-                        : Text(nextLabel),
+                  child: BusyButton(
+                    label: nextLabel,
+                    busyLabel: busyLabel,
+                    busy: busy,
+                    onPressed: onNext,
+                    showSlowNote: false,
                   ),
                 ),
               ],

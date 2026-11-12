@@ -34,7 +34,7 @@ class FixtureKitsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final fixtureAsync = ref.watch(fixtureProvider(fixtureId));
     return fixtureAsync.when(
-      loading: () => const Scaffold(body: LoadingView()),
+      loading: () => const Scaffold(body: LoadingView(message: 'Loading the kits…')),
       error: (error, _) =>
           Scaffold(body: ErrorView(message: appErrorMessage(error))),
       data: (f) => f == null
@@ -168,7 +168,7 @@ class _EditKitsState extends ConsumerState<_EditKits> {
     if (error != null) {
       body = ErrorView(message: appErrorMessage(error));
     } else if (home == null || away == null) {
-      body = const LoadingView();
+      body = const LoadingView(message: 'Loading the kits…');
     } else {
       final s = _picked ?? _saved;
       KitLook? look(MatchTeam t, KitSlot slot) => t.teamKits.look(slot);

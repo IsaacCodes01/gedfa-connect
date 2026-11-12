@@ -61,7 +61,7 @@ class _TeamPositionsScreenState extends ConsumerState<TeamPositionsScreen> {
         },
       );
     } else if (!playersAsync.hasValue || !profilesAsync.hasValue) {
-      body = const LoadingView();
+      body = const LoadingView(message: 'Getting your squad…');
     } else {
       body = _body(
         playersAsync.requireValue

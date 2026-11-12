@@ -104,7 +104,7 @@ class _InviteReadyScreenState extends ConsumerState<InviteReadyScreen> {
         leading: const AppBackButton(fallback: Routes.adminPeople, close: true),
       ),
       body: inviteAsync.when(
-        loading: () => const LoadingView(),
+        loading: () => const LoadingView(message: 'Loading the invite…'),
         error: (error, _) => ErrorView(message: appErrorMessage(error)),
         data: (invite) => switch (invite) {
           null => const EmptyView(

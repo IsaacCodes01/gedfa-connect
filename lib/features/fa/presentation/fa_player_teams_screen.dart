@@ -72,7 +72,7 @@ class _FaPlayerTeamsScreenState extends ConsumerState<FaPlayerTeamsScreen> {
         },
       );
     } else if (!teamsAsync.hasValue || !playersAsync.hasValue) {
-      body = const LoadingView();
+      body = const LoadingView(message: 'Loading the teams…');
     } else {
       final teams = teamsAsync.requireValue;
       final all = playersAsync.requireValue;

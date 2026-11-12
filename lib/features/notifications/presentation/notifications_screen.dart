@@ -80,7 +80,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     if (error != null) {
       body = ErrorView(message: appErrorMessage(error));
     } else if (!notificationsAsync.hasValue || !announcementsAsync.hasValue) {
-      body = const LoadingView();
+      body = const SkeletonList(message: 'Getting your notifications…');
     } else {
       body = _body(
         isFa: isFa,

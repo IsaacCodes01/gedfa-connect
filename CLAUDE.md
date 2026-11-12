@@ -90,7 +90,7 @@ Build one at a time, mockup first where it says so; details are in `docs/ROADMAP
 | ✓ | **3.5** Match officials + referee Home | ✓ **3.5a** the FA appoints (`fixtureOfficials`, notes to `person:<uid>`); **3.5b** referee Home, Matches, bell, Can't make it (RD1–RD3); **3.5c** officials see **both sheets from the lock, with player IDs** (MC1) | **Approved** (`3.5-match-officials.html`; MC1 in `3.6-match-day-check.html`) | Done 12 Nov 2026 (3.5a–c). **Next: 3.3**. Clubs see officials 24 h before |
 | ✓ | **3.3** Official sheet as a PDF | Both teams' sheets with player IDs, kits, officials, captains' signature lines; `pdf` / `printing`; **no QR code** (Isaac) | MC4 approved | Done 12 Nov 2026 (3.3, 3.3b team copy + photo kits). Web: `web/index.html` gives older Safari pdf.js legacy; if the preview fails the screen offers Open the PDF. Deploy after `flutter clean` (a stale build left out the printing web plugin). **Next: 3.6** |
 | ✓ | **3.6** Player check (✓ 3.6a photos, ✓ 3.6b Check players, ✓ 3.6c FA's view + note; MC3 later) | "Check players": the **commissioner only** checks each face (big photo, number, ID): Matches / Doesn't match (note) / Absent; a mismatch is **recorded** for the FA and the report, not struck off (MC2, MC5) | MC2, MC5 approved | Photos via a separate locked-down copy, Storage rules too |
-| 6 | **M1, M2** Sending and loading states | One shared look for "saving…" and loading everywhere | Yes, first | Part of the UI/UX refresh |
+| ✓ | **M1, M2** Sending and loading states | Start-up screen, `LoadingView(message:)` / `SkeletonList` / `LoadingLine`, `BusyButton`, `SendingSheet.run` (`core/widgets/loading.dart`, `sending.dart`) | Approved (`m1-m2-loading-and-sending.html`) | Done 12 Nov 2026. New loading / save code must use these. **Next: Refresh (light)**. Full manual tests: `docs/TEST_PLAN.md` |
 | 7 | **Refresh (light)** | App icon (`flutter_launcher_icons`), splash (`flutter_native_splash`) + intro before "Get started" | Yes, first | Never mixed with feature work |
 | 7b | **3.3c** PDF preview on old iPhones | iPhone 8 (iOS 16), every viewer (FA, commissioner, referee, team): the preview page is blank (pdf.js legacy runs, draws nothing; likely OffscreenCanvas). Print / Download work. Fix: pdf.js without OffscreenCanvas, or on old Safari skip the preview and show "Your sheet is ready" + Open the PDF (`_PreviewUnavailable`) | — | Isaac, 12 Nov 2026: after Refresh (light), before Phase 4 |
 | 8 | **Phase 4** Match reports | Referee report form (offline draft), signed sheet photo, FA approval; goals, cards, assists (4th official); **protests** (fee GH₵ 500 in League settings, chairman-editable) | Yes, first | Ask GEDFA: protest answer time, public holidays |
@@ -318,6 +318,12 @@ Build one at a time, mockup first where it says so; details are in `docs/ROADMAP
   starts at **app start-up**, when a user opens the app, with a **friendly message**; after start-up, **loading** (fetching) and
   **submitting** (saving / sending) each get their **own messages** in the app. One shared look everywhere (replace the plain
   `LoadingView` / spinners and the "saving…" states screen by screen). Then Refresh (light), then 3.3c.
+- **M1, M2** done (12 Nov 2026, 463 rules tests, 389 Dart tests, no rules change): every page's loading says its own words
+  (`LoadingView(message: …)`, exported from `state_views.dart`); lists use `SkeletonList` (a `ListView`: only as a body or in
+  `Expanded`); save buttons use `BusyButton(label, busyLabel, busy, onPressed)` (`showSlowNote: false` beside another button);
+  long saves use `SendingSheet.run(context, title:, unit:, start:, task: (progress) => …)`. An `AnimationController` that a
+  widget may never use must be made in `initState`, not `late final … =` (made first in `dispose` it crashes). Isaac's full
+  manual test list: `docs/TEST_PLAN.md` (keep it up to date with each step). **Next: Refresh (light)**, then 3.3c.
 - Calendar backdrop (`_CalendarBackdrop` in `match_calendar_card.dart`): GEDFA logo as a one-colour watermark (its letters are white,
   so tint it with `color` + `BlendMode.srcIn`). `assets/images/gedfa_logo.png` is now committed.
 - **Plan agreed 9 Nov 2026 (deadline Thu 12 Nov, 12:30 pm; Isaac's prompts in that conversation):** next, in order:

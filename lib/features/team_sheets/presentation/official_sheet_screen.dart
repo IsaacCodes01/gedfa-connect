@@ -187,7 +187,7 @@ class _OfficialSheetScreenState extends ConsumerState<OfficialSheetScreen> {
     if (error != null) {
       body = ErrorView(message: appErrorMessage(error));
     } else if (fixture.isLoading || (myTeam?.isLoading ?? false)) {
-      body = const LoadingView();
+      body = const LoadingView(message: 'Getting the official sheet…');
     } else if (f == null || (isTeam && mine == null)) {
       body = const EmptyView(
         icon: Icons.event_busy_outlined,
@@ -206,7 +206,7 @@ class _OfficialSheetScreenState extends ConsumerState<OfficialSheetScreen> {
     } else if ((home?.isLoading ?? false) ||
         (away?.isLoading ?? false) ||
         (officials?.isLoading ?? false)) {
-      body = const LoadingView();
+      body = const LoadingView(message: 'Getting the official sheet…');
     } else if (isTeam && ownSheet == null) {
       body = const EmptyView(
         icon: Icons.assignment_outlined,
@@ -233,7 +233,7 @@ class _OfficialSheetScreenState extends ConsumerState<OfficialSheetScreen> {
         canDebug: false,
         maxPageWidth: 760,
         pdfFileName: _sheet!.fileName,
-        loadingWidget: const LoadingView(),
+        loadingWidget: const LoadingView(message: 'Getting the official sheet…'),
         onError: (_, e) {
           debugPrint('Team sheet PDF preview failed: $e');
           final text = e.toString();
@@ -254,7 +254,7 @@ class _OfficialSheetScreenState extends ConsumerState<OfficialSheetScreen> {
                         '${appErrorMessage(made.error!)}\n\nDetails: '
                         '${made.error}',
                   )
-                : const LoadingView(),
+                : const LoadingView(message: 'Getting the official sheet…'),
           );
         },
       );

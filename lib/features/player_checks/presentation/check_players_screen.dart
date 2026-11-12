@@ -165,7 +165,7 @@ class _CheckPlayersScreenState extends ConsumerState<CheckPlayersScreen> {
     if (error != null) {
       body = ErrorView(message: appErrorMessage(error));
     } else if (loading) {
-      body = const LoadingView();
+      body = const LoadingView(message: 'Getting the players to check…');
     } else if (f == null) {
       body = const EmptyView(
         icon: Icons.event_busy_outlined,
@@ -488,7 +488,7 @@ class _PlayerCard extends ConsumerWidget {
                 AsyncLoading() => const SizedBox(
                   width: 165,
                   height: 220,
-                  child: Center(child: CircularProgressIndicator()),
+                  child: SkeletonBox(height: 220, radius: 12),
                 ),
                 _ => Column(
                   children: [

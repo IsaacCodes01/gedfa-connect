@@ -8,6 +8,7 @@ import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/core/utils/initials.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
+import 'package:gedfa_connect/core/widgets/loading.dart';
 import 'package:gedfa_connect/features/auth/presentation/widgets/auth_widgets.dart';
 import 'package:gedfa_connect/features/league/data/league_settings_repository.dart';
 import 'package:gedfa_connect/features/people/data/people_repository.dart';
@@ -29,19 +30,21 @@ class WelcomeScreen extends ConsumerWidget {
     // Invited by the FA (2.6)? Then this screen is "Accept invitation",
     // not "Register your team". Wait for the answer to avoid a flicker.
     if (!inviteAsync.hasValue && !inviteAsync.hasError) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        body: LoadingView(message: 'Getting your account ready…'),
+      );
     }
     final invite = inviteAsync.value;
     if (invite != null) return InviteAcceptView(invite: invite);
 
-// Still waiting for Firestore's first answer: show a spinner, not the intro
-if (!requestAsync.hasValue && !requestAsync.hasError) {
-  return const Scaffold(
-    body: Center(child: CircularProgressIndicator()),
-  );
-}
+    // Still waiting for Firestore's first answer: show a spinner, not the intro
+    if (!requestAsync.hasValue && !requestAsync.hasError) {
+      return const Scaffold(
+        body: LoadingView(message: 'Getting your account ready…'),
+      );
+    }
 
-final request = requestAsync.value; // null = really no request → intro
+    final request = requestAsync.value; // null = really no request → intro
 
     Future<void> refresh() async {
       ref.invalidate(myTeamRequestProvider);
@@ -58,7 +61,9 @@ final request = requestAsync.value; // null = really no request → intro
     );
 
     if (request == null && requestAsync.isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        body: LoadingView(message: 'Getting your registration…'),
+      );
     }
 
     if (request == null && requestAsync.hasError) {
@@ -112,10 +117,10 @@ class _HeroTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: Theme.of(context)
-          .textTheme
-          .headlineSmall
-          ?.copyWith(color: Colors.white, fontWeight: FontWeight.w600),
+      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+        color: Colors.white,
+        fontWeight: FontWeight.w600,
+      ),
     );
   }
 }
@@ -137,8 +142,7 @@ class _SignedInFooter extends StatelessWidget {
       children: [
         Text(
           'Signed in as $email',
-          style:
-              textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+          style: textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
         ),
         TextButton(onPressed: onLogOut, child: const Text('Log out')),
       ],
@@ -204,8 +208,7 @@ class _IntroCard extends ConsumerWidget {
         Text(
           "You're signed in. Let's get your team into the GEDFA league.",
           textAlign: TextAlign.center,
-          style:
-              textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+          style: textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
         ),
         const SizedBox(height: 20),
         if (!open)
@@ -344,13 +347,15 @@ class _HowStep extends StatelessWidget {
             children: [
               Text(
                 title,
-                style:
-                    textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                style: textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               Text(
                 text,
-                style: textTheme.bodySmall
-                    ?.copyWith(color: scheme.onSurfaceVariant),
+                style: textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
               ),
             ],
           ),
@@ -468,23 +473,23 @@ class _StatusPill extends StatelessWidget {
 
     final (label, icon, background, foreground) = switch (status) {
       ApprovalStatus.pending => (
-          'Pending FA review',
-          Icons.schedule_rounded,
-          isDark ? const Color(0xFF3A3000) : AppColors.pendingBg,
-          isDark ? AppColors.ghanaGold : AppColors.pendingText,
-        ),
+        'Pending FA review',
+        Icons.schedule_rounded,
+        isDark ? const Color(0xFF3A3000) : AppColors.pendingBg,
+        isDark ? AppColors.ghanaGold : AppColors.pendingText,
+      ),
       ApprovalStatus.rejected => (
-          'Changes requested',
-          Icons.error_outline_rounded,
-          isDark ? const Color(0xFF3D1218) : AppColors.rejectedBg,
-          isDark ? const Color(0xFFFF8A94) : AppColors.rejectedText,
-        ),
+        'Changes requested',
+        Icons.error_outline_rounded,
+        isDark ? const Color(0xFF3D1218) : AppColors.rejectedBg,
+        isDark ? const Color(0xFFFF8A94) : AppColors.rejectedText,
+      ),
       ApprovalStatus.approved => (
-          'Approved',
-          Icons.check_circle_outline_rounded,
-          isDark ? const Color(0xFF0E3324) : AppColors.approvedBg,
-          isDark ? AppColors.darkGreen : AppColors.approvedText,
-        ),
+        'Approved',
+        Icons.check_circle_outline_rounded,
+        isDark ? const Color(0xFF0E3324) : AppColors.approvedBg,
+        isDark ? AppColors.darkGreen : AppColors.approvedText,
+      ),
     };
 
     return Container(
@@ -501,9 +506,9 @@ class _StatusPill extends StatelessWidget {
           Text(
             label,
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: foreground,
-                  fontWeight: FontWeight.w600,
-                ),
+              color: foreground,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
@@ -531,20 +536,20 @@ class _Timeline extends StatelessWidget {
       ),
       switch (status) {
         ApprovalStatus.pending => (
-            _StepState.current,
-            'FA review',
-            "Usually within a few days. You'll see the result here.",
-          ),
+          _StepState.current,
+          'FA review',
+          "Usually within a few days. You'll see the result here.",
+        ),
         ApprovalStatus.rejected => (
-            _StepState.problem,
-            'Changes requested',
-            'Edit your registration and send it again.',
-          ),
+          _StepState.problem,
+          'Changes requested',
+          'Edit your registration and send it again.',
+        ),
         ApprovalStatus.approved => (
-            _StepState.done,
-            'FA review',
-            'Your team was approved.',
-          ),
+          _StepState.done,
+          'FA review',
+          'Your team was approved.',
+        ),
       },
       (
         status == ApprovalStatus.approved ? _StepState.done : _StepState.todo,
@@ -590,35 +595,34 @@ class _TimelineItem extends StatelessWidget {
 
     final Widget dot = switch (state) {
       _StepState.done => CircleAvatar(
-          radius: 13,
-          backgroundColor: green,
-          child: Icon(Icons.check_rounded, size: 16, color: scheme.surface),
-        ),
+        radius: 13,
+        backgroundColor: green,
+        child: Icon(Icons.check_rounded, size: 16, color: scheme.surface),
+      ),
       _StepState.current || _StepState.problem => Container(
-          width: 26,
-          height: 26,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: state == _StepState.current ? gold : scheme.error,
-              width: 2,
-            ),
-          ),
-          child: CircleAvatar(
-            radius: 4,
-            backgroundColor:
-                state == _StepState.current ? gold : scheme.error,
+        width: 26,
+        height: 26,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: state == _StepState.current ? gold : scheme.error,
+            width: 2,
           ),
         ),
+        child: CircleAvatar(
+          radius: 4,
+          backgroundColor: state == _StepState.current ? gold : scheme.error,
+        ),
+      ),
       _StepState.todo => Container(
-          width: 26,
-          height: 26,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: scheme.outline, width: 2),
-          ),
+        width: 26,
+        height: 26,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: scheme.outline, width: 2),
         ),
+      ),
     };
 
     return Row(
@@ -654,8 +658,9 @@ class _TimelineItem extends StatelessWidget {
                 ),
                 Text(
                   text,
-                  style: textTheme.bodySmall
-                      ?.copyWith(color: scheme.onSurfaceVariant),
+                  style: textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),

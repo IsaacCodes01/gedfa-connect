@@ -53,7 +53,7 @@ class FaJuvenileChildScreen extends ConsumerWidget {
           ? FaBanBar(player: player)
           : null,
       body: playerAsync.when(
-        loading: () => const LoadingView(),
+        loading: () => const LoadingView(message: 'Loading the player…'),
         error: (error, _) => ErrorView(message: appErrorMessage(error)),
         data: (player) => player == null
             ? const EmptyView(

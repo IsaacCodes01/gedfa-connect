@@ -53,7 +53,7 @@ class FaAnnouncementsScreen extends ConsumerWidget {
         label: const Text('New announcement'),
       ),
       body: async.when(
-        loading: () => const LoadingView(),
+        loading: () => const SkeletonList(message: 'Getting announcements…', circle: false),
         error: (error, _) => ErrorView(message: appErrorMessage(error)),
         data: (announcements) => ListView(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 96),

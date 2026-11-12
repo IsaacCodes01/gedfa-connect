@@ -225,7 +225,7 @@ class _CupScreenState extends ConsumerState<CupScreen> {
       );
     } else if (cup == null) {
       body = cupAsync.isLoading || _deleting
-          ? const LoadingView()
+          ? const LoadingView(message: 'Loading the cup…')
           : const EmptyView(
               icon: Icons.emoji_events_outlined,
               title: 'Not here',
@@ -424,7 +424,7 @@ class _History extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final historyAsync = ref.watch(cupHistoryProvider(cupId));
     return historyAsync.when(
-      loading: () => const LoadingView(),
+      loading: () => const LoadingView(message: 'Loading the cup…'),
       error: (error, _) => ErrorView(message: appErrorMessage(error)),
       data: (lines) => DashboardCard(
         padding: lines.isEmpty ? const EdgeInsets.all(14) : EdgeInsets.zero,

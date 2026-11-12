@@ -33,7 +33,7 @@ class FaChangesView extends ConsumerWidget {
     return changesAsync.when(
       loading: () => const Padding(
         padding: EdgeInsets.only(top: 40),
-        child: LoadingView(),
+        child: LoadingView(message: 'Getting the changes…'),
       ),
       error: (error, _) => ErrorView(
         message: appErrorMessage(error),

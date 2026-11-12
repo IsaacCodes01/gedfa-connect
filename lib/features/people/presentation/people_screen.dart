@@ -39,7 +39,7 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
     if (error != null) {
       body = ErrorView(message: appErrorMessage(error));
     } else if (!membersAsync.hasValue || !invitesAsync.hasValue) {
-      body = const LoadingView();
+      body = const SkeletonList(message: 'Getting the people…');
     } else {
       body = _body(membersAsync.requireValue, invitesAsync.requireValue);
     }

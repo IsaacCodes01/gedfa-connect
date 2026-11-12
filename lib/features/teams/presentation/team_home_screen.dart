@@ -73,7 +73,7 @@ class _TeamHomeScreenState extends ConsumerState<TeamHomeScreen> {
     final teamAsync = ref.watch(myTeamProvider);
 
     return teamAsync.when(
-      loading: () => const Scaffold(body: LoadingView()),
+      loading: () => const Scaffold(body: LoadingView(message: 'Getting your squad…')),
       error: (error, _) => Scaffold(
         appBar: const GedfaAppBar(title: 'My team'),
         body: ErrorView(
@@ -287,7 +287,7 @@ class _SquadBody extends ConsumerWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return playersAsync.when(
-      loading: () => const LoadingView(),
+      loading: () => const SkeletonList(message: 'Getting your squad…'),
       error: (error, _) => ErrorView(
         message: appErrorMessage(error),
         onRetry: () => ref.invalidate(teamPlayersProvider),

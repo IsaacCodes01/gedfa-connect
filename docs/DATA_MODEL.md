@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.45, matches the rules after step 3.6c, the FA's view of the players check and its note (12 Nov 2026)
+**Status:** v2.46, matches the rules after step 3.6c (M1, M2 changed no data, 12 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -1019,6 +1019,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 12 Nov 2026 | v2.46 (M1, M2): no data or rules change; shared loading and sending looks only. 463 rules tests. |
 | 12 Nov 2026 | v2.45 (3.6c): notification kind `playerMismatch` (written by the match's commissioner, only with a Doesn't match saved in the same batch). 463 rules tests. |
 | 12 Nov 2026 | v2.44 (3.6b): new `playerChecks/{fixtureId}` (the commissioner only, one player per write, a player on the saved sheet, a note for Doesn't match, from the lock to 2 h after kick-off; read by the FA and the match officials). 458 rules tests. |
 | 12 Nov 2026 | v2.43 (3.6a): new `playerPhotos/{playerId}` (FA writes with the approval / pass / Repair, only the player's own links; read by the FA and referees). Section 7: Isaac's answers on the face check. 452 rules tests. |

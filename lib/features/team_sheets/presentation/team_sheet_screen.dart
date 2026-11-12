@@ -91,7 +91,7 @@ class TeamSheetScreen extends ConsumerWidget {
                 team.isLoading ||
                 players.isLoading ||
                 settings.isLoading
-            ? const LoadingView()
+            ? const LoadingView(message: 'Getting your squad…')
             : const EmptyView(
                 icon: Icons.event_busy_outlined,
                 title: 'Match not found',

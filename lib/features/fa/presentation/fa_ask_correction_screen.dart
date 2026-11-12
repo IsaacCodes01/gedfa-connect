@@ -44,7 +44,7 @@ class FaAskCorrectionScreen extends ConsumerWidget {
         body: error != null
             ? ErrorView(message: appErrorMessage(error))
             : teamsAsync.isLoading || requestAsync.isLoading
-                ? const LoadingView()
+                ? const LoadingView(message: 'Loading the team…')
                 : const EmptyView(
                     icon: Icons.search_off_rounded,
                     title: 'Team not found',

@@ -48,7 +48,7 @@ class _FaFeesScreenState extends ConsumerState<FaFeesScreen> {
         leading: widget.fromHome ? const BackToHomeButton() : null,
       ),
       body: teamsAsync.when(
-        loading: () => const LoadingView(),
+        loading: () => const SkeletonList(message: 'Getting the fees…'),
         error: (error, _) => ErrorView(message: appErrorMessage(error)),
         data: (teams) {
           final rows = [

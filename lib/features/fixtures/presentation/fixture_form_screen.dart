@@ -5,6 +5,7 @@ import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
+import 'package:gedfa_connect/core/widgets/sending.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
@@ -44,7 +45,7 @@ class FixtureFormScreen extends ConsumerWidget {
     }
     final fixtureAsync = ref.watch(fixtureProvider(id));
     return fixtureAsync.when(
-      loading: () => const Scaffold(body: LoadingView()),
+      loading: () => const Scaffold(body: LoadingView(message: 'Loading the match…')),
       error: (error, _) =>
           Scaffold(body: ErrorView(message: appErrorMessage(error))),
       data: (f) => f == null
@@ -606,15 +607,11 @@ class _SaveBar extends StatelessWidget {
             heightFactor: 1,
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 480),
-              child: FilledButton(
-                onPressed: busy ? null : onSave,
-                child: busy
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2.5),
-                      )
-                    : Text(label),
+              child: BusyButton(
+                label: label,
+                busyLabel: 'Saving and telling the teams…',
+                busy: busy,
+                onPressed: onSave,
               ),
             ),
           ),

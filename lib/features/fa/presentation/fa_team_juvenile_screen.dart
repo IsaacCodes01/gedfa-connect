@@ -57,7 +57,7 @@ class _FaTeamJuvenileScreenState extends ConsumerState<FaTeamJuvenileScreen> {
     if (error != null) {
       body = ErrorView(message: appErrorMessage(error));
     } else if (!teamAsync.hasValue || !playersAsync.hasValue) {
-      body = const LoadingView();
+      body = const LoadingView(message: 'Getting the juvenile players…');
     } else if (team == null) {
       body = const EmptyView(
         icon: Icons.search_off_rounded,

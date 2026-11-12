@@ -7,6 +7,7 @@ import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/initials.dart';
 import 'package:gedfa_connect/core/utils/validators.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
+import 'package:gedfa_connect/core/widgets/sending.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/core/widgets/back_to_home.dart';
@@ -58,7 +59,7 @@ class TeamEditScreen extends ConsumerWidget {
         ),
         body: detailsAsync.hasError
             ? ErrorView(message: appErrorMessage(detailsAsync.error!))
-            : const LoadingView(),
+            : const LoadingView(message: 'Loading your team…'),
       );
     }
     return _Editor(section: section, team: team, teamId: teamId);
@@ -416,18 +417,11 @@ class _SaveBar extends StatelessWidget {
             heightFactor: 1,
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 480),
-              child: FilledButton(
-                onPressed: busy ? null : onSave,
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size.fromHeight(52),
-                ),
-                child: busy
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2.5),
-                      )
-                    : const Text('Save'),
+              child: BusyButton(
+                label: 'Save',
+                busyLabel: 'Saving…',
+                busy: busy,
+                onPressed: onSave,
               ),
             ),
           ),

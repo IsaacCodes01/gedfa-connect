@@ -7,6 +7,7 @@ import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
+import 'package:gedfa_connect/core/widgets/sending.dart';
 import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
@@ -42,7 +43,7 @@ class SuspendPlayerScreen extends ConsumerWidget {
     if (error != null) {
       body = ErrorView(message: appErrorMessage(error));
     } else if (!playerAsync.hasValue || !fixturesAsync.hasValue) {
-      body = const LoadingView();
+      body = const LoadingView(message: "Finding the player's matches…");
     } else if (player == null || !player.isApproved) {
       body = const EmptyView(
         icon: Icons.person_off_outlined,
@@ -442,7 +443,7 @@ class _FormState extends ConsumerState<_Form> {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    FilledButton.icon(
+                    BusyButton(
                       onPressed: _canSave && inForce == null
                           ? () => _save(competition, toMiss, back)
                           : null,
@@ -450,17 +451,12 @@ class _FormState extends ConsumerState<_Form> {
                         backgroundColor: scheme.error,
                         foregroundColor: scheme.onError,
                       ),
-                      icon: _busy
-                          ? const SizedBox.square(
-                              dimension: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.block_rounded),
-                      label: Text(
-                        _matches == 1
-                            ? 'Suspend for 1 match'
-                            : 'Suspend for $_matches matches',
-                      ),
+                      icon: Icons.block_rounded,
+                      busy: _busy,
+                      busyLabel: 'Suspending…',
+                      label: _matches == 1
+                          ? 'Suspend for 1 match'
+                          : 'Suspend for $_matches matches',
                     ),
                   ],
                 ),

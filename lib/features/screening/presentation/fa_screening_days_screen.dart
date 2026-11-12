@@ -200,7 +200,7 @@ class _FaScreeningDaysScreenState
         ),
         bottomNavigationBar: _SaveBar(busy: _busy, onSave: _save),
         body: daysAsync.when(
-          loading: () => const LoadingView(),
+          loading: () => const LoadingView(message: 'Loading screening days…'),
           error: (error, _) => ErrorView(
             message: appErrorMessage(error),
             onRetry: () => ref.invalidate(upcomingScreeningsProvider),

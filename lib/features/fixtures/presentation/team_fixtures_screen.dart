@@ -82,7 +82,7 @@ class _TeamFixturesScreenState extends ConsumerState<TeamFixturesScreen> {
         actions: const [NotificationBell()],
       ),
       body: fixturesAsync.when(
-        loading: () => const LoadingView(),
+        loading: () => const SkeletonList(message: 'Loading your fixtures…'),
         error: (error, _) => ErrorView(
           message: appErrorMessage(error),
           onRetry: () => ref.invalidate(myFixturesProvider),

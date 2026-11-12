@@ -7,6 +7,7 @@ import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/core/utils/open_link.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
 import 'package:gedfa_connect/core/widgets/dashed_border.dart';
+import 'package:gedfa_connect/core/widgets/loading.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/fa/presentation/widgets/review_widgets.dart';
 import 'package:gedfa_connect/features/payments/data/payment_repository.dart';
@@ -16,16 +17,16 @@ import 'package:gedfa_connect/features/payments/presentation/widgets/payment_row
 /// The FA's green.
 ({Color ink, Color bg, Color line}) _greens(BuildContext context) =>
     Theme.of(context).brightness == Brightness.dark
-        ? (
-            ink: const Color(0xFF7BE3B0),
-            bg: const Color(0xFF123D2B),
-            line: const Color(0xFF2E7D57),
-          )
-        : (
-            ink: const Color(0xFF00502F),
-            bg: const Color(0xFFE3F2EA),
-            line: const Color(0xFF1E8E5A),
-          );
+    ? (
+        ink: const Color(0xFF7BE3B0),
+        bg: const Color(0xFF123D2B),
+        line: const Color(0xFF2E7D57),
+      )
+    : (
+        ink: const Color(0xFF00502F),
+        bg: const Color(0xFFE3F2EA),
+        line: const Color(0xFF1E8E5A),
+      );
 
 /// Board R7: one club's season fee, for the FA. Each waiting payment has
 /// the green tick ("Payment confirmed") and "Payment not found"; the FA
@@ -52,7 +53,8 @@ class FaPaymentCard extends ConsumerWidget {
     final textTheme = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
     final greens = _greens(context);
-    final summary = ref.watch(feeSummaryProvider(requestUid)).value ??
+    final summary =
+        ref.watch(feeSummaryProvider(requestUid)).value ??
         FeeSummary(confirmed: 0, fee: Season.fee);
     final paymentsAsync = ref.watch(clubPaymentsProvider(requestUid));
     final payments = paymentsAsync.value ?? const <Payment>[];
@@ -82,7 +84,8 @@ class FaPaymentCard extends ConsumerWidget {
                     text: cedis(summary.confirmed),
                     children: [
                       TextSpan(
-                        text: ' of ${cedis(Season.fee).substring(4)} '
+                        text:
+                            ' of ${cedis(Season.fee).substring(4)} '
                             'confirmed',
                         style: TextStyle(
                           fontWeight: FontWeight.w500,
@@ -92,8 +95,9 @@ class FaPaymentCard extends ConsumerWidget {
                       ),
                     ],
                   ),
-                  style: textTheme.titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w700),
+                  style: textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
               Text(
@@ -120,17 +124,15 @@ class FaPaymentCard extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
           if (paymentsAsync.isLoading && payments.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(12),
-              child: Center(child: CircularProgressIndicator()),
-            )
+            const LoadingLine(message: 'Getting the payments…')
           else if (payments.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Text(
                 'No payment sent yet.',
-                style: textTheme.bodyMedium
-                    ?.copyWith(color: scheme.onSurfaceVariant),
+                style: textTheme.bodyMedium?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
               ),
             ),
           for (final (i, payment) in payments.indexed)
@@ -166,7 +168,9 @@ class FaPaymentCard extends ConsumerWidget {
     if (result == null || faUid == null || !context.mounted) return;
 
     try {
-      final receipt = await ref.read(paymentRepositoryProvider).recordCash(
+      final receipt = await ref
+          .read(paymentRepositoryProvider)
+          .recordCash(
             requestUid: requestUid,
             teamId: teamId,
             teamName: teamName,
@@ -244,11 +248,11 @@ class _PaymentBlockState extends ConsumerState<_PaymentBlock> {
       title: 'Payment not found?',
       message: widget.rejectsRequest
           ? 'Use this only if the ID is not on the FA statement or the '
-              'details are false. The registration goes back to the club '
-              'with your reason, to correct and send again.'
+                'details are false. The registration goes back to the club '
+                'with your reason, to correct and send again.'
           : 'Use this only if the ID is not on the FA statement or the '
-              'details are false. The club sees your reason and can send '
-              'it again.',
+                'details are false. The club sees your reason and can send '
+                'it again.',
       fieldLabel: 'Reason for the club',
       quickReasons: const [
         'ID not on our statement',
@@ -261,7 +265,9 @@ class _PaymentBlockState extends ConsumerState<_PaymentBlock> {
 
     setState(() => _busy = true);
     try {
-      await ref.read(paymentRepositoryProvider).markNotFound(
+      await ref
+          .read(paymentRepositoryProvider)
+          .markNotFound(
             widget.payment,
             faUid: faUid,
             reason: reason,
@@ -289,14 +295,17 @@ class _PaymentBlockState extends ConsumerState<_PaymentBlock> {
       context: context,
       builder: (_) => _AmountDialog(
         title: 'Correct the amount',
-        message: 'The receipt number (${payment.receiptNo ?? ''}) stays the '
+        message:
+            'The receipt number (${payment.receiptNo ?? ''}) stays the '
             "same. The club's total changes by the difference.",
         initial: payment.amount,
         action: 'Save',
       ),
     );
     final faUid = _faUid;
-    if (amount == null || amount == payment.amount || faUid == null ||
+    if (amount == null ||
+        amount == payment.amount ||
+        faUid == null ||
         !mounted) {
       return;
     }
@@ -329,27 +338,29 @@ class _PaymentBlockState extends ConsumerState<_PaymentBlock> {
     final proof = payment.proofUrl;
 
     Widget line(String label, Widget value) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 2),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  label,
-                  style: textTheme.bodySmall?.copyWith(
-                    fontSize: 13.5,
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: textTheme.bodySmall?.copyWith(
+                fontSize: 13.5,
+                color: scheme.onSurfaceVariant,
               ),
-              value,
-            ],
+            ),
           ),
-        );
+          value,
+        ],
+      ),
+    );
     Text bold(String text) => Text(
-          text,
-          style: textTheme.bodyMedium
-              ?.copyWith(fontWeight: FontWeight.w700, fontSize: 13.5),
-        );
+      text,
+      style: textTheme.bodyMedium?.copyWith(
+        fontWeight: FontWeight.w700,
+        fontSize: 13.5,
+      ),
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -381,11 +392,13 @@ class _PaymentBlockState extends ConsumerState<_PaymentBlock> {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    bold([
-                      amount == null ? 'From FA records' : cedis(amount),
-                      if (paidOn != null) formatDate(paidOn),
-                      ?payment.paidWhen,
-                    ].join(', ')),
+                    bold(
+                      [
+                        amount == null ? 'From FA records' : cedis(amount),
+                        if (paidOn != null) formatDate(paidOn),
+                        ?payment.paidWhen,
+                      ].join(', '),
+                    ),
                     if (canCorrect)
                       IconButton(
                         onPressed: _busy ? null : _correct,
@@ -416,9 +429,11 @@ class _PaymentBlockState extends ConsumerState<_PaymentBlock> {
               if (payment.recordedByFa)
                 line(
                   'Recorded',
-                  bold(payment.editedAt == null
-                      ? 'By the FA'
-                      : 'By the FA · amount corrected'),
+                  bold(
+                    payment.editedAt == null
+                        ? 'By the FA'
+                        : 'By the FA · amount corrected',
+                  ),
                 ),
             ],
           ),
@@ -458,12 +473,12 @@ class _PaymentBlockState extends ConsumerState<_PaymentBlock> {
                               ),
                             )
                           : confirmed
-                              ? Icon(
-                                  Icons.check_rounded,
-                                  size: 20,
-                                  color: greens.line,
-                                )
-                              : null,
+                          ? Icon(
+                              Icons.check_rounded,
+                              size: 20,
+                              color: greens.line,
+                            )
+                          : null,
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -486,7 +501,7 @@ class _PaymentBlockState extends ConsumerState<_PaymentBlock> {
                                     'receipt ${payment.receiptNo ?? ''}',
                                   ].join(' · ')
                                 : "Check it against the FA's MoMo statement "
-                                    'or list, then tick.',
+                                      'or list, then tick.',
                             style: textTheme.bodySmall?.copyWith(
                               fontSize: 12,
                               color: scheme.onSurfaceVariant,
@@ -591,7 +606,8 @@ class RecordCashButton extends StatelessWidget {
 class _AmountDialog extends StatefulWidget {
   const _AmountDialog({
     this.title = 'Confirm this payment',
-    this.message = 'The club paid before the app. Enter the amount from the '
+    this.message =
+        'The club paid before the app. Enter the amount from the '
         "FA's records.",
     this.initial,
     this.action = 'Confirm',
@@ -608,8 +624,9 @@ class _AmountDialog extends StatefulWidget {
 
 class _AmountDialogState extends State<_AmountDialog> {
   final _formKey = GlobalKey<FormState>();
-  late final _amount =
-      TextEditingController(text: widget.initial?.toString() ?? '');
+  late final _amount = TextEditingController(
+    text: widget.initial?.toString() ?? '',
+  );
 
   @override
   void dispose() {
@@ -727,10 +744,9 @@ class _CashDialogState extends State<_CashDialog> {
         FilledButton(
           onPressed: () {
             if (!_formKey.currentState!.validate()) return;
-            Navigator.of(context).pop((
-              amount: int.parse(_amount.text.trim()),
-              note: _note.text,
-            ));
+            Navigator.of(
+              context,
+            ).pop((amount: int.parse(_amount.text.trim()), note: _note.text));
           },
           style: FilledButton.styleFrom(minimumSize: const Size(96, 44)),
           child: const Text('Record'),

@@ -53,7 +53,7 @@ class MatchDetailsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final fixtureAsync = ref.watch(fixtureProvider(fixtureId));
     return fixtureAsync.when(
-      loading: () => const Scaffold(body: LoadingView()),
+      loading: () => const Scaffold(body: LoadingView(message: 'Loading the match…')),
       error: (error, _) =>
           Scaffold(body: ErrorView(message: appErrorMessage(error))),
       data: (f) => f == null

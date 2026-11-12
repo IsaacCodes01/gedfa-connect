@@ -87,7 +87,7 @@ class _LeagueSettingsScreenState extends ConsumerState<LeagueSettingsScreen> {
         leading: const AppBackButton(fallback: Routes.adminMore),
       ),
       body: settingsAsync.when(
-        loading: () => const LoadingView(),
+        loading: () => const LoadingView(message: 'Loading league settings…'),
         error: (error, _) => ErrorView(message: appErrorMessage(error)),
         data: (saved) {
           final s = _draft ?? saved;

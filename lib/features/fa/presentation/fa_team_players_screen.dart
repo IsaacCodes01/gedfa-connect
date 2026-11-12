@@ -135,7 +135,7 @@ class _FaTeamPlayersScreenState extends ConsumerState<FaTeamPlayersScreen> {
     if (error != null) {
       body = ErrorView(message: appErrorMessage(error));
     } else if (!teamAsync.hasValue || !playersAsync.hasValue) {
-      body = const LoadingView();
+      body = const SkeletonList(message: 'Getting the players…');
     } else if (team == null) {
       body = const EmptyView(
         icon: Icons.search_off_rounded,

@@ -315,7 +315,7 @@ class _CupFormScreenState extends ConsumerState<CupFormScreen> {
     } else if (!divisionAsync.hasValue ||
         !juvenileAsync.hasValue ||
         (savedAsync != null && !savedAsync.hasValue)) {
-      body = const LoadingView();
+      body = const LoadingView(message: 'Loading the cup…');
     } else if (savedAsync != null && savedAsync.value == null) {
       body = const EmptyView(
         icon: Icons.emoji_events_outlined,

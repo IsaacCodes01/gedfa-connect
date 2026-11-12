@@ -78,7 +78,7 @@ class FaRequestReviewScreen extends ConsumerWidget {
               ? _ReviewActions(request: request)
               : null,
       body: requestAsync.when(
-        loading: () => const LoadingView(),
+        loading: () => const LoadingView(message: 'Loading the request…'),
         error: (error, _) => ErrorView(message: appErrorMessage(error)),
         data: (request) => request == null
             ? const EmptyView(

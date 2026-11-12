@@ -38,7 +38,7 @@ class PlayerProfileEditScreen extends ConsumerWidget {
     if (error != null) {
       body = ErrorView(message: appErrorMessage(error));
     } else if (!player.hasValue || !profiles.hasValue || !armbands.hasValue) {
-      body = const LoadingView();
+      body = const LoadingView(message: 'Loading the player…');
     } else if (player.value == null) {
       body = const EmptyView(
         icon: Icons.search_off_rounded,

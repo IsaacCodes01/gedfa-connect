@@ -44,7 +44,7 @@ class TeamSheetViewScreen extends ConsumerWidget {
     if (error != null) {
       body = ErrorView(message: appErrorMessage(error));
     } else if (fixture.isLoading || sheet.isLoading) {
-      body = const LoadingView();
+      body = const LoadingView(message: 'Loading the team sheet…');
     } else if (f == null || s == null || side == null) {
       body = EmptyView(
         icon: Icons.assignment_outlined,

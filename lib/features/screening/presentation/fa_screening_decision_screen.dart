@@ -241,7 +241,7 @@ class _FaScreeningDecisionScreenState
     if (error != null) {
       body = ErrorView(message: appErrorMessage(error));
     } else if (!dayAsync.hasValue || !childrenAsync.hasValue) {
-      body = const LoadingView();
+      body = const LoadingView(message: 'Loading the player…');
     } else if (day == null) {
       body = const EmptyView(
         icon: Icons.event_busy_outlined,

@@ -39,7 +39,7 @@ class SeasonFeeScreen extends ConsumerWidget {
               onPressed: () => context.push(Routes.teamAddPayment),
             ),
       body: paymentsAsync.when(
-        loading: () => const LoadingView(),
+        loading: () => const LoadingView(message: 'Loading your payments…'),
         error: (error, _) => ErrorView(message: appErrorMessage(error)),
         data: (payments) => ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),

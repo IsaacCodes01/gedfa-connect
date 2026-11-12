@@ -39,7 +39,7 @@ class SuspendedPlayersScreen extends ConsumerWidget {
     if (error != null) {
       body = ErrorView(message: appErrorMessage(error));
     } else if (!suspensions.hasValue || !fixtures.hasValue) {
-      body = const LoadingView();
+      body = const SkeletonList(message: 'Getting suspended players…');
     } else if (bans.isEmpty) {
       body = const EmptyView(
         icon: Icons.verified_user_outlined,

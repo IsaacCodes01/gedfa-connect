@@ -71,7 +71,7 @@ class _FaRequestsScreenState extends ConsumerState<FaRequestsScreen> {
       ),
       body: requestsAsync.when(
         data: _body,
-        loading: () => const LoadingView(),
+        loading: () => const SkeletonList(message: 'Getting the requests…'),
         error: (error, _) => ErrorView(
           message: appErrorMessage(error),
           onRetry: () => ref.invalidate(allTeamRequestsProvider),

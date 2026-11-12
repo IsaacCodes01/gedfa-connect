@@ -34,7 +34,7 @@ class FaTeamFeeScreen extends ConsumerWidget {
         leading: const AppBackButton(fallback: Routes.adminFees),
       ),
       body: teamAsync.when(
-        loading: () => const LoadingView(),
+        loading: () => const LoadingView(message: "Loading the team's payments…"),
         error: (error, _) => ErrorView(message: appErrorMessage(error)),
         data: (team) {
           final requestUid = team?.requestUid;

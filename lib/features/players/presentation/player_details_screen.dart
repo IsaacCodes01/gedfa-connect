@@ -49,7 +49,7 @@ class PlayerDetailsScreen extends ConsumerWidget {
           ? null
           : _BottomButton(player: player, onPressed: () => _edit(context)),
       body: playerAsync.when(
-        loading: () => const LoadingView(),
+        loading: () => const LoadingView(message: 'Loading the player…'),
         error: (error, _) => ErrorView(
           message: appErrorMessage(error),
           onRetry: () => ref.invalidate(playerProvider(playerId)),

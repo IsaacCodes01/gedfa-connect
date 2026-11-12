@@ -57,7 +57,7 @@ class AppointRoundScreen extends ConsumerWidget {
     if (error != null) {
       body = ErrorView(message: appErrorMessage(error));
     } else if (!fixturesAsync.hasValue || !officialsAsync.hasValue) {
-      body = const LoadingView();
+      body = const LoadingView(message: 'Loading the matchday…');
     } else if (matches.isEmpty) {
       body = const EmptyView(
         icon: Icons.event_busy_outlined,

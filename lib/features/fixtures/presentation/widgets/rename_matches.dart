@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
+import 'package:gedfa_connect/core/widgets/sending.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/fixtures/data/fixture_repository.dart';
 import 'package:gedfa_connect/features/fixtures/domain/fixture.dart';
@@ -43,51 +44,22 @@ Future<int> renameTeamMatches(
 }) async {
   final me = ref.read(authStateProvider).value;
   if (me == null) return 0;
-  final navigator = Navigator.of(context, rootNavigator: true);
-  final progress = ValueNotifier<(int, int)>((0, 0));
-
-  showDialog<void>(
-    context: context,
-    barrierDismissible: false,
-    useRootNavigator: true,
-    builder: (_) => PopScope(
-      canPop: false,
-      child: AlertDialog(
-        title: const Text('Renaming matches…'),
-        content: ValueListenableBuilder<(int, int)>(
-          valueListenable: progress,
-          builder: (_, p, _) => Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text('$newName is approved. Its matches are being renamed.'),
-              const SizedBox(height: 14),
-              LinearProgressIndicator(value: p.$2 == 0 ? null : p.$1 / p.$2),
-              const SizedBox(height: 8),
-              Text(
-                p.$2 == 0
-                    ? 'Finding its matches…'
-                    : '${p.$1} of ${p.$2} · keep the app open',
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
   try {
-    return await ref
-        .read(fixtureRepositoryProvider)
-        .renameTeam(
-          teamId,
-          until: until ?? DateTime.now(),
-          by: me,
-          onProgress: (done, total) => progress.value = (done, total),
-        );
+    // S2 (M2): the sheet with the progress bar
+    return await SendingSheet.run(
+      context,
+      title: 'Renaming matches to $newName…',
+      unit: 'Match',
+      task: (progress) => ref
+          .read(fixtureRepositoryProvider)
+          .renameTeam(
+            teamId,
+            until: until ?? DateTime.now(),
+            by: me,
+            onProgress: progress,
+          ),
+    );
   } catch (error) {
     throw RenameStoppedException(error);
-  } finally {
-    navigator.pop();
-    progress.dispose();
   }
 }

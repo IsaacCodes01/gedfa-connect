@@ -6,6 +6,7 @@ import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/initials.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
+import 'package:gedfa_connect/core/widgets/sending.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/core/widgets/back_to_home.dart';
@@ -47,7 +48,7 @@ class AskChangeScreen extends ConsumerWidget {
         ),
         body: detailsAsync.hasError
             ? ErrorView(message: appErrorMessage(detailsAsync.error!))
-            : const LoadingView(),
+            : const LoadingView(message: 'Loading your team…'),
       );
     }
     return _Form(team: team, teamId: teamId, initialKind: kind);
@@ -667,18 +668,11 @@ class _SendBar extends StatelessWidget {
             heightFactor: 1,
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 480),
-              child: FilledButton(
-                onPressed: busy ? null : onSend,
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size.fromHeight(52),
-                ),
-                child: busy
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2.5),
-                      )
-                    : const Text('Send to the FA'),
+              child: BusyButton(
+                label: 'Send to the FA',
+                busyLabel: 'Sending to the FA…',
+                busy: busy,
+                onPressed: onSend,
               ),
             ),
           ),

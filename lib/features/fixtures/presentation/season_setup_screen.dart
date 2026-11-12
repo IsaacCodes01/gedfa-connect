@@ -191,7 +191,7 @@ class _SeasonSetupScreenState extends ConsumerState<SeasonSetupScreen> {
     if (teamsAsync.hasError) {
       body = ErrorView(message: appErrorMessage(teamsAsync.error!));
     } else if (!teamsAsync.hasValue) {
-      body = const LoadingView();
+      body = const LoadingView(message: 'Loading the season…');
     } else {
       final teams = teamsAsync.requireValue;
       final inCount = teams.where((t) => !_left.contains(t.side.id)).length;

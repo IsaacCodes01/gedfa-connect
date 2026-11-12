@@ -369,7 +369,7 @@ class _FaTeamChangesScreenState extends ConsumerState<FaTeamChangesScreen> {
                     _busy ? null : () => _approveAll(waiting, teamName),
               ),
         body: changesAsync.when(
-          loading: () => const LoadingView(),
+          loading: () => const LoadingView(message: 'Getting the changes…'),
           error: (error, _) => ErrorView(
             message: appErrorMessage(error),
             onRetry: () => ref.invalidate(allTeamChangesProvider),

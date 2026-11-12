@@ -39,7 +39,7 @@ class FaCorrectDetailsScreen extends ConsumerWidget {
         body: detailsAsync.hasError
             ? ErrorView(message: appErrorMessage(detailsAsync.error!))
             : detailsAsync.isLoading
-                ? const LoadingView()
+                ? const LoadingView(message: 'Loading the team…')
                 : const EmptyView(
                     icon: Icons.search_off_rounded,
                     title: 'Team not found',

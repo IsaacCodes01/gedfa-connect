@@ -82,7 +82,7 @@ class _TeamDashboardScreenState extends ConsumerState<TeamDashboardScreen> {
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
         body: teamAsync.when(
-          loading: () => const LoadingView(),
+          loading: () => const LoadingView(message: "Getting your team's news…"),
           error: (error, _) => ErrorView(
             message: appErrorMessage(error),
             onRetry: () => ref.invalidate(myTeamProvider),

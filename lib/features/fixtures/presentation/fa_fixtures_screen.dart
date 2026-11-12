@@ -113,7 +113,7 @@ class _FaFixturesScreenState extends ConsumerState<FaFixturesScreen> {
         ),
       ),
       body: fixturesAsync.when(
-        loading: () => const LoadingView(),
+        loading: () => const SkeletonList(message: 'Loading fixtures…'),
         error: (error, _) => ErrorView(
           message: appErrorMessage(error),
           onRetry: () => ref.invalidate(seasonFixturesProvider),

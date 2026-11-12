@@ -73,7 +73,7 @@ class _NotificationDetailsScreenState
     if (async.hasError) {
       body = ErrorView(message: appErrorMessage(async.error!));
     } else if (!async.hasValue || mark == null) {
-      body = const LoadingView();
+      body = const LoadingView(message: 'Loading the note…');
     } else if (note == null) {
       body = const EmptyView(
         icon: Icons.notifications_off_outlined,

@@ -48,7 +48,7 @@ class TeamProfileScreen extends ConsumerWidget {
         leading: const AppBackButton(fallback: Routes.teamMore),
       ),
       body: detailsAsync.when(
-        loading: () => const LoadingView(),
+        loading: () => const LoadingView(message: 'Loading your team…'),
         error: (error, _) => ErrorView(
           message: appErrorMessage(error),
           onRetry: () => ref.invalidate(myTeamDetailsProvider),

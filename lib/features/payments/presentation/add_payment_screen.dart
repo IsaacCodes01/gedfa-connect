@@ -4,6 +4,7 @@ import 'package:gedfa_connect/core/connectivity/connectivity_provider.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/files/picked_document.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
+import 'package:gedfa_connect/core/widgets/sending.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/payments/data/payment_repository.dart';
@@ -142,15 +143,11 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
               heightFactor: 1,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 480),
-                child: FilledButton(
-                  onPressed: _busy ? null : _send,
-                  child: _busy
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2.5),
-                        )
-                      : const Text('Send payment'),
+                child: BusyButton(
+                  label: 'Send payment',
+                  busyLabel: 'Sending to GEDFA…',
+                  busy: _busy,
+                  onPressed: _send,
                 ),
               ),
             ),

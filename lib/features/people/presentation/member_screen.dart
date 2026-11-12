@@ -88,7 +88,7 @@ class _MemberScreenState extends ConsumerState<MemberScreen> {
         leading: const AppBackButton(fallback: Routes.adminPeople),
       ),
       body: memberAsync.when(
-        loading: () => const LoadingView(),
+        loading: () => const LoadingView(message: 'Loading the member…'),
         error: (error, _) => ErrorView(message: appErrorMessage(error)),
         data: (member) => member == null
             ? const EmptyView(

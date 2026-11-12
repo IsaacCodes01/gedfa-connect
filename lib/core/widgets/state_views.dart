@@ -1,14 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:gedfa_connect/app/theme.dart';
 
-class LoadingView extends StatelessWidget {
-  const LoadingView({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(child: CircularProgressIndicator());
-  }
-}
+// LoadingView, LoadingLine and the shimmer live in loading.dart (M1)
+export 'package:gedfa_connect/core/widgets/loading.dart';
 
 class EmptyView extends StatelessWidget {
   const EmptyView({
@@ -64,7 +58,11 @@ class ErrorView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline, size: 48, color: AppColors.ghanaRed),
+            const Icon(
+              Icons.error_outline,
+              size: 48,
+              color: AppColors.ghanaRed,
+            ),
             const SizedBox(height: 12),
             Text('Something went wrong', style: textTheme.titleLarge),
             const SizedBox(height: 4),

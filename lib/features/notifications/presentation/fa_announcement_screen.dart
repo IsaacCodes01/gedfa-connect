@@ -112,7 +112,7 @@ class _FaAnnouncementScreenState extends ConsumerState<FaAnnouncementScreen> {
         ],
       ),
       body: async.when(
-        loading: () => const LoadingView(),
+        loading: () => const LoadingView(message: 'Loading the announcement…'),
         error: (error, _) => ErrorView(message: appErrorMessage(error)),
         data: (a) => a == null
             ? const EmptyView(

@@ -11,6 +11,7 @@ import 'package:gedfa_connect/core/utils/passport_photo.dart';
 import 'package:gedfa_connect/core/utils/phone.dart';
 import 'package:gedfa_connect/core/utils/validators.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
+import 'package:gedfa_connect/core/widgets/sending.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/core/widgets/back_to_home.dart';
@@ -323,7 +324,7 @@ class _PlayerFormScreenState extends ConsumerState<PlayerFormScreen> {
     if (team == null || !playersAsync.hasValue) {
       return Scaffold(
         appBar: GedfaAppBar(title: title),
-        body: const LoadingView(),
+        body: const LoadingView(message: 'Loading the player…'),
       );
     }
 
@@ -984,18 +985,14 @@ class _BottomBar extends StatelessWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     flex: 2,
-                    child: FilledButton(
-                      onPressed: busy ? null : onSave,
-                      child: busy
-                          ? SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                color: scheme.primary,
-                              ),
-                            )
-                          : Text(saveLabel),
+                    child: BusyButton(
+                      label: saveLabel,
+                      busyLabel: saveLabel == 'Save changes'
+                          ? 'Saving…'
+                          : 'Sending to GEDFA…',
+                      busy: busy,
+                      onPressed: onSave,
+                      showSlowNote: false,
                     ),
                   ),
                 ],

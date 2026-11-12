@@ -31,7 +31,7 @@ class RefereeMatchesScreen extends ConsumerWidget {
     if (error != null) {
       body = ErrorView(message: appErrorMessage(error));
     } else if (!mineAsync.hasValue || !fixturesAsync.hasValue) {
-      body = const LoadingView();
+      body = const SkeletonList(message: 'Finding your matches…', circle: false);
     } else {
       final list = appointmentsOf(
         user?.uid ?? '',

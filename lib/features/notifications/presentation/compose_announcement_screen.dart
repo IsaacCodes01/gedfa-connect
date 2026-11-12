@@ -5,6 +5,7 @@ import 'package:gedfa_connect/core/constants/user_role.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
+import 'package:gedfa_connect/core/widgets/sending.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/notifications/data/notifications_repository.dart';
@@ -130,16 +131,12 @@ class _ComposeAnnouncementScreenState
               heightFactor: 1,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 480),
-                child: FilledButton.icon(
-                  onPressed: _busy ? null : _publish,
-                  icon: _busy
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2.5),
-                        )
-                      : const Icon(Icons.campaign_outlined),
-                  label: const Text('Publish'),
+                child: BusyButton(
+                  label: 'Publish',
+                  busyLabel: 'Publishing…',
+                  icon: Icons.campaign_outlined,
+                  busy: _busy,
+                  onPressed: _publish,
                 ),
               ),
             ),

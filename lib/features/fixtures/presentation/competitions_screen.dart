@@ -7,6 +7,7 @@ import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
+import 'package:gedfa_connect/core/widgets/sending.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
@@ -99,7 +100,7 @@ class CompetitionsScreen extends ConsumerWidget {
             ),
             const DashboardSectionTitle(title: 'Cups and Gala'),
             ...cupsAsync.when(
-              loading: () => const [LoadingView()],
+              loading: () => const [LoadingView(message: 'Loading competitions…')],
               error: (error, _) => [
                 ErrorView(
                   message: appErrorMessage(error),
@@ -418,7 +419,6 @@ Future<void> _runPostpone(
   final me = ref.read(authRepositoryProvider).currentUser;
   if (me == null) return;
   final repository = ref.read(fixtureRepositoryProvider);
-  final navigator = Navigator.of(context, rootNavigator: true);
   final progress = ValueNotifier<(int, int)>((
     job.movedCount,
     job.moves.length,
@@ -427,37 +427,22 @@ Future<void> _runPostpone(
   try {
     while (true) {
       if (!context.mounted) return;
-      showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => PopScope(
-          canPop: false,
-          child: AlertDialog(
-            title: Text(starting ? 'Postponing…' : 'Finishing…'),
-            content: ValueListenableBuilder<(int, int)>(
-              valueListenable: progress,
-              builder: (_, p, _) => Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  LinearProgressIndicator(
-                    value: p.$2 == 0 ? null : p.$1 / p.$2,
-                  ),
-                  const SizedBox(height: 10),
-                  Text('${p.$1} of ${p.$2} matches'),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
       try {
-        await repository.finishPostpone(
-          current,
-          by: me,
-          onProgress: (done, total) => progress.value = (done, total),
+        // S2 (M2): the sheet with the progress bar
+        await SendingSheet.run(
+          context,
+          title: starting ? 'Postponing…' : 'Finishing…',
+          unit: 'Match',
+          start: SendingProgress(progress.value.$1, progress.value.$2),
+          task: (onProgress) => repository.finishPostpone(
+            current,
+            by: me,
+            onProgress: (done, total) {
+              progress.value = (done, total);
+              onProgress(done, total);
+            },
+          ),
         );
-        navigator.pop(); // the progress
         if (context.mounted) {
           AppToast.success(
             context,
@@ -467,7 +452,6 @@ Future<void> _runPostpone(
         }
         return;
       } catch (error) {
-        navigator.pop();
         if (!context.mounted) return;
         final (done, total) = progress.value;
         final again = await showDialog<bool>(

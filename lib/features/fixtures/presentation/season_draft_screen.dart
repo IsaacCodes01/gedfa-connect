@@ -6,6 +6,7 @@ import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
+import 'package:gedfa_connect/core/widgets/sending.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
@@ -59,7 +60,9 @@ class _SeasonDraftScreenState extends ConsumerState<SeasonDraftScreen> {
     if (me == null) return;
     setState(() => _busy = true);
     try {
-      await ref.read(fixtureRepositoryProvider).saveDraft(
+      await ref
+          .read(fixtureRepositoryProvider)
+          .saveDraft(
             draftId: s.draftId,
             category: s.category,
             ageGroup: s.group,
@@ -91,8 +94,8 @@ class _SeasonDraftScreenState extends ConsumerState<SeasonDraftScreen> {
         content: Text(
           'Every team in the ${s.leagueName} is told and sees its matches.'
           '${kitProblems == 0 ? '' : '\n\n$kitProblems matches have a kit clash the app '
-              "couldn't solve: choose their kits after publishing (tap the "
-              'match, then Kits).'}',
+                    "couldn't solve: choose their kits after publishing (tap the "
+                    'match, then Kits).'}',
         ),
         actions: [
           TextButton(
@@ -108,53 +111,35 @@ class _SeasonDraftScreenState extends ConsumerState<SeasonDraftScreen> {
     );
     if (ok != true || !mounted) return;
 
-    final progress = ValueNotifier<(int, int)>((0, s.draft.matches.length));
     setState(() => _busy = true);
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => PopScope(
-        canPop: false,
-        child: AlertDialog(
-          title: const Text('Publishing…'),
-          content: ValueListenableBuilder<(int, int)>(
-            valueListenable: progress,
-            builder: (_, p, _) => Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                LinearProgressIndicator(value: p.$2 == 0 ? null : p.$1 / p.$2),
-                const SizedBox(height: 10),
-                Text('${p.$1} of ${p.$2} matches'),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
     try {
-      await ref.read(fixtureRepositoryProvider).publishSeason(
-            draftId: s.draftId,
-            leagueName: s.leagueName,
-            matches: s.toFixtureDrafts(),
-            by: me,
-            onProgress: (done, total) => progress.value = (done, total),
-          );
+      // S2 (M2): the sheet with the progress bar while the matches go out
+      await SendingSheet.run(
+        context,
+        title: 'Publishing the season…',
+        unit: 'Match',
+        task: (progress) => ref
+            .read(fixtureRepositoryProvider)
+            .publishSeason(
+              draftId: s.draftId,
+              leagueName: s.leagueName,
+              matches: s.toFixtureDrafts(),
+              by: me,
+              onProgress: progress,
+            ),
+      );
       if (!mounted) return;
-      Navigator.of(context, rootNavigator: true).pop(); // the progress
       ref.read(seasonMakerProvider.notifier).clear();
       AppToast.success(context, 'Season published. Every team was told.');
       context.go(Routes.adminFixtures);
     } catch (error) {
       if (!mounted) return;
-      Navigator.of(context, rootNavigator: true).pop();
       AppToast.error(
         context,
         '${appErrorMessage(error)} Tap Publish again: it carries on where it '
         'stopped.',
       );
     } finally {
-      progress.dispose();
       if (mounted) setState(() => _busy = false);
     }
   }
@@ -294,11 +279,7 @@ class _SeasonDraftScreenState extends ConsumerState<SeasonDraftScreen> {
                 FixtureListCard(
                   children: [
                     for (final m in list)
-                      _DraftRow(
-                        session: s,
-                        match: m,
-                        onTap: () => _edit(s, m),
-                      ),
+                      _DraftRow(session: s, match: m, onTap: () => _edit(s, m)),
                   ],
                 ),
               ],
@@ -378,8 +359,9 @@ class _DraftRow extends StatelessWidget {
         ),
       );
       return Row(
-        mainAxisAlignment:
-            isHome ? MainAxisAlignment.start : MainAxisAlignment.end,
+        mainAxisAlignment: isHome
+            ? MainAxisAlignment.start
+            : MainAxisAlignment.end,
         children: isHome
             ? [FixtureCrest(side: s), const SizedBox(width: 8), name]
             : [name, const SizedBox(width: 8), FixtureCrest(side: s)],
@@ -413,8 +395,10 @@ class _DraftRow extends StatelessWidget {
                 Expanded(child: side(true)),
                 const SizedBox(width: 8),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: dashboardTrack(context),
                     borderRadius: BorderRadius.circular(10),
@@ -460,13 +444,13 @@ class _EditMatchSheetState extends State<_EditMatchSheet> {
   }
 
   void _swap() => setState(() {
-        final newHome = widget.session.team(_m.awayId);
-        _m = _m.copyWith(homeId: _m.awayId, awayId: _m.homeId);
-        // The match follows the new home team's ground
-        if (newHome != null && newHome.homeGround.isNotEmpty) {
-          _venue.text = newHome.homeGround;
-        }
-      });
+    final newHome = widget.session.team(_m.awayId);
+    _m = _m.copyWith(homeId: _m.awayId, awayId: _m.homeId);
+    // The match follows the new home team's ground
+    if (newHome != null && newHome.homeGround.isNotEmpty) {
+      _venue.text = newHome.homeGround;
+    }
+  });
 
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
@@ -477,10 +461,17 @@ class _EditMatchSheetState extends State<_EditMatchSheet> {
       helpText: 'Match date',
     );
     if (picked != null && mounted) {
-      setState(() => _m = _m.copyWith(
-            kickoffAt: DateTime(picked.year, picked.month, picked.day,
-                _m.kickoffAt.hour, _m.kickoffAt.minute),
-          ));
+      setState(
+        () => _m = _m.copyWith(
+          kickoffAt: DateTime(
+            picked.year,
+            picked.month,
+            picked.day,
+            _m.kickoffAt.hour,
+            _m.kickoffAt.minute,
+          ),
+        ),
+      );
     }
   }
 
@@ -492,10 +483,17 @@ class _EditMatchSheetState extends State<_EditMatchSheet> {
     );
     if (picked != null && mounted) {
       final d = _m.kickoffAt;
-      setState(() => _m = _m.copyWith(
-            kickoffAt:
-                DateTime(d.year, d.month, d.day, picked.hour, picked.minute),
-          ));
+      setState(
+        () => _m = _m.copyWith(
+          kickoffAt: DateTime(
+            d.year,
+            d.month,
+            d.day,
+            picked.hour,
+            picked.minute,
+          ),
+        ),
+      );
     }
   }
 
@@ -559,9 +557,9 @@ class _EditMatchSheetState extends State<_EditMatchSheet> {
               onPressed: _venue.text.trim().length < 2
                   ? null
                   : () => Navigator.pop(
-                        context,
-                        _m.copyWith(venue: _venue.text.trim()),
-                      ),
+                      context,
+                      _m.copyWith(venue: _venue.text.trim()),
+                    ),
               child: const Text('Done'),
             ),
           ],
