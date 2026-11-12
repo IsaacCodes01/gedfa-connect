@@ -66,7 +66,8 @@ class TeamSheetViewScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                savedSheetPaper(f, s),
+                // The FA sees the player IDs too, like the officials (Isaac)
+                savedSheetPaper(f, s, showIds: isFa),
                 const SizedBox(height: 10),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 6),

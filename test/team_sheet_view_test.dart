@@ -78,6 +78,7 @@ void main() {
           name: i == 16 ? 'Kojo Brew' : 'Emmanuel Tetteh-Asamoah $i',
           position: 'CB',
           usual: i,
+          code: 'GE26-00${i.toString().padLeft(2, '0')}',
           ageGroup: i == 16 ? AgeGroup.u15 : null,
         ),
     },
@@ -125,6 +126,8 @@ void main() {
       expect(find.text('C'), findsOneWidget);
       expect(find.text('GK'), findsOneWidget);
       expect(find.text('usual 15'), findsOneWidget);
+      // The FA sees each player's ID (Isaac, 12 Nov 2026)
+      expect(find.text('CB · GE26-0004'), findsOneWidget);
       expect(find.text('U15'), findsOneWidget);
       expect(find.textContaining('Kojo Antwi (Team manager)'), findsOneWidget);
       expect(

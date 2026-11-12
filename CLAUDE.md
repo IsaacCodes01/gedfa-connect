@@ -285,6 +285,10 @@ Build one at a time, mockup first where it says so; details are in `docs/ROADMAP
   `fixtureOfficials.officialIds` from the lock); `SheetPaper.showIds` (position · player ID); `savedSheetPaper(f, sheet, showIds:)` in
   `team_sheet_view_screen.dart` draws any saved sheet (use it for 3.3 too); `_OfficialSheets` on Match details (`isOfficial`). Rules
   changed: Isaac deploys to dev. **Next: 3.3** the official sheet as a PDF (MC4 approved, `pdf` / `printing`, no QR code).
+- **FA sees IDs** (Isaac, 12 Nov 2026): `TeamSheetViewScreen` draws `savedSheetPaper(f, s, showIds: isFa)`; the opponent's view has no IDs.
+- **Next conversation (Isaac, 12 Nov 2026): build 3.3**, the official team sheet as a PDF (mockup MC4 in `3.6-match-day-check.html`,
+  approved): both teams' sheets with player IDs (`savedSheetPaper` / `SheetPlayer.code`), kits, the officials from `fixtureOfficials`,
+  captains' signature lines; packages `pdf` / `printing`; **no QR code**. Before starting, check Isaac deployed the 3.5 rules to dev.
 - Calendar backdrop (`_CalendarBackdrop` in `match_calendar_card.dart`): GEDFA logo as a one-colour watermark (its letters are white,
   so tint it with `color` + `BlendMode.srcIn`). `assets/images/gedfa_logo.png` is now committed.
 - **Plan agreed 9 Nov 2026 (deadline Thu 12 Nov, 12:30 pm; Isaac's prompts in that conversation):** next, in order:
