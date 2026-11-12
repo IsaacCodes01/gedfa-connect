@@ -91,7 +91,7 @@ Build one at a time, mockup first where it says so; details are in `docs/ROADMAP
 | ✓ | **3.3** Official sheet as a PDF | Both teams' sheets with player IDs, kits, officials, captains' signature lines; `pdf` / `printing`; **no QR code** (Isaac) | MC4 approved | Done 12 Nov 2026 (3.3, 3.3b team copy + photo kits). Web: `web/index.html` gives older Safari pdf.js legacy; if the preview fails the screen offers Open the PDF. Deploy after `flutter clean` (a stale build left out the printing web plugin). **Next: 3.6** |
 | ✓ | **3.6** Player check (✓ 3.6a photos, ✓ 3.6b Check players, ✓ 3.6c FA's view + note; MC3 later) | "Check players": the **commissioner only** checks each face (big photo, number, ID): Matches / Doesn't match (note) / Absent; a mismatch is **recorded** for the FA and the report, not struck off (MC2, MC5) | MC2, MC5 approved | Photos via a separate locked-down copy, Storage rules too |
 | ✓ | **M1, M2** Sending and loading states | Start-up screen, `LoadingView(message:)` / `SkeletonList` / `LoadingLine`, `BusyButton`, `SendingSheet.run` (`core/widgets/loading.dart`, `sending.dart`) | Approved (`m1-m2-loading-and-sending.html`) | Done 12 Nov 2026. New loading / save code must use these. **Next: Refresh (light)**. Full manual tests: `docs/TEST_PLAN.md` |
-| 7 | **Refresh (light)** | App icon (`flutter_launcher_icons`), splash (`flutter_native_splash`) + intro before "Get started" | Yes, first | Never mixed with feature work |
+| 7 | **Refresh (light)** | App icon from **GEDFA's logo** (`flutter_launcher_icons`), app name **"Gedfa Connect"**, splash (`flutter_native_splash`) + intro before "Get started", **modern colours and styling**, **tab icons** (audit below) | Yes, first | Never mixed with feature work. **Next conversation** (Isaac, 12 Nov 2026) |
 | 7b | **3.3c** PDF preview on old iPhones | iPhone 8 (iOS 16), every viewer (FA, commissioner, referee, team): the preview page is blank (pdf.js legacy runs, draws nothing; likely OffscreenCanvas). Print / Download work. Fix: pdf.js without OffscreenCanvas, or on old Safari skip the preview and show "Your sheet is ready" + Open the PDF (`_PreviewUnavailable`) | — | Isaac, 12 Nov 2026: after Refresh (light), before Phase 4 |
 | 8 | **Phase 4** Match reports | Referee report form (offline draft), signed sheet photo, FA approval; goals, cards, assists (4th official); **protests** (fee GH₵ 500 in League settings, chairman-editable) | Yes, first | Ask GEDFA: protest answer time, public holidays |
 | 9 | **Phase 5** Standings | Table from approved reports, **tie-breakers as the English Premier League**, top scorers, fair play, automatic suspensions from cards | Yes, first | |
@@ -324,6 +324,32 @@ Build one at a time, mockup first where it says so; details are in `docs/ROADMAP
   long saves use `SendingSheet.run(context, title:, unit:, start:, task: (progress) => …)`. An `AnimationController` that a
   widget may never use must be made in `initState`, not `late final … =` (made first in `dispose` it crashes). Isaac's full
   manual test list: `docs/TEST_PLAN.md` (keep it up to date with each step). **Next: Refresh (light)**, then 3.3c.
+- **Refresh (light): Isaac's decisions and the audit** (12 Nov 2026), for the mockup in the next conversation:
+  - **App icon = GEDFA's logo** (`assets/images/gedfa_logo.png`). It is **wide** (ball and flag emblem on the left, white
+    "GEDFA" letters, the full name under them), so a square icon needs a choice in the mockup: the emblem alone (ball + flag) on
+    deep blue, or the whole logo small on blue. Android adaptive icon: foreground + `#0F2A4A` / `#1259A8` background.
+  - **App name "Gedfa Connect"** (not `gedfa_connect`): change `android:label` in `AndroidManifest.xml`, `name` / `short_name`
+    in `web/manifest.json`, `<title>` and `apple-mobile-web-app-title` in `web/index.html`. iOS already says "Gedfa Connect".
+    The web manifest's `theme_color` / `background_color` are still Flutter's default `#0175C2`: set them to the app's blue.
+  - **Theme audit** (`lib/app/theme.dart`): good base (Poppins, colour tokens, dark mode, `AccentTone`, hero gradient). To make
+    it attractive and consistent:
+    1. The **app bar** is flat bright `brandBlue` (#1E88E5) while dashboards use the deep hero gradient: make them match
+       (gradient or deep-blue app bar, or a light surface app bar with blue titles; show options).
+    2. **No `cardTheme`**: cards use Material 3's tinted default. Add radius 20, `cardBorder`, the soft shadow from the mockups.
+    3. **No `dialogTheme`, `bottomSheetTheme`, `chipTheme`, `snackBarTheme`**: dialogs and sheets are plain; give them radius
+       24, the surface colour and Poppins titles; chips like the mockups' pills.
+    4. **Ghana gold and green are underused**: gold as the second accent (selected tab dot / pill edge, highlights), green for
+       success; keep red for errors only.
+    5. **~330 hard-coded `Color(0x…)` outside the theme** (most in `position_rows.dart` 21, `kit_colors.dart` 16 (fine: kits),
+       `fa_player_teams_screen.dart` 15, `note_look.dart` 10): move the UI ones into `AppColors` / `AccentTone` so the
+       refresh changes them in one place.
+    6. Page transitions are Cupertino slides everywhere; the web could use a fade-through.
+  - **Tab icons** (`app_shell.dart`, Material outlined → rounded when selected): team Home `home`, Squad `groups`, Fixtures
+    `calendar_month`, Profiles `assignment_ind`, More `more_horiz`; referee Matches `sports` (a whistle: keep); FA Teams
+    `shield`, Players `groups`. Modern option: **Material Symbols Rounded** (package `material_symbols_icons`: newer shapes,
+    fill that animates on selection, adjustable weight). Ideas to show side by side in the mockup: Squad `groups_3`, Fixtures
+    `event` or `stadium`, Profiles `badge` / `id_card`, Players `directions_run` or `person_search`, More `grid_view` / `menu`;
+    plus a small gold dot or pill under the selected tab.
 - Calendar backdrop (`_CalendarBackdrop` in `match_calendar_card.dart`): GEDFA logo as a one-colour watermark (its letters are white,
   so tint it with `color` + `BlendMode.srcIn`). `assets/images/gedfa_logo.png` is now committed.
 - **Plan agreed 9 Nov 2026 (deadline Thu 12 Nov, 12:30 pm; Isaac's prompts in that conversation):** next, in order:
