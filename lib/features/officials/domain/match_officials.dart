@@ -55,7 +55,11 @@ class AppointedOfficial {
 /// (Isaac, 11 Nov 2026). The FA and the appointed officials read it any
 /// time.
 class MatchOfficials {
-  const MatchOfficials({required this.fixtureId, this.places = const {}});
+  const MatchOfficials({
+    required this.fixtureId,
+    this.places = const {},
+    this.cantMake = const {},
+  });
 
   /// The clubs see the officials from this long before kick-off.
   static const clubsSeeBefore = Duration(hours: 24);
@@ -65,6 +69,10 @@ class MatchOfficials {
 
   final String fixtureId;
   final Map<OfficialPlace, AppointedOfficial> places;
+
+  /// 3.5b: uid → why they can't make it (they press Can't make it; the FA
+  /// is told and appoints someone else). Only people still appointed.
+  final Map<String, String> cantMake;
 
   AppointedOfficial? operator [](OfficialPlace place) => places[place];
 
@@ -87,7 +95,15 @@ class MatchOfficials {
         if (key != place && value.uid != who?.uid) key: value,
     };
     if (who != null) next[place] = who;
-    return MatchOfficials(fixtureId: fixtureId, places: next);
+    final ids = {for (final o in next.values) o.uid};
+    return MatchOfficials(
+      fixtureId: fixtureId,
+      places: next,
+      cantMake: {
+        for (final MapEntry(:key, :value) in cantMake.entries)
+          if (ids.contains(key)) key: value,
+      },
+    );
   }
 
   /// Whether the clubs of [f] may see the officials at [now].
@@ -104,14 +120,26 @@ class MatchOfficials {
         key.name: value.toMap(),
     },
     'officialIds': [for (final o in places.values) o.uid],
+    if (cantMake.isNotEmpty)
+      'cantMake': {
+        for (final MapEntry(:key, :value) in cantMake.entries)
+          key: {'reason': value},
+      },
     'updatedBy': by,
     'updatedAt': FieldValue.serverTimestamp(),
   };
 
   static MatchOfficials fromMap(String id, Map<String, dynamic>? data) {
     final raw = data?['officials'];
+    final cant = data?['cantMake'];
     return MatchOfficials(
       fixtureId: id,
+      cantMake: {
+        if (cant is Map)
+          for (final e in cant.entries)
+            if (e.value is Map && (e.value as Map)['reason'] is String)
+              e.key.toString(): (e.value as Map)['reason'] as String,
+      },
       places: {
         if (raw is Map)
           for (final e in raw.entries)
@@ -185,4 +213,58 @@ String appointmentLine(Fixture f) {
     if (when != null) '${formatShortDate(when)}, ${formatTime(when)}',
     f.venue,
   ].join(', ');
+}
+
+/// One of my appointments (3.5b): the match, my place, everyone in it.
+typedef Appointment = ({
+  Fixture match,
+  OfficialPlace place,
+  MatchOfficials officials,
+});
+
+/// [uid]'s appointments ([mine], by match ID) with their matches: coming
+/// up (in kick-off order, postponed ones without a date last) and played
+/// (newest first). Cancelled matches are left out.
+({List<Appointment> upcoming, List<Appointment> played}) appointmentsOf(
+  String uid,
+  Map<String, MatchOfficials> mine,
+  List<Fixture> fixtures,
+  DateTime now,
+) {
+  final upcoming = <Appointment>[];
+  final played = <Appointment>[];
+  for (final f in fixtures) {
+    final o = mine[f.id];
+    final place = o?.placeOf(uid);
+    if (o == null || place == null || f.isCancelled) continue;
+    (f.isPlayed(now) ? played : upcoming).add((
+      match: f,
+      place: place,
+      officials: o,
+    ));
+  }
+  int byKickoff(Appointment a, Appointment b) {
+    final ta = a.match.kickoffAt, tb = b.match.kickoffAt;
+    if (ta == null || tb == null) return ta == null ? 1 : -1;
+    return ta.compareTo(tb);
+  }
+
+  upcoming.sort(byKickoff);
+  played.sort((a, b) => byKickoff(b, a));
+  return (upcoming: upcoming, played: played);
+}
+
+/// "E. Owusu (A1), P. Quaye (4th), K. Arthur (Com.)": the others in the
+/// match.
+String othersLine(MatchOfficials o, String uid) => [
+  for (final place in OfficialPlace.values)
+    if (o[place] case final who? when who.uid != uid)
+      '${shortName(who.name)} (${place.short})',
+].join(', ');
+
+/// "Esi Owusu" → "E. Owusu"
+String shortName(String name) {
+  final parts = name.trim().split(RegExp(r'\s+'));
+  if (parts.length < 2) return name.trim();
+  return '${parts.first[0]}. ${parts.sublist(1).join(' ')}';
 }

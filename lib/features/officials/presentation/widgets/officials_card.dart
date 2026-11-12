@@ -5,6 +5,7 @@ import 'package:gedfa_connect/core/constants/user_role.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/core/widgets/app_toast.dart';
+import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/dashboard/presentation/widgets/dashboard_card.dart';
 import 'package:gedfa_connect/features/fixtures/data/fixture_repository.dart';
@@ -21,16 +22,26 @@ import 'package:gedfa_connect/features/people/domain/member.dart';
 /// - A club: the names from 24 hours before kick-off (Isaac, 11 Nov 2026);
 ///   before that, when they will show.
 class OfficialsSection extends ConsumerWidget {
-  const OfficialsSection({super.key, required this.fixture, this.isFa = false});
+  const OfficialsSection({
+    super.key,
+    required this.fixture,
+    this.isFa = false,
+    this.isOfficial = false,
+  });
 
   final Fixture fixture;
   final bool isFa;
+
+  /// An appointed referee or commissioner (3.5b, RD3): every name, theirs
+  /// marked "(you)", and Can't make it.
+  final bool isOfficial;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final f = fixture;
     final now = DateTime.now();
-    final canSee = isFa || MatchOfficials.clubsMaySee(f, now);
+    final canSee = isFa || isOfficial || MatchOfficials.clubsMaySee(f, now);
+    final myUid = ref.watch(appUserProvider).value?.uid;
     // The rules refuse a club before then: don't even ask
     final officials = canSee
         ? ref.watch(matchOfficialsProvider(f.id)).value
@@ -58,8 +69,19 @@ class OfficialsSection extends ConsumerWidget {
                   ? Icons.person_add_alt_outlined
                   : Icons.sports_rounded,
               title: place.label,
-              detail: o[place]?.name ?? 'Not appointed',
+              detail: switch (o[place]) {
+                null => 'Not appointed',
+                final who when isOfficial && who.uid == myUid =>
+                  '${who.name} (you)',
+                final who => who.name,
+              },
               muted: o[place] == null,
+              // 3.5b: the FA sees why someone can't come
+              warning: switch (o[place]) {
+                final who? when o.cantMake.containsKey(who.uid) =>
+                  "Can't make it: \"${o.cantMake[who.uid]}\"",
+                _ => null,
+              },
               trailing: !canChange
                   ? null
                   : o[place] == null
@@ -97,7 +119,13 @@ class OfficialsSection extends ConsumerWidget {
               : '${officials.count} of ${OfficialPlace.values.length}',
         ),
         DashboardCard(padding: EdgeInsets.zero, child: body),
-        if (isFa && colours.isNotEmpty)
+        if (isOfficial && myUid != null)
+          _CantMakeIt(
+            fixture: f,
+            officials: officials ?? MatchOfficials(fixtureId: f.id),
+            uid: myUid,
+          ),
+        if ((isFa || isOfficial) && colours.isNotEmpty)
           Padding(
             padding: const EdgeInsets.fromLTRB(6, 8, 6, 0),
             child: Wrap(
@@ -179,6 +207,7 @@ class OfficialLine extends StatelessWidget {
     required this.title,
     required this.detail,
     this.muted = false,
+    this.warning,
     this.trailing,
   });
 
@@ -186,6 +215,9 @@ class OfficialLine extends StatelessWidget {
   final String title;
   final String detail;
   final bool muted;
+
+  /// A red line under the name (Can't make it).
+  final String? warning;
   final Widget? trailing;
 
   @override
@@ -217,11 +249,128 @@ class OfficialLine extends StatelessWidget {
                     color: muted ? scheme.onSurfaceVariant : null,
                   ),
                 ),
+                if (warning case final w?)
+                  Text(
+                    w,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: scheme.error,
+                    ),
+                  ),
               ],
             ),
           ),
           ?trailing,
         ],
+      ),
+    );
+  }
+}
+
+/// RD3 (3.5b): "Can't make it" for the signed-in official, with why; or,
+/// once sent, what they told the FA.
+class _CantMakeIt extends ConsumerWidget {
+  const _CantMakeIt({
+    required this.fixture,
+    required this.officials,
+    required this.uid,
+  });
+
+  final Fixture fixture;
+  final MatchOfficials officials;
+  final String uid;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final f = fixture;
+    final place = officials.placeOf(uid);
+    final me = place == null ? null : officials[place];
+    if (place == null || me == null) return const SizedBox.shrink();
+    final sent = officials.cantMake[uid];
+    final scheme = Theme.of(context).colorScheme;
+    if (sent != null) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 10),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: scheme.error.withValues(alpha: .1),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Text(
+            "You told the FA you can't make it: \"$sent\". The FA will "
+            'appoint someone else; you are told when it does.',
+            style: TextStyle(fontSize: 12.5, color: scheme.error),
+          ),
+        ),
+      );
+    }
+    if (f.isCancelled || f.isPlayed(DateTime.now())) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: FilledButton.tonalIcon(
+        onPressed: () async {
+          final reason = await _askWhy(context);
+          if (reason == null || !context.mounted) return;
+          try {
+            await ref
+                .read(officialsRepositoryProvider)
+                .cantMakeIt(f, place: place, me: me, reason: reason);
+            if (context.mounted) {
+              AppToast.success(context, 'The FA has been told.');
+            }
+          } catch (error) {
+            if (context.mounted) {
+              AppToast.error(context, appErrorMessage(error));
+            }
+          }
+        },
+        icon: const Icon(Icons.event_busy_rounded),
+        label: const Text("Can't make it"),
+      ),
+    );
+  }
+
+  static Future<String?> _askWhy(BuildContext context) {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setState) {
+          final text = controller.text.trim();
+          return AlertDialog(
+            title: const Text("Can't make it?"),
+            content: TextField(
+              controller: controller,
+              autofocus: true,
+              maxLength: 200,
+              minLines: 2,
+              maxLines: 4,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(
+                labelText: 'Why? *',
+                helperText: 'The FA reads it and appoints someone else.',
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(minimumSize: const Size(88, 40)),
+                onPressed: text.length < 3
+                    ? null
+                    : () => Navigator.of(dialogContext).pop(text),
+                child: const Text('Tell the FA'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

@@ -10,7 +10,6 @@ import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/auth/presentation/login_screen.dart';
 import 'package:gedfa_connect/features/dashboard/presentation/fa_dashboard_screen.dart';
 import 'package:gedfa_connect/features/dashboard/presentation/team_dashboard_screen.dart';
-import 'package:gedfa_connect/features/home/presentation/placeholder_home.dart';
 import 'package:gedfa_connect/features/notifications/presentation/announcement_screen.dart';
 import 'package:gedfa_connect/features/notifications/presentation/compose_announcement_screen.dart';
 import 'package:gedfa_connect/features/notifications/presentation/fa_announcement_screen.dart';
@@ -38,6 +37,8 @@ import 'package:gedfa_connect/features/fixtures/presentation/season_draft_screen
 import 'package:gedfa_connect/features/fixtures/presentation/season_setup_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/team_fixtures_screen.dart';
 import 'package:gedfa_connect/features/players/domain/age_group.dart';
+import 'package:gedfa_connect/features/officials/presentation/referee_home_screen.dart';
+import 'package:gedfa_connect/features/officials/presentation/referee_matches_screen.dart';
 import 'package:gedfa_connect/features/officials/presentation/appoint_round_screen.dart';
 import 'package:gedfa_connect/features/suspensions/presentation/suspend_player_screen.dart';
 import 'package:gedfa_connect/features/suspensions/presentation/suspended_players_screen.dart';
@@ -693,12 +694,76 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
-      GoRoute(
-        path: Routes.referee,
-        builder: (_, _) => const PlaceholderHome(
-          title: 'Referee',
-          message: 'Referee home. (Coming soon)',
+      // Referee area (3.5b, RD1–RD3): Home, Matches, More
+      StatefulShellRoute.indexedStack(
+        builder: (_, state, navigationShell) => AppShell(
+          navigationShell: navigationShell,
+          destinations: refereeDestinations,
+          openedFromHome: Routes.backOf(state.uri) != null,
         ),
+        branches: [
+          // Tab 0: Home (RD1), and the bell
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: Routes.referee,
+                builder: (_, _) => const RefereeHomeScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'notifications',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (_, _) => const NotificationsScreen(),
+                    routes: [
+                      GoRoute(
+                        path: 'note/:id',
+                        parentNavigatorKey: rootNavigatorKey,
+                        builder: (_, state) => NotificationDetailsScreen(
+                          id: state.pathParameters['id']!,
+                        ),
+                      ),
+                      GoRoute(
+                        path: 'announcement/:id',
+                        parentNavigatorKey: rootNavigatorKey,
+                        builder: (_, state) => AnnouncementScreen(
+                          id: state.pathParameters['id']!,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+          // Tab 1: Matches (RD2); a match opens full-screen (RD3)
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: Routes.refereeMatches,
+                builder: (_, _) => const RefereeMatchesScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'match/:id',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (_, state) => MatchDetailsScreen(
+                      fixtureId: state.pathParameters['id']!,
+                      isOfficial: true,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          // Tab 2: More (My profile, Settings)
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: Routes.refereeMore,
+                builder: (_, _) => const MoreScreen(),
+                routes: [..._moreChildren()],
+              ),
+            ],
+          ),
+        ],
       ),
     ],
   );

@@ -184,6 +184,15 @@ class Routes {
   static String teamClubAsk(String kind) => '$teamClub/ask?kind=$kind';
   static const teamAddPayment = '/team/more/fee/add';
   static const referee = '/referee';
+
+  /// The referee's area (3.5b): Home (/referee), Matches, More; the bell.
+  static const refereeMatches = '/referee/matches';
+  static String refereeMatch(String id) => '$refereeMatches/match/$id';
+  static const refereeMore = '/referee/more';
+  static const refereeNotifications = '/referee/notifications';
+  static String refereeNote(String id) => '$refereeNotifications/note/$id';
+  static String refereeAnnouncement(String id) =>
+      '$refereeNotifications/announcement/$id';
   static const teamPlayer = '/team/player';
   static String player(String playerId) => '$teamPlayer/$playerId';
   static const addPlayer = '/team/add';

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -225,15 +227,28 @@ final notificationsRepositoryProvider =
 
 // ---------- Who am I, for notifications ----------
 
-// My notification audience: 'fa', 'team:<teamId>', or null (none yet).
+// My notification audience: 'fa', 'team:<teamId>', 'person:<uid>' (a
+// referee, 3.5b), or null (none yet).
 final myAudienceProvider = Provider<String?>((ref) {
   final user = ref.watch(appUserProvider).value;
   return switch (user?.role) {
     UserRole.faAdmin => 'fa',
     UserRole.teamAdmin when (user?.teamId ?? '').isNotEmpty =>
       'team:${user!.teamId}',
+    UserRole.referee => 'person:${user!.uid}',
     _ => null,
   };
+});
+
+/// Every audience my bell reads: my own, and for an FA official also the
+/// notes to them as a person (appointed as commissioner, 3.5b).
+final myAudienceListProvider = Provider<List<String>>((ref) {
+  final audience = ref.watch(myAudienceProvider);
+  final uid = ref.watch(appUserProvider).value?.uid;
+  return [
+    ?audience,
+    if (audience == 'fa' && uid != null) 'person:$uid',
+  ];
 });
 
 /// The announcement audiences that include me.
@@ -261,9 +276,11 @@ final myAudiencesProvider = Provider<List<Audience>>((ref) {
 
 final myNotificationsProvider =
     StreamProvider<List<AppNotification>>((ref) {
-  final audience = ref.watch(myAudienceProvider);
-  if (audience == null) return Stream.value(const []);
-  return ref.watch(notificationsRepositoryProvider).watchNotifications(audience);
+  final audiences = ref.watch(myAudienceListProvider);
+  if (audiences.isEmpty) return Stream.value(const []);
+  final repo = ref.watch(notificationsRepositoryProvider);
+  if (audiences.length == 1) return repo.watchNotifications(audiences.first);
+  return mergeNotes([for (final a in audiences) repo.watchNotifications(a)]);
 });
 
 /// FA: every announcement. Others: the ones meant for them.
@@ -338,3 +355,39 @@ final announcementSeenProvider =
     StreamProvider.family<Map<String, DateTime?>, String>((ref, id) {
   return ref.watch(notificationsRepositoryProvider).watchSeen(id);
 });
+
+/// Several audiences' notes as one list, newest first: a new list each time
+/// any of them changes, once every one has sent its first.
+Stream<List<AppNotification>> mergeNotes(
+  List<Stream<List<AppNotification>>> streams,
+) {
+  final latest = List<List<AppNotification>?>.filled(streams.length, null);
+  final subscriptions = <StreamSubscription<List<AppNotification>>>[];
+  late final StreamController<List<AppNotification>> controller;
+  controller = StreamController(
+    onListen: () {
+      for (final (i, stream) in streams.indexed) {
+        subscriptions.add(
+          stream.listen((notes) {
+            latest[i] = notes;
+            if (latest.every((l) => l != null)) {
+              final all = [for (final l in latest) ...l!]
+                ..sort(
+                  (a, b) => (b.updatedAt ?? DateTime(2000)).compareTo(
+                    a.updatedAt ?? DateTime(2000),
+                  ),
+                );
+              controller.add(all);
+            }
+          }, onError: controller.addError),
+        );
+      }
+    },
+    onCancel: () async {
+      for (final s in subscriptions) {
+        await s.cancel();
+      }
+    },
+  );
+  return controller.stream;
+}

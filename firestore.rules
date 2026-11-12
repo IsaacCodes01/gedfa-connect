@@ -39,6 +39,11 @@ service cloud.firestore {
         return /databases/$(database)/documents/districts/$(districtId)/teamRequests/$(uid);
       }
 
+      // A match's officials (3.5a); here because the bell's rules use it
+      function fixtureOfficialDoc(fixtureId) {
+        return /databases/$(database)/documents/districts/$(districtId)/fixtureOfficials/$(fixtureId);
+      }
+
       function userDoc(uid) {
         return /databases/$(database)/documents/districts/$(districtId)/users/$(uid);
       }
@@ -484,7 +489,7 @@ service cloud.firestore {
                            'fixtureAdded', 'fixtureChanged', 'fixturePostponed',
                            'fixtureCancelled', 'divisionJuveniles',
                            'playerSuspended', 'playerSuspensionLifted',
-                           'appointed', 'appointmentRemoved']
+                           'appointed', 'appointmentRemoved', 'cantMakeIt']
           // What the note's button opens (3.1e1: a player)
           && isOptionalText(data, 'targetId', 60)
           && data.teamId is string
@@ -504,7 +509,12 @@ service cloud.firestore {
                                 'changeRequested', 'correctionSentBack',
                                 'divisionJuveniles']
                   && isTeamAdminOf(data.teamId))
-              || data.kind in ['teamRequest', 'inviteAccepted']);
+              || data.kind in ['teamRequest', 'inviteAccepted']
+              // An appointed official can't make it (3.5b): only with
+              // their own reason on the match's officials, same batch
+              || (data.kind == 'cantMakeIt'
+                  && getAfter(fixtureOfficialDoc(data.get('targetId', '-'))).data
+                       .get('cantMake', {}).keys().hasAny([request.auth.uid])));
       }
 
       match /notifications/{notificationId} {
@@ -1454,7 +1464,10 @@ service cloud.firestore {
         let officials = data.get('officials', null);
         let ids = data.get('officialIds', null);
         return data.keys().hasOnly(['fixtureId', 'season', 'officials', 'officialIds',
-                                    'updatedBy', 'updatedAt'])
+                                    'cantMake', 'updatedBy', 'updatedAt'])
+          // The FA keeps or clears "can't make it", only for people still in
+          && data.get('cantMake', {}) is map
+          && data.get('cantMake', {}).keys().hasOnly(data.get('officialIds', []))
           && data.fixtureId == fixtureId
           && data.season == get(fixtureDoc(fixtureId)).data.season
           && officials is map
@@ -1487,6 +1500,17 @@ service cloud.firestore {
         allow get: if isClubOfMatchSoon(fixtureId);
         allow create, update: if isFaAdmin()
           && isValidMatchOfficials(fixtureId, request.resource.data);
+
+        // 3.5b: an appointed official says they can't make it, with why
+        // (3 to 200 characters): their own line only, nothing else
+        allow update: if request.auth != null
+          && request.auth.uid in resource.data.officialIds
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['cantMake'])
+          && request.resource.data.cantMake is map
+          && request.resource.data.cantMake.diff(resource.data.get('cantMake', {}))
+               .affectedKeys().hasOnly([request.auth.uid])
+          && request.resource.data.cantMake[request.auth.uid].keys().hasOnly(['reason'])
+          && isText(request.resource.data.cantMake[request.auth.uid].get('reason', ''), 3, 200);
       }
 
       // ---------- fixtureDrafts/{draftId} (3.0b) ----------

@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.38, matches the rules after step 3.5a, the FA appoints match officials (12 Nov 2026)
+**Status:** v2.39, matches the rules after step 3.5b, the referee's area and Can't make it (12 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -585,7 +585,7 @@ Readable and writable only by FA admins. Created with `next: 2` by the very firs
 
 | Field | Notes |
 | ----- | ----- |
-| `audience` | `fa`, `team:<teamId>`, or `person:<uid>` (3.5a: a referee or FA official; FA writes only `appointed` / `appointmentRemoved`; read by that person) |
+| `audience` | `fa`, `team:<teamId>`, or `person:<uid>` (3.5a: a referee or FA official; FA writes only `appointed` / `appointmentRemoved`; read by that person). A referee's bell reads `person:<uid>`; an FA official's bell reads `fa` **and** `person:<uid>` (3.5b) |
 | `kind` | `playersApproved`, `playersRejected`, `teamApproved`, `paymentConfirmed`, `paymentNotFound`, `feeReminder`, `changeApproved`, `changeRefused`, `teamCorrected`, `correctionAsked`, `correctionDone`, `teamSuspended`, `suspensionLifted`, `fixtureAdded`, `fixtureChanged`, `fixturePostponed`, `fixtureCancelled`, `playerSuspended`, `playerSuspensionLifted` (for teams, written by the FA); `teamRequest`, `playersSubmitted`, `playersResubmitted`, `juvenileSubmitted`, `inviteAccepted`, `paymentSent`, `teamUpdated`, `changeRequested`, `correctionSentBack` (for the FA) |
 | `teamId`, `teamName` | The team concerned (`teamRequest`: the club's uid) |
 | `names` | e.g. `Kojo Arthur (GE26-0011)`, `Yaw Boateng: Jersey number #10 → #14` |
@@ -717,6 +717,7 @@ Who officiates a match (mockup `3.5-match-officials.html`, MO1–MO3). **Its own
 | `fixtureId`, `season` | string | The match (the document ID) and its season |
 | `officials` | map | Place → `{ uid, name }`. Places: `referee`, `assistant1`, `assistant2`, `fourth`, `commissioner`. Only the referee is required (Isaac); an empty place is absent |
 | `officialIds` | array | The uids of the people in `officials`, exactly, all different (one place each); a referee lists their matches with `array-contains` |
+| `cantMake` | map? | **3.5b:** uid → `{ reason }` (3–200): an appointed official can't come. Written by **that official only**, their own line, nothing else (rule on `fixtureOfficials` update), in a batch with a `cantMakeIt` note to the FA (the note's rule checks the line is there after the batch). The FA's saves keep or clear lines, only for people still appointed (`keys` ⊆ `officialIds`); appointing someone else clears it |
 | `updatedBy`, `updatedAt` | | The FA official and server time |
 
 - **Write: FA only**, the whole document each time (rule `isValidMatchOfficials`, 8 lookups): the first four places only `referee` accounts; the commissioner a referee or an FA official (Isaac, 9 Nov 2026).
@@ -978,6 +979,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 12 Nov 2026 | v2.39 (3.5b): `fixtureOfficials.cantMake` (the official's own line; the FA keeps or clears it), FA note kind `cantMakeIt` (written by the official, with `targetId` = the match). 445 rules tests. |
 | 12 Nov 2026 | v2.38 (3.5a): `fixtureOfficials/{fixtureId}` (FA only; read by the FA, the officials, the clubs from 24 h before), notification audience `person:<uid>` with kinds `appointed` / `appointmentRemoved`. Section 7: Isaac's answers on match officials. 441 rules tests. |
 | 11 Nov 2026 | v2.37 (3.1e3): Isaac: a suspended player can't play in any competition until it is served or lifted; only the matches of the competition where it was given count. Other matches in that period carry the player in `fixtures.banned` (FA's sync, no new fields or rules). 432 rules tests. |
 | 11 Nov 2026 | v2.36 (3.1e2): team sheets refuse players in the match's `banned`; a suspension's `fixtureIds` may change alone (FA, never longer than `matches`, not once lifted) when its match is postponed or cancelled, in a batch of its own before the postpone. Every notification kind has its own icon (app only). 431 rules tests. |

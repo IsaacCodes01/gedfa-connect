@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:gedfa_connect/app/routes.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
@@ -137,9 +136,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
             _markRead(a.id, a.createdAt);
             // Full-screen above the bell, so ← comes back to it
             context.open(
-              isFa
-                  ? Routes.adminBellAnnouncement(a.id)
-                  : Routes.teamAnnouncement(a.id),
+              ref.read(bellPlacesProvider).announcement(a.id),
             );
           },
         ),
@@ -259,7 +256,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   /// How a note looks. A tap opens its details (3.0f), which mark it read
   /// and have the button to where it is about.
   _Item _fromNotification(AppNotification n) {
-    final isFa = n.audience == 'fa';
+    final places = ref.read(bellPlacesProvider);
     return _Item(
       id: n.id,
       look: noteTarget(n).look,
@@ -268,7 +265,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       body: n.body,
       time: n.updatedAt,
       onTap: () => context.open(
-        isFa ? Routes.adminNote(n.id) : Routes.teamNote(n.id),
+        places.note(n.id),
       ),
     );
   }

@@ -1,8 +1,65 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gedfa_connect/app/routes.dart';
+import 'package:gedfa_connect/core/constants/user_role.dart';
+import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/features/notifications/data/notifications_repository.dart';
 import 'package:go_router/go_router.dart';
+
+/// Where the bell, its notes and the matches live for each role (3.5b:
+/// referees have their own area). Like the signposts in each part of the
+/// building: same words, different rooms.
+class BellPlaces {
+  const BellPlaces({
+    required this.bell,
+    required this.note,
+    required this.announcement,
+    required this.home,
+    required this.match,
+    required this.matches,
+  });
+
+  final String bell;
+  final String Function(String id) note;
+  final String Function(String id) announcement;
+  final String home;
+
+  /// A match, and the list of my matches.
+  final String Function(String id) match;
+  final String matches;
+
+  static BellPlaces of(UserRole? role) => switch (role) {
+    UserRole.faAdmin => const BellPlaces(
+      bell: Routes.adminNotifications,
+      note: Routes.adminNote,
+      announcement: Routes.adminBellAnnouncement,
+      home: Routes.adminHome,
+      match: Routes.adminMatch,
+      matches: Routes.adminFixtures,
+    ),
+    UserRole.referee => const BellPlaces(
+      bell: Routes.refereeNotifications,
+      note: Routes.refereeNote,
+      announcement: Routes.refereeAnnouncement,
+      home: Routes.referee,
+      match: Routes.refereeMatch,
+      matches: Routes.refereeMatches,
+    ),
+    _ => const BellPlaces(
+      bell: Routes.teamNotifications,
+      note: Routes.teamNote,
+      announcement: Routes.teamAnnouncement,
+      home: Routes.teamHome,
+      match: Routes.teamMatch,
+      matches: Routes.teamFixtures,
+    ),
+  };
+}
+
+/// My [BellPlaces], from my role.
+final bellPlacesProvider = Provider<BellPlaces>((ref) {
+  return BellPlaces.of(ref.watch(appUserProvider).value?.role);
+});
 
 /// Where the bell was opened from (Home, Fixtures, a match…). The bell's ←
 /// goes back there, even after a note opened another tab and ← came back
@@ -30,8 +87,7 @@ class BellBackButton extends ConsumerWidget {
       if (origin != null) {
         context.go(origin);
       } else {
-        final isFa = ref.read(myAudienceProvider) == 'fa';
-        context.go(isFa ? Routes.adminHome : Routes.teamHome);
+        context.go(ref.read(bellPlacesProvider).home);
       }
     }
 
@@ -53,14 +109,14 @@ class NotificationBell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final unread = ref.watch(unreadCountProvider);
-    final isFa = ref.watch(myAudienceProvider) == 'fa';
+    final places = ref.watch(bellPlacesProvider);
 
     return IconButton(
       onPressed: () {
         ref
             .read(bellOriginProvider.notifier)
             .set(GoRouterState.of(context).uri.toString());
-        context.push(isFa ? Routes.adminNotifications : Routes.teamNotifications);
+        context.push(places.bell);
       },
       tooltip: unread == 0 ? 'Notifications' : 'Notifications, $unread new',
       icon: Badge(

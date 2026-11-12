@@ -5070,3 +5070,69 @@ describe('Match officials (3.5a)', () => {
     }));
   });
 });
+
+// ---------- Can't make it (3.5b) ----------
+
+describe("Can't make it (3.5b)", () => {
+  const ref = (db) => doc(db, `${D}/fixtureOfficials/f1`);
+  const REF1 = { uid: 'ref1', name: 'Ebo Quaye' };
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, `${D}/users/ref2`), { role: 'referee', name: 'Esi Owusu' });
+      await setDoc(doc(db, `${D}/fixtures/f1`), fixtureData());
+      await setDoc(ref(db), {
+        fixtureId: 'f1', season: '2026-27', officials: { referee: REF1 },
+        officialIds: ['ref1'], updatedBy: 'fa1', updatedAt: Timestamp.now(),
+      });
+    });
+  });
+
+  const note = (db, uid = 'ref1', targetId = 'f1') => ({
+    path: doc(db, `${D}/notifications/fa_cantMakeIt_all_2026-11-12`),
+    data: {
+      audience: 'fa', kind: 'cantMakeIt', teamId: '', teamName: 'Ebo Quaye',
+      names: arrayUnion('Ebo Quaye (Referee) — Royal Unique FC v Gomoa Stars. "Funeral"'),
+      count: increment(1), day: '2026-11-12', updatedAt: serverTimestamp(), targetId,
+    },
+  });
+  function cantMakeIt(db, uid = 'ref1', reason = 'Family funeral') {
+    const batch = writeBatch(db);
+    batch.update(ref(db), { [`cantMake.${uid}`]: { reason } });
+    const n = note(db, uid);
+    batch.set(n.path, n.data, { merge: true });
+    return batch.commit();
+  }
+
+  it('the appointed official says why, and the FA is told in the same batch', async () => {
+    await assertSucceeds(cantMakeIt(dbAs('ref1')));
+  });
+
+  it('only their own line, with a reason; nobody else, nothing else', async () => {
+    await assertFails(cantMakeIt(dbAs('ref2'), 'ref2'));
+    await assertFails(cantMakeIt(dbAs('ref1'), 'ref1', 'no'));
+    await assertFails(updateDoc(ref(dbAs('ref1')), { 'cantMake.ref2': { reason: 'Not me' } }));
+    await assertFails(updateDoc(ref(dbAs('ref1')), { 'cantMake.ref1': { reason: 'Ill', at: 1 } }));
+    await assertFails(updateDoc(ref(dbAs('ref1')), { 'officials.assistant1': REF1 }));
+    await assertFails(cantMakeIt(dbAs('admin1'), 'admin1'));
+  });
+
+  it('the note to the FA only comes with the reason saved', async () => {
+    const n = note(dbAs('ref1'));
+    await assertFails(setDoc(n.path, n.data, { merge: true }));
+    const other = note(dbAs('ref2'));
+    await assertFails(setDoc(other.path, other.data, { merge: true }));
+  });
+
+  it("the FA keeps it, or clears it; only for people still appointed", async () => {
+    const save = (cantMake, places = { referee: REF1 }) => setDoc(ref(dbAs('fa1')), {
+      fixtureId: 'f1', season: '2026-27', officials: places,
+      officialIds: Object.values(places).map((p) => p.uid),
+      cantMake, updatedBy: 'fa1', updatedAt: serverTimestamp(),
+    });
+    await assertSucceeds(save({ ref1: { reason: 'Family funeral' } }));
+    await assertSucceeds(save({}));
+    await assertFails(save({ ref2: { reason: 'Ill' } }));
+  });
+});

@@ -48,6 +48,7 @@ IconData noteKindIcon(NotificationKind kind) => switch (kind) {
   NotificationKind.playerSuspensionLifted => Icons.lock_open_rounded,
   NotificationKind.appointed => Icons.sports_rounded,
   NotificationKind.appointmentRemoved => Icons.person_remove_rounded,
+  NotificationKind.cantMakeIt => Icons.do_not_disturb_on_rounded,
   NotificationKind.teamRequest => Icons.shield_rounded,
   NotificationKind.playersSubmitted => Icons.person_add_alt_1_rounded,
   NotificationKind.playersResubmitted => Icons.restart_alt_rounded,
@@ -101,6 +102,10 @@ const announcementIcon = Icons.campaign_rounded;
 ({NoteLook look, String target, String button}) noteTarget(
   AppNotification n, {
   String? requestUid,
+  // Where an appointment opens: the referee's area, or the FA's for an FA
+  // official appointed as commissioner
+  String Function(String fixtureId) officialMatchRoute = Routes.refereeMatch,
+  String officialHome = Routes.refereeMatches,
 }) {
   const squad = 'Open Squad';
   const fee = 'Open Season fee';
@@ -220,12 +225,25 @@ const announcementIcon = Icons.campaign_rounded;
       ),
       _ => (NoteLook.ok, Routes.team, squad),
     },
-    // Appointments (3.5a); the referee's Matches tab comes in 3.5b
-    NotificationKind.appointed => (NoteLook.ref, Routes.referee, 'Open Home'),
+    // Appointments (3.5): the match, in the person's own area
+    NotificationKind.appointed => (
+      NoteLook.ref,
+      n.people == 1 && n.targetId != null
+          ? officialMatchRoute(n.targetId!)
+          : officialHome,
+      n.people == 1 ? 'Open the match' : 'Open my matches',
+    ),
     NotificationKind.appointmentRemoved => (
       NoteLook.no,
-      Routes.referee,
-      'Open Home',
+      officialHome,
+      'Open my matches',
+    ),
+    NotificationKind.cantMakeIt => (
+      NoteLook.no,
+      n.people == 1 && n.targetId != null
+          ? Routes.adminMatch(n.targetId!)
+          : Routes.adminFixtures,
+      n.people == 1 ? 'Open the match' : 'Open Fixtures',
     ),
   };
   return (look: look, target: target, button: button);

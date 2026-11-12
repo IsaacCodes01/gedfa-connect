@@ -19,7 +19,11 @@ class MorePaths {
   static MorePaths of(BuildContext context) {
     final location = GoRouterState.of(context).matchedLocation;
     return MorePaths._(
-      location.startsWith(Routes.admin) ? Routes.adminMore : Routes.teamMore,
+      location.startsWith(Routes.admin)
+          ? Routes.adminMore
+          : location.startsWith(Routes.referee)
+          ? Routes.refereeMore
+          : Routes.teamMore,
     );
   }
 }

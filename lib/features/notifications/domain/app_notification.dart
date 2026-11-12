@@ -39,6 +39,7 @@ enum NotificationKind {
   inviteAccepted,
   paymentSent, // a team added a payment (2.13c)
   divisionJuveniles, // a club named or removed juveniles for the Division (3.1d)
+  cantMakeIt, // an appointed official can't come (3.5b)
   registrationChanged; // an FA official opened or closed registration
 
   static NotificationKind? fromString(String? value) {
@@ -186,6 +187,10 @@ class AppNotification {
         NotificationKind.appointmentRemoved => people == 1
             ? 'Appointment taken off'
             : '$people appointments taken off',
+        // "Esi Owusu (Assistant 1) can't make it"
+        NotificationKind.cantMakeIt => people == 1
+            ? "${splitLine(names.firstOrNull ?? 'An official').$1} can't make it"
+            : "$people officials can't make it",
       };
 
   /// The short text in the bell's list ("Kojo Arthur, Nana Ofori and 2
@@ -213,7 +218,8 @@ class AppNotification {
       NotificationKind.playerSuspended ||
       NotificationKind.playerSuspensionLifted ||
       NotificationKind.appointed ||
-      NotificationKind.appointmentRemoved => people > 1,
+      NotificationKind.appointmentRemoved ||
+      NotificationKind.cantMakeIt => people > 1,
       _ => true,
     };
   }
@@ -226,6 +232,7 @@ class AppNotification {
       NotificationKind.teamRequest when people > 1 => '$people clubs',
       NotificationKind.inviteAccepted ||
       NotificationKind.registrationChanged => 'GEDFA',
+      NotificationKind.cantMakeIt when people > 1 => '$people officials',
       _ => teamName.isEmpty ? 'GEDFA' : teamName,
     };
   }
@@ -315,6 +322,10 @@ class AppNotification {
           ? '${splitLine(this.names.firstOrNull ?? '').$2} The FA took you '
                 'off this match.'
           : withNames('The FA took you off these matches.'),
+      NotificationKind.cantMakeIt => people == 1
+          ? '${splitLine(this.names.firstOrNull ?? '').$2} Appoint someone '
+                'else.'
+          : withNames('Appoint someone else in each match.'),
     };
   }
 

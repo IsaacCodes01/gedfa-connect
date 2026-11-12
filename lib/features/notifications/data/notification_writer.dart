@@ -122,6 +122,7 @@ class NotificationWriter {
     required String teamId,
     required String teamName,
     required String name,
+    String? targetId,
   }) {
     final e = _entry(
       audience: 'fa',
@@ -129,7 +130,11 @@ class NotificationWriter {
       teamId: teamId,
       teamName: teamName,
       name: name,
-      groupKey: kind == NotificationKind.teamRequest ? 'all' : null,
+      groupKey: switch (kind) {
+        NotificationKind.teamRequest || NotificationKind.cantMakeIt => 'all',
+        _ => null,
+      },
+      targetId: targetId,
     );
     batch.set(e.ref, e.data, SetOptions(merge: true));
   }

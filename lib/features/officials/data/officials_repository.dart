@@ -77,6 +77,46 @@ class OfficialsRepository {
     return batch.commit().timeout(_timeout);
   }
 
+  /// 3.5b (RD3): the person in [place] can't make it, with why. Their
+  /// reason goes on the match's officials (the FA sees it beside the
+  /// name) and a note goes to the FA, in one batch. The FA appoints
+  /// someone else (that clears it).
+  Future<void> cantMakeIt(
+    Fixture f, {
+    required OfficialPlace place,
+    required AppointedOfficial me,
+    required String reason,
+  }) {
+    final why = reason.trim();
+    final batch = _db.batch()
+      ..update(_all.doc(f.id), {
+        FieldPath(['cantMake', me.uid]): {'reason': why},
+      });
+    NotificationWriter(_db).forFaInBatch(
+      batch,
+      kind: NotificationKind.cantMakeIt,
+      teamId: '',
+      teamName: me.name,
+      targetId: f.id,
+      name:
+          '${me.name} (${place.label})${AppNotification.lineBreak}'
+          '${appointmentLine(f)}. "$why"',
+    );
+    return batch.commit().timeout(_timeout);
+  }
+
+  /// A person's own appointments (referees, and FA officials as
+  /// commissioner), by match ID.
+  Stream<Map<String, MatchOfficials>> watchMine(String uid) => _all
+      .where('officialIds', arrayContains: uid)
+      .snapshots()
+      .map(
+        (snap) => {
+          for (final doc in snap.docs)
+            doc.id: MatchOfficials.fromMap(doc.id, doc.data()),
+        },
+      );
+
   /// "You are the referee", "You are assistant 1"…
   static String youAre(OfficialPlace place) => switch (place) {
     OfficialPlace.referee => 'You are the referee',
@@ -96,6 +136,15 @@ final seasonOfficialsProvider = StreamProvider<Map<String, MatchOfficials>>((
   ref,
 ) {
   return ref.watch(officialsRepositoryProvider).watchSeason(Season.current);
+});
+
+/// The signed-in person's appointments, by match ID (3.5b).
+final myAppointmentsProvider = StreamProvider<Map<String, MatchOfficials>>((
+  ref,
+) {
+  final uid = ref.watch(appUserProvider).value?.uid;
+  if (uid == null) return Stream.value(const {});
+  return ref.watch(officialsRepositoryProvider).watchMine(uid);
 });
 
 /// One match's officials (an empty one when nobody is appointed yet).

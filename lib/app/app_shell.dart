@@ -59,6 +59,25 @@ final teamDestinations = [
 /// The FA admin's tabs. The gold numbers are things waiting for the FA.
 /// Home (the dashboard, 2.12) comes first and has no number: its
 /// "Needs you" card lists them all.
+/// The referee's tabs (3.5b, RD1): Home, Matches, More.
+final refereeDestinations = [
+  const ShellDestination(
+    icon: Icons.home_outlined,
+    selectedIcon: Icons.home_rounded,
+    label: 'Home',
+  ),
+  const ShellDestination(
+    icon: Icons.sports_outlined,
+    selectedIcon: Icons.sports_rounded,
+    label: 'Matches',
+  ),
+  const ShellDestination(
+    icon: Icons.more_horiz_rounded,
+    selectedIcon: Icons.more_horiz_rounded,
+    label: 'More',
+  ),
+];
+
 final adminDestinations = [
   const ShellDestination(
     icon: Icons.home_outlined,

@@ -33,10 +33,15 @@ class MatchDetailsScreen extends ConsumerWidget {
     super.key,
     required this.fixtureId,
     this.isFa = false,
+    this.isOfficial = false,
   });
 
   final String fixtureId;
   final bool isFa;
+
+  /// An appointed official (3.5b, RD3): the officials with Can't make it;
+  /// the team sheets open to them at the lock (3.5c).
+  final bool isOfficial;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -53,16 +58,21 @@ class MatchDetailsScreen extends ConsumerWidget {
                 message: 'It may have been removed.',
               ),
             )
-          : _Details(fixture: f, isFa: isFa),
+          : _Details(fixture: f, isFa: isFa, isOfficial: isOfficial),
     );
   }
 }
 
 class _Details extends ConsumerStatefulWidget {
-  const _Details({required this.fixture, required this.isFa});
+  const _Details({
+    required this.fixture,
+    required this.isFa,
+    this.isOfficial = false,
+  });
 
   final Fixture fixture;
   final bool isFa;
+  final bool isOfficial;
 
   @override
   ConsumerState<_Details> createState() => _DetailsState();
@@ -159,9 +169,27 @@ class _DetailsState extends ConsumerState<_Details> {
                           : 'Due ${formatShortDate(f.sheetDueAt!)}, '
                               '${formatTime(f.sheetDueAt!)}',
                     ),
-                    _Sheets(fixture: f, now: now, isFa: widget.isFa),
+                    if (widget.isOfficial)
+                      // Officials see both sheets from the lock (3.5c)
+                      DashboardCard(
+                        child: _Line(
+                          icon: Icons.lock_clock_outlined,
+                          title: 'Both team sheets',
+                          detail: f.sheetDueAt == null
+                              ? 'They open to you 1 hour before kick-off.'
+                              : 'They open to you at '
+                                    '${formatTime(f.sheetDueAt!)}, 1 hour '
+                                    'before kick-off.',
+                        ),
+                      )
+                    else
+                      _Sheets(fixture: f, now: now, isFa: widget.isFa),
                     // The FA appoints; the clubs see them 24 h before (3.5a)
-                    OfficialsSection(fixture: f, isFa: widget.isFa),
+                    OfficialsSection(
+                      fixture: f,
+                      isFa: widget.isFa,
+                      isOfficial: widget.isOfficial,
+                    ),
                   ],
                 ),
               ),

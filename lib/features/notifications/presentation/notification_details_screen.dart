@@ -5,6 +5,7 @@ import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
+import 'package:gedfa_connect/core/widgets/notification_bell.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
@@ -99,6 +100,9 @@ class _NotificationDetailsScreenState
             note,
             requestUid:
                 note.audience == 'fa' ? _requestUidOf(note.teamId) : null,
+            // An appointment opens the match in my own area (3.5b)
+            officialMatchRoute: ref.watch(bellPlacesProvider).match,
+            officialHome: ref.watch(bellPlacesProvider).matches,
           );
 
     return Scaffold(
