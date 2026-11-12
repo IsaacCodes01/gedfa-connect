@@ -276,7 +276,7 @@ Mockup `3.0-fixtures-and-sheet.html` (approved 8 Nov 2026).
   - [x] 3.6b **Check players** (MC2) for the match's commissioner, from the lock to 2 h after kick-off: `playerChecks/{fixtureId}`; Match details › "Players check · you are the commissioner" › Check players; one player at a time in shirt order (big registered photo, number, name, position · ID · usual number, Starting / Bench), Matches / Doesn't match (a note) / Absent, then on to the next; both teams; other officials may look. 458 rules tests, 376 Dart tests *(done 12 Nov 2026)*
   - [ ] 3.6c **The FA's view** (MC5) and a bell note when a player doesn't match
   - [ ] 3.6d (later) MC3: the other team sees the Division players' photos at the lock
-  - [ ] 3.3c **PDF preview on old iPhones** (iPhone 8, iOS 16: blank preview; Print and Download work). After the light refresh, before Phase 4 (Isaac)
+  - [ ] 3.3c **PDF preview on old iPhones** (iPhone 8, iOS 16: blank preview or an error, for every viewer: FA, commissioner, referee, team; Print and Download work). After the light refresh, before Phase 4 (Isaac)
   - [x] 3.3b (Isaac) **A team prints its own sheet**: Match details › "Print your team sheet" once saved (its team across the page, its captain's line; the officials' names from 24 h before). **Kits made from photos** show the shirt, shorts and socks photos stacked in the same kit box, each scaled to fit (grey kit if they can't load). 446 rules tests, 360 Dart tests *(done 12 Nov 2026)*
 - [ ] 3.4 Formation on a pitch (optional)
 

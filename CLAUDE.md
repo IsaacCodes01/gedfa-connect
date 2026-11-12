@@ -19,7 +19,7 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
    - test steps he can do himself in the app
 5. **Before every commit**, run (and show the result):
    - `flutter analyze` → must be **0 issues**
-   - `cd test/rules && npm test` → **all** rules tests pass (458 after 3.6b)
+   - `cd test/rules && npm test` → **all** rules tests pass (460 after 3.6b)
    - `flutter test` → all Dart tests pass (layout smoke tests and the kit check)
 6. **Commit after each step** with a clear message, e.g.
    `feat(teams): change requests for name, short name, logo and competitions; 250 rules tests; docs v2.12`
@@ -92,7 +92,7 @@ Build one at a time, mockup first where it says so; details are in `docs/ROADMAP
 | 5 | **3.6** Player check (✓ 3.6a photos, ✓ 3.6b Check players; next **3.6c**) | "Check players": the **commissioner only** checks each face (big photo, number, ID): Matches / Doesn't match (note) / Absent; a mismatch is **recorded** for the FA and the report, not struck off (MC2, MC5) | MC2, MC5 approved | Photos via a separate locked-down copy, Storage rules too |
 | 6 | **M1, M2** Sending and loading states | One shared look for "saving…" and loading everywhere | Yes, first | Part of the UI/UX refresh |
 | 7 | **Refresh (light)** | App icon (`flutter_launcher_icons`), splash (`flutter_native_splash`) + intro before "Get started" | Yes, first | Never mixed with feature work |
-| 7b | **3.3c** PDF preview on old iPhones | iPhone 8 (iOS 16): the preview page is blank (pdf.js legacy runs, draws nothing; likely OffscreenCanvas). Print / Download work. Fix: pdf.js without OffscreenCanvas, or on old Safari skip the preview and show "Your sheet is ready" + Open the PDF (`_PreviewUnavailable`) | — | Isaac, 12 Nov 2026: after Refresh (light), before Phase 4 |
+| 7b | **3.3c** PDF preview on old iPhones | iPhone 8 (iOS 16), every viewer (FA, commissioner, referee, team): the preview page is blank (pdf.js legacy runs, draws nothing; likely OffscreenCanvas). Print / Download work. Fix: pdf.js without OffscreenCanvas, or on old Safari skip the preview and show "Your sheet is ready" + Open the PDF (`_PreviewUnavailable`) | — | Isaac, 12 Nov 2026: after Refresh (light), before Phase 4 |
 | 8 | **Phase 4** Match reports | Referee report form (offline draft), signed sheet photo, FA approval; goals, cards, assists (4th official); **protests** (fee GH₵ 500 in League settings, chairman-editable) | Yes, first | Ask GEDFA: protest answer time, public holidays |
 | 9 | **Phase 5** Standings | Table from approved reports, **tie-breakers as the English Premier League**, top scorers, fair play, automatic suspensions from cards | Yes, first | |
 | 10 | **Push notifications** | FCM (Blaze is on), 3-day fee reminders | — | Before the pilot |

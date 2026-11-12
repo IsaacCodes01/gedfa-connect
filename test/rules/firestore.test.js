@@ -5300,6 +5300,27 @@ describe('Players check (3.6b)', () => {
     await assertSucceeds(check(dbAs('ref2')));
   });
 
+  it('before anyone is checked (no document yet) the commissioner and FA may look', async () => {
+    await seedMatch();
+    await assertSucceeds(getDoc(ref(dbAs('ref2'))));
+    await assertSucceeds(getDoc(ref(dbAs('ref1'))));
+    await assertSucceeds(getDoc(ref(dbAs('fa1'))));
+    await assertFails(getDoc(ref(dbAs('admin1'))));
+  });
+
+  it('the commissioner reads both sheets and the photos from the lock', async () => {
+    await seedMatch();
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `${D}/playerPhotos/p1`), {
+        teamId: 'royal', photoUrl: 'https://example.com/photo-1.jpg',
+        thumbUrl: 'https://example.com/thumb-1.jpg', updatedAt: Timestamp.now(),
+      });
+    });
+    await assertSucceeds(getDoc(doc(dbAs('ref2'), `${D}/teamSheets/f1_royal`)));
+    await assertSucceeds(getDoc(doc(dbAs('ref2'), `${D}/fixtureOfficials/f1`)));
+    await assertSucceeds(getDoc(doc(dbAs('ref2'), `${D}/playerPhotos/p1`)));
+  });
+
   it('read by the FA and the match officials, not by clubs or other referees', async () => {
     await seedMatch();
     await assertSucceeds(check(dbAs('ref2')));
