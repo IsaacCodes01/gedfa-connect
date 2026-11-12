@@ -131,6 +131,14 @@ class _OfficialSheetScreenState extends ConsumerState<OfficialSheetScreen> {
     }
   }
 
+  /// Share (phone) or Download (web): on an iPhone the browser opens the
+  /// PDF in its own viewer.
+  void _download() {
+    final name = _sheet?.fileName;
+    if (name == null) return;
+    _run((bytes) => Printing.sharePdf(bytes: bytes, filename: name));
+  }
+
   @override
   Widget build(BuildContext context) {
     final viewer = widget.viewer;
@@ -227,13 +235,26 @@ class _OfficialSheetScreenState extends ConsumerState<OfficialSheetScreen> {
         pdfFileName: _sheet!.fileName,
         loadingWidget: const LoadingView(),
         onError: (_, e) {
-          // The real reason too, in small print and in the console: a PDF
-          // that can't be made is a fault to report, not to retry
-          debugPrint('Team sheet PDF failed: $e');
+          debugPrint('Team sheet PDF preview failed: $e');
           final text = e.toString();
           final details = text.length > 300 ? text.substring(0, 300) : text;
-          return ErrorView(
-            message: '${appErrorMessage(e)}\n\nDetails: $details',
+          // Made but not shown: the browser can't draw the preview (older
+          // Safari, e.g. iPhone 8). The PDF is fine, so offer to open it.
+          // Not made at all: a real fault, with the reason in small print.
+          return FutureBuilder<Uint8List>(
+            future: pdf,
+            builder: (context, made) => made.hasData
+                ? _PreviewUnavailable(
+                    details: details,
+                    onOpen: _busy ? null : _download,
+                  )
+                : made.hasError
+                ? ErrorView(
+                    message:
+                        '${appErrorMessage(made.error!)}\n\nDetails: '
+                        '${made.error}',
+                  )
+                : const LoadingView(),
           );
         },
       );
@@ -278,14 +299,7 @@ class _OfficialSheetScreenState extends ConsumerState<OfficialSheetScreen> {
                     Expanded(
                       // On the web, sharing a file means downloading it
                       child: FilledButton.icon(
-                        onPressed: _busy
-                            ? null
-                            : () => _run(
-                                (bytes) => Printing.sharePdf(
-                                  bytes: bytes,
-                                  filename: sheet.fileName,
-                                ),
-                              ),
+                        onPressed: _busy ? null : _download,
                         icon: Icon(
                           kIsWeb ? Icons.download_outlined : Icons.share,
                         ),
@@ -296,6 +310,64 @@ class _OfficialSheetScreenState extends ConsumerState<OfficialSheetScreen> {
                 ),
               ),
             ),
+    );
+  }
+}
+
+/// The PDF is made but this browser can't draw the preview (older Safari,
+/// e.g. iPhone 8 / iOS 16): say so calmly and open the PDF in the
+/// browser's own viewer instead.
+class _PreviewUnavailable extends StatelessWidget {
+  const _PreviewUnavailable({required this.details, required this.onOpen});
+
+  final String details;
+  final VoidCallback? onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.picture_as_pdf_outlined,
+                size: 56,
+                color: scheme.primary,
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'Your sheet is ready',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                "This browser can't show the preview here, but the PDF "
+                'is fine. Open it to see, save or print it.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: scheme.onSurfaceVariant),
+              ),
+              const SizedBox(height: 18),
+              FilledButton.icon(
+                onPressed: onOpen,
+                icon: const Icon(Icons.open_in_new),
+                label: const Text('Open the PDF'),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'Details: $details',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
