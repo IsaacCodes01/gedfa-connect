@@ -51,6 +51,8 @@ import 'package:gedfa_connect/features/auth/presentation/verify_email_screen.dar
 import 'package:gedfa_connect/features/auth/presentation/forgot_password_screen.dart';
 import 'package:gedfa_connect/features/auth/presentation/sign_up_screen.dart';
 import 'package:gedfa_connect/features/teams/presentation/welcome_screen.dart';
+import 'package:gedfa_connect/features/onboarding/data/intro_seen.dart';
+import 'package:gedfa_connect/features/onboarding/presentation/intro_screen.dart';
 import 'package:gedfa_connect/features/teams/presentation/register_team_screen.dart';
 import 'package:gedfa_connect/features/teams/data/team_profile_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/correction_request.dart';
@@ -84,6 +86,12 @@ final routerProvider = Provider<GoRouter>((ref) {
   final refresh = ValueNotifier<int>(0);
   ref.listen(authStateProvider, (_, _) => refresh.value++);
   ref.listen(appUserProvider, (_, _) => refresh.value++);
+  ref.listen(introSeenProvider, (_, _) => refresh.value++);
+  // Someone signed in on this phone is past the intro: don't show it to
+  // them after they log out (people who had the app before R-b).
+  ref.listen(authStateProvider, (_, next) {
+    if (next.value != null) ref.read(introSeenProvider.notifier).markSeen();
+  });
 
   // The top-level navigator. Screens given this key open above the tabs.
   final rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -97,6 +105,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.startup,
         builder: (_, _) => const StartupScreen(),
+      ),
+      GoRoute(
+        path: Routes.intro,
+        builder: (_, _) => const IntroScreen(),
       ),
       GoRoute(
         path: Routes.login,
@@ -841,6 +853,14 @@ List<RouteBase> _moreChildren() => [
       ),
     ];
 
+/// Where a signed-out user may be: the intro until it has been seen on this
+/// phone, then Log in (and its Sign up / Forgot password pages). Null =
+/// stay.
+String? signedOutRedirect(String location, {required bool introSeen}) {
+  if (!introSeen) return location == Routes.intro ? null : Routes.intro;
+  return location.startsWith(Routes.login) ? null : Routes.login;
+}
+
 String? _redirect(Ref ref, String location) {
   String? goTo(String target) => location == target ? null : target;
 
@@ -850,10 +870,11 @@ String? _redirect(Ref ref, String location) {
   // 1. Still finding out who is signed in
   if (!auth.hasValue) return goTo(Routes.startup);
 
-  // 2. Nobody signed in
+  // 2. Nobody signed in: the intro the first time on this phone (R-b),
+  //    then Log in
   final authUser = auth.value;
   if (authUser == null) {
-    return location.startsWith(Routes.login) ? null : Routes.login;
+    return signedOutRedirect(location, introSeen: ref.read(introSeenProvider));
   }
 
   // 3. Email account not confirmed yet

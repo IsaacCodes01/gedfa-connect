@@ -2,6 +2,8 @@ class Routes {
   Routes._();
 
   static const startup = '/startup';
+  /// R-b: the three intro screens, once per phone, before Log in.
+  static const intro = '/intro';
   static const login = '/login';
   static const signUp = '/login/signup';
   static const forgotPassword = '/login/forgot';

@@ -174,6 +174,11 @@ Written 12 Nov 2026 (after M1, M2). Tick each box as you go; write what went wro
 - [ ] R-a Android: open the app → ✅ deep navy splash with the logo (Android 12+: in a circle), then the blue start-up screen "Gedfa Connect"
 - [ ] R-a Web (Chrome, laptop and iPhone 8): the tab says **Gedfa Connect** with the new icon; a fresh load shows the navy splash with the logo, then the start-up screen (no white flash, no stuck splash)
 - [ ] R-a Web on a phone: Add to Home screen → ✅ the icon is the GEDFA logo on blue, named Gedfa Connect; pinch-zoom still works
+- [ ] R-b A new phone / browser (Chrome: a guest or incognito window) → after the start-up screen, intro I1 "Your club" with Skip; → or swipe to I2 "Match day", then I3 "Stay in the game" with **Get started** (no Skip) → ✅ Log in
+- [ ] R-b Close and open the app again → ✅ straight to Log in, no intro
+- [ ] R-b On a fresh phone, Skip on I1 → ✅ Log in; the intro never comes back
+- [ ] R-b A phone where someone was already signed in: Log out → ✅ Log in, no intro
+- [ ] R-b Laptop (wide window): the intro is a card in the middle with ← and → · dark mode: the bottom card is dark, words readable · phone set to less motion (Android: Remove animations): the pictures don't animate
 
 ---
 
