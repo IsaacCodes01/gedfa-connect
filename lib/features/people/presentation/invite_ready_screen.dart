@@ -27,7 +27,7 @@ String inviteMessage(Invite invite) {
   final firstName = invite.name.trim().split(RegExp(r'\s+')).first;
   final expires = invite.expiresAt;
   return 'Hello $firstName, Gomoa East District FA has invited you to '
-      'GEDFA Connect as ${roleWithArticle(invite.role)}.\n\n'
+      'Gedfa Connect as ${roleWithArticle(invite.role)}.\n\n'
       '1. Open $appWebLink\n'
       '2. Create an account with ${invite.email}\n'
       '3. Tap "Accept invitation".'

@@ -35,7 +35,7 @@ class _InviteAcceptViewState extends ConsumerState<InviteAcceptView> {
     setState(() => _busy = true);
     try {
       await ref.read(peopleRepositoryProvider).accept(widget.invite, me: me);
-      if (mounted) AppToast.success(context, 'Welcome to GEDFA Connect.');
+      if (mounted) AppToast.success(context, 'Welcome to Gedfa Connect.');
       // No navigation here: the new role makes the router move us.
     } catch (error) {
       if (mounted) AppToast.error(context, appErrorMessage(error));

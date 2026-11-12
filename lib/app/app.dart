@@ -27,7 +27,7 @@ class GedfaApp extends ConsumerWidget {
     }
 
     return MaterialApp.router(
-      title: 'GEDFA Connect',
+      title: 'Gedfa Connect',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),

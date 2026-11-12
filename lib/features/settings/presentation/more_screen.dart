@@ -307,7 +307,7 @@ class _AboutTile extends ConsumerWidget {
 
     return SettingsTile(
       icon: Icons.info_outline_rounded,
-      title: 'About GEDFA Connect',
+      title: 'About Gedfa Connect',
       subtitle: subtitle,
     );
   }
@@ -364,7 +364,7 @@ class _LogOutDialog extends StatelessWidget {
     return AlertDialog(
       title: const Text('Log out?'),
       content: const Text(
-        "You'll need to log in again to use GEDFA Connect. "
+        "You'll need to log in again to use Gedfa Connect. "
         "Everything you've saved stays saved.",
       ),
       actions: [

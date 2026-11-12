@@ -23,7 +23,7 @@ void main() {
       tester,
     ) async {
       await tester.pumpWidget(app(const StartupView()));
-      expect(find.text('GEDFA Connect'), findsOneWidget);
+      expect(find.text('Gedfa Connect'), findsOneWidget);
       expect(find.text(slowLoadingText), findsNothing);
 
       await tester.pump(const Duration(seconds: 2));

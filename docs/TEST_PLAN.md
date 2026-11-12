@@ -168,6 +168,15 @@ Written 12 Nov 2026 (after M1, M2). Tick each box as you go; write what went wro
 
 ---
 
+## 15. Refresh (light)
+
+- [ ] R-a Android: install the new build → ✅ the home screen shows the round blue icon with the GEDFA logo, named **Gedfa Connect**
+- [ ] R-a Android: open the app → ✅ deep navy splash with the logo (Android 12+: in a circle), then the blue start-up screen "Gedfa Connect"
+- [ ] R-a Web (Chrome, laptop and iPhone 8): the tab says **Gedfa Connect** with the new icon; a fresh load shows the navy splash with the logo, then the start-up screen (no white flash, no stuck splash)
+- [ ] R-a Web on a phone: Add to Home screen → ✅ the icon is the GEDFA logo on blue, named Gedfa Connect; pinch-zoom still works
+
+---
+
 ## Known and accepted
 
 - iPhone 8 / old Safari: PDF preview blank (fix planned in 3.3c).

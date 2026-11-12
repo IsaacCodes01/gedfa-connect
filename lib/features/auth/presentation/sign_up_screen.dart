@@ -121,7 +121,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     try {
       await ref.read(authRepositoryProvider).signInWithGoogle();
       if (!mounted || attempt != _googleAttempt) return;
-      AppToast.success(context, 'Welcome to GEDFA Connect!');
+      AppToast.success(context, 'Welcome to Gedfa Connect!');
     } catch (error) {
       // Already stopped by the guard, or replaced by a newer attempt
       if (!mounted || attempt != _googleAttempt) return;
@@ -162,7 +162,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Join GEDFA Connect, then register your team for FA approval.',
+                'Join Gedfa Connect, then register your team for FA approval.',
                 style: textTheme.bodyMedium
                     ?.copyWith(color: scheme.onSurfaceVariant),
               ),

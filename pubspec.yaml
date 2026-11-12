@@ -1,5 +1,5 @@
 name: gedfa_connect
-description: "A new Flutter project."
+description: "Gedfa Connect, the Gomoa East District Football Association app."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -51,6 +51,7 @@ dependencies:
   web: ^1.1.1
   pdf: ^3.13.1
   printing: ^5.15.1
+  flutter_native_splash: ^2.4.8
 
 dev_dependencies:
   flutter_test:
@@ -62,11 +63,8 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
 
-# For information on the generic Dart part of this file, see the
-# following page: https://dart.dev/tools/pub/pubspec
-
-# The following section is specific to Flutter packages.
 flutter:
 
   # The following line ensures that the Material Icons font is
@@ -108,3 +106,31 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# Refresh R-a (Isaac, 12 Nov 2026): app icon = the whole GEDFA logo, small,
+# on deep blue (option B). Pictures in assets/branding/. Remake every size:
+#   dart run flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  image_path: "assets/branding/icon.png"
+  adaptive_icon_background: "assets/branding/icon_background.png"
+  adaptive_icon_foreground: "assets/branding/icon_foreground.png"
+  web:
+    generate: true
+    image_path: "assets/branding/icon.png"
+    background_color: "#0F2A4A"
+    theme_color: "#0F2A4A"
+
+# The phone's own splash, before Flutter starts (then StartupScreen):
+#   dart run flutter_native_splash:create
+flutter_native_splash:
+  color: "#0F2A4A"
+  image: assets/branding/splash.png
+  android_12:
+    color: "#0F2A4A"
+    image: assets/branding/splash_android12.png
+  web: true
+  web_image_mode: center
+  fullscreen: false

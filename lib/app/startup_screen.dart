@@ -135,7 +135,7 @@ class _StartupViewState extends State<StartupView>
                     ),
                     const SizedBox(height: 26),
                     const Text(
-                      'GEDFA Connect',
+                      'Gedfa Connect',
                       style: TextStyle(
                         color: white,
                         fontSize: 24,

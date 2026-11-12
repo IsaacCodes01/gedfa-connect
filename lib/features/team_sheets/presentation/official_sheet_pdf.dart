@@ -77,7 +77,7 @@ Future<Uint8List> officialSheetPdf(
 }) {
   final doc = pw.Document(
     title: '${s.matchLine}, ${s.title.toLowerCase()}',
-    author: 'GEDFA Connect',
+    author: 'Gedfa Connect',
   );
   doc.addPage(
     pw.Page(
@@ -135,7 +135,7 @@ Future<Uint8List> officialSheetPdf(
           pw.Spacer(),
           pw.Divider(color: _line, thickness: 0.5),
           pw.Text(
-            'GEDFA Connect · printed ${formatDateTime(printedAt)}',
+            'Gedfa Connect · printed ${formatDateTime(printedAt)}',
             style: const pw.TextStyle(fontSize: 7, color: _grey),
           ),
         ],
