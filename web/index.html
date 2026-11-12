@@ -31,6 +31,19 @@
 
   <title>gedfa_connect</title>
   <link rel="manifest" href="manifest.json">
+
+  <!--
+    Team sheet PDF preview (3.3): the `printing` package draws it with pdf.js.
+    The normal pdf.js needs Safari 17.4 or newer (Promise.withResolvers); older
+    Safari (iPhone 8 = iOS 16, older Macs) gets pdf.js's legacy build instead.
+    Keep the version the same as `printing` uses (printing 5.15.1: 6.2.108).
+  -->
+  <script>
+    if (typeof Promise.withResolvers !== 'function') {
+      window.dartPdfJsBaseUrl =
+        'https://unpkg.com/pdfjs-dist@6.2.108/legacy/build/';
+    }
+  </script>
 </head>
 <body>
   <!--
