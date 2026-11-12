@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.42, matches the rules after step 3.3b, the team sheet PDFs (12 Nov 2026)
+**Status:** v2.43, matches the rules after step 3.6a, player photos for the face check (12 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -449,6 +449,23 @@ The IDs of a team's **approved** players, one list per competition: `group` is `
   - The FA may add an approved player (repair) or take off a player who is not approved. Nobody else writes it.
 - Read: the team (its own lists; a missing list may be looked for) and the FA.
 - **Repair** (FA › More › League settings › Team sheets › Squad lists › Repair, `PlayerRepository.repairSquadLists`): adds every approved player missing from their list and takes off anyone no longer approved. Needed once for players approved before 10 Nov 2026; safe to run again.
+
+### 2.4d3 `playerPhotos/{playerId}` — registered photos for the face check (3.6a)
+
+An **approved** player's registered photo links, copied by the FA so the commissioner can check faces on match day (3.6). Only the team and the FA can read player files, and the club must not be able to swap a photo, so the FA keeps this copy (Isaac, 12 Nov 2026, option B).
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `teamId` | string | The player's team |
+| `photoUrl` | string | Exactly the player's `photoUrl` |
+| `thumbUrl` | string | Exactly the player's `thumbUrl` |
+| `updatedAt` | timestamp | Server time |
+
+- **Written by the FA only**, in the same transaction as the approval (`approve`) or screening pass (`passJuvenile`), and by **Repair**. The rules allow only the player's own links and team, and only for an approved player. The club can't write it.
+- **Read by the FA and every referee** (Isaac: all referees, not only the match's officials; juveniles too). Never by a club.
+- The photo links are Storage download links (they open the image for whoever has the link), so no Storage rule changes are needed.
+- A player sent back to pending keeps the old copy (the photo the FA approved) until approved again.
+- **Repair** (League settings › Squad lists › Repair, debug builds) also runs `PlayerRepository.repairPlayerPhotos`: copies every approved player whose copy is missing or old. Needed once for players approved before 12 Nov 2026.
 
 ### 2.4d2 `squads/{teamId}_divisionJuveniles` — juveniles in the Division (3.1d1)
 
@@ -946,6 +963,8 @@ Feed rules: never include dates of birth; player photos only if agreed with GEDF
 
 **Answered by Isaac (12 Nov 2026), match officials (3.5, mockup `3.5-match-officials.html`, approved):** (1) the clubs see who the officials are **24 hours before** kick-off (not before); (2) only the **referee** is required, the other places may stay "Not appointed"; (3) officials don't confirm: they are told, and press **Can't make it** (with a reason) if they can't come (3.5b); (4) one person may have **two matches the same day**, with a warning when kick-offs are less than 3 hours apart.
 
+**Answered by Isaac (12 Nov 2026), the face check (3.6):** the commissioner's photos come from **`playerPhotos`, written by the FA** (the club can't change them; every referee and FA official may read any registered player's photo). The check may be recorded **from the lock (1 h before kick-off) until 2 h after kick-off**. MC3 (the other team sees the Division photos) is **later**.
+
 **Answered by Isaac (11 Nov 2026), match day (mockup `3.6-match-day-check.html`, MC1–MC5, approved):** from the lock the appointed officials see both sheets **with player IDs** (3.5) and the PDF shows them (3.3). The **face check** (3.6, "Check players": big photo, shirt number for the match, name, ID; Matches / Doesn't match with a note / Absent) is done by the **commissioner only**. The **other team sees the photos at the lock for Division players; juveniles without photos** (children's photos stay with the team, the FA and the officials). A player who **doesn't match** is **recorded** for the FA and the match report, not struck off the sheet by the commissioner. Photos can't go on the sheet itself (the other team reads it): a separate copy for the match, opened at the lock to the appointed officials and the FA (and the Division photos to the other team); Storage rules must allow the images too.
 
 **Answered by GEDFA via Isaac (10 Nov 2026), fees:** the **Juvenile affiliation fee is separate from the Division one**. A club pays one Juvenile fee whatever the number of age groups it enters; a club in both competitions pays the Division fee too. There is also a **referee fee**, for the Division and for the Juvenile league. Every fee (affiliation and referee) can be paid in instalments, like the affiliation fee today, and its amount is set in League settings. Planned as its own payments step (after JA): today `settings/league.fee` and `fees/{season}_{uid}` hold one affiliation fee per club.
@@ -981,6 +1000,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 12 Nov 2026 | v2.43 (3.6a): new `playerPhotos/{playerId}` (FA writes with the approval / pass / Repair, only the player's own links; read by the FA and referees). Section 7: Isaac's answers on the face check. 452 rules tests. |
 | 12 Nov 2026 | v2.42 (3.3b): no new data. A team prints its own sheet from what it already reads (its `teamSheets` doc; `fixtureOfficials` from 24 h before); kit photos are downloaded from their saved URLs. 446 rules tests. |
 | 12 Nov 2026 | v2.41 (3.3): no new data. The official sheet PDF is made in the app from what the FA and the officials can already read (`fixtures`, both `teamSheets` with their `players` copies and IDs, `fixtureOfficials`); nothing is stored. 446 rules tests. |
 | 12 Nov 2026 | v2.40 (3.5c): `teamSheets` read by the match's appointed officials from the lock (1 h before kick-off). 446 rules tests. |

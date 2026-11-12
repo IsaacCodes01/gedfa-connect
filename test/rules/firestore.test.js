@@ -4244,6 +4244,66 @@ describe('Squad lists (3.1a1)', () => {
 
 // ---------- Juveniles in the Division (3.1d1) ----------
 
+describe('Player photos for the face check (3.6a)', () => {
+  const ref = (db, id = 'p1') => doc(db, `${D}/playerPhotos/${id}`);
+  const copy = (changes = {}) => ({
+    teamId: 'royal',
+    photoUrl: 'https://example.com/photo-1.jpg',
+    thumbUrl: 'https://example.com/thumb-1.jpg',
+    updatedAt: serverTimestamp(),
+    ...changes,
+  });
+
+  it("the FA copies an approved player's own photo links", async () => {
+    await assertSucceeds(setDoc(ref(dbAs('fa1')), copy()));
+  });
+
+  it("the copy can't hold another photo, team or extra field", async () => {
+    const db = dbAs('fa1');
+    await assertFails(setDoc(ref(db), copy({ photoUrl: 'https://example.com/someone-else.jpg' })));
+    await assertFails(setDoc(ref(db), copy({ thumbUrl: 'https://example.com/someone-else.jpg' })));
+    await assertFails(setDoc(ref(db), copy({ teamId: 'stars' })));
+    await assertFails(setDoc(ref(db), copy({ note: 'x' })));
+    await assertFails(setDoc(ref(db), without(copy(), 'thumbUrl')));
+  });
+
+  it('a pending player has no copy yet', async () => {
+    await assertFails(setDoc(ref(dbAs('fa1'), 'p3'), copy()));
+  });
+
+  it('approving a player copies the photo in the same write', async () => {
+    await seedCounter(2);
+    const db = dbAs('fa1');
+    const batch = writeBatch(db);
+    addToSquad(batch, db, 'royal_division', 'p3');
+    batch.update(doc(db, `${D}/players/p3`), {
+      status: 'approved', playerCode: `GE${YY}-0002`, approvedAt: serverTimestamp(),
+      approvedBy: 'fa1', rejectionReason: null, changes: deleteField(), updatedAt: serverTimestamp(),
+    });
+    batch.update(doc(db, COUNTER), { next: 3 });
+    batch.set(ref(db, 'p3'), copy());
+    await assertSucceeds(batch.commit());
+  });
+
+  it("a club can't write or read the copies", async () => {
+    await assertFails(setDoc(ref(dbAs('admin1')), copy()));
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(ref(context.firestore()), { ...copy(), updatedAt: Timestamp.now() });
+    });
+    await assertFails(getDoc(ref(dbAs('admin1'))));
+    await assertFails(getDoc(ref(dbAs('newbie'))));
+  });
+
+  it('the FA and referees read them; a referee writes nothing', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(ref(context.firestore()), { ...copy(), updatedAt: Timestamp.now() });
+    });
+    await assertSucceeds(getDoc(ref(dbAs('fa1'))));
+    await assertSucceeds(getDoc(ref(dbAs('ref1'))));
+    await assertFails(setDoc(ref(dbAs('ref1')), copy()));
+  });
+});
+
 describe('Juveniles in the Division (3.1d1)', () => {
   const ID = 'royal_divisionJuveniles';
   const ref = (db, id = ID) => doc(db, `${D}/squads/${id}`);

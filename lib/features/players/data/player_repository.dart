@@ -11,6 +11,7 @@ import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
 import 'package:gedfa_connect/core/constants/approval_status.dart';
 import 'package:gedfa_connect/features/notifications/data/notification_writer.dart';
 import 'package:gedfa_connect/features/notifications/domain/app_notification.dart';
+import 'package:gedfa_connect/features/players/data/player_photos.dart';
 import 'package:gedfa_connect/features/players/data/squad_list.dart';
 import 'package:gedfa_connect/features/players/domain/age_group.dart';
 import 'package:gedfa_connect/features/players/domain/player.dart';
@@ -531,6 +532,10 @@ class PlayerRepository {
           SetOptions(merge: true),
         );
       }
+      // The registered photo for the face check (3.6a), same write
+      if (playerPhotoCopy(data) case final photo?) {
+        tx.set(playerPhotoRef(_db, playerId), photo);
+      }
       return code;
     }).timeout(_timeout);
   }
@@ -704,6 +709,10 @@ class PlayerRepository {
           SetOptions(merge: true),
         );
       }
+      // The registered photo for the face check (3.6a), same write
+      if (playerPhotoCopy(data) case final photo?) {
+        tx.set(playerPhotoRef(_db, child.id), photo);
+      }
       return code;
     }).timeout(_timeout);
   }
@@ -753,6 +762,33 @@ class PlayerRepository {
             .timeout(_timeout);
         fixed++;
       }
+    }
+    return fixed;
+  }
+
+  /// FA (3.6a): copies every approved player's photo links to
+  /// `playerPhotos` where the copy is missing or old. Needed once for
+  /// players approved before 3.6 (12 Nov 2026); safe to run again.
+  /// Returns how many it fixed.
+  Future<int> repairPlayerPhotos() async {
+    final players = await _players
+        .where('status', isEqualTo: ApprovalStatus.approved.name)
+        .get()
+        .timeout(_timeout);
+    final copies = await _db
+        .collection(FirestorePaths.playerPhotos)
+        .get()
+        .timeout(_timeout);
+    final byId = {for (final c in copies.docs) c.id: c};
+
+    var fixed = 0;
+    for (final player in players.docs) {
+      final data = player.data();
+      if (isPhotoCopyUpToDate(byId[player.id], data)) continue;
+      final photo = playerPhotoCopy(data);
+      if (photo == null) continue;
+      await playerPhotoRef(_db, player.id).set(photo).timeout(_timeout);
+      fixed++;
     }
     return fixed;
   }

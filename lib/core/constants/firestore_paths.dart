@@ -78,6 +78,12 @@ class FirestorePaths {
   static String squad(String teamId, String group) =>
       '$district/squads/${teamId}_$group';
 
+  /// An approved player's registered photo links, copied by the FA (3.6a)
+  /// for the commissioner's face check.
+  static const playerPhotos = '$district/playerPhotos';
+  static String playerPhoto(String playerId) =>
+      '$district/playerPhotos/$playerId';
+
   /// All team sheets (3.1c: a team lists its own).
   static const teamSheets = '$district/teamSheets';
 

@@ -316,14 +316,17 @@ class _SquadListsTileState extends ConsumerState<_SquadListsTile> {
   Future<void> _repair() async {
     setState(() => _busy = true);
     try {
+      // Squad lists (3.1a1) and the players' photos for the face check
+      // (3.6a)
+      final players = ref.read(playerRepositoryProvider);
       final fixed =
-          await ref.read(playerRepositoryProvider).repairSquadLists();
+          await players.repairSquadLists() + await players.repairPlayerPhotos();
       if (!mounted) return;
       AppToast.success(
         context,
         fixed == 0
-            ? 'All squad lists are up to date.'
-            : 'Squad lists repaired: $fixed '
+            ? 'Squad lists and player photos are up to date.'
+            : 'Squad lists and photos repaired: $fixed '
                 '${fixed == 1 ? 'player' : 'players'} fixed.',
       );
     } catch (error) {
@@ -340,7 +343,9 @@ class _SquadListsTileState extends ConsumerState<_SquadListsTile> {
         'Squad lists',
         style: TextStyle(fontWeight: FontWeight.w600),
       ),
-      subtitle: const Text('Approved players, for team sheets'),
+      subtitle: const Text(
+        'Approved players, for team sheets and the face check',
+      ),
       trailing: _busy
           ? const SizedBox.square(
               dimension: 22,

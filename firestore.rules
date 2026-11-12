@@ -2332,6 +2332,29 @@ service cloud.firestore {
                        .get(after.changed, false) == true));
       }
 
+      // ---------- playerPhotos/{playerId} (3.6a) ----------
+      // An approved player's registered photo links, copied by the FA with
+      // the approval (or a repair). The commissioner's face check (3.6)
+      // reads them. The club can't write here, and the FA may only copy
+      // the player's own links, so nobody can put another face here.
+      // Read by the FA and every referee (Isaac, 12 Nov 2026).
+      function isPlayerPhotoCopy(playerId) {
+        let player = getAfter(playerDoc(playerId)).data;
+        let data = request.resource.data;
+        return data.keys().hasOnly(['teamId', 'photoUrl', 'thumbUrl', 'updatedAt'])
+          && data.keys().hasAll(['teamId', 'photoUrl', 'thumbUrl', 'updatedAt'])
+          && player.status == 'approved'
+          && data.teamId == player.teamId
+          && data.photoUrl == player.photoUrl
+          && data.thumbUrl == player.thumbUrl
+          && data.updatedAt == request.time;
+      }
+
+      match /playerPhotos/{playerId} {
+        allow read: if isFaAdmin() || (hasRole() && myRole() == 'referee');
+        allow create, update: if isFaAdmin() && isPlayerPhotoCopy(playerId);
+      }
+
       match /squads/{squadId} {
         // (a list not made yet doesn't exist: a team admin may look, and
         // finds nothing)
