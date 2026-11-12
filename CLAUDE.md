@@ -314,6 +314,10 @@ Build one at a time, mockup first where it says so; details are in `docs/ROADMAP
   takes the `Fixture` and writes the check + FA note (`playerMismatch`, `mismatchNoteLine`) in one batch; rules `playerCheckDoc`,
   `isMismatchJustRecorded` (defined above `canNotifyFa`). Icon `face_retouching_off_rounded`. Rules changed: Isaac deploys to dev.
   **Next: M1, M2** (shared sending and loading states, mockup first), then Refresh (light), then 3.3c.
+- **3.6 tested by Isaac** (12 Nov 2026). **Next conversation: M1, M2, mockup first** (Isaac's direction): the styled loading
+  starts at **app start-up**, when a user opens the app, with a **friendly message**; after start-up, **loading** (fetching) and
+  **submitting** (saving / sending) each get their **own messages** in the app. One shared look everywhere (replace the plain
+  `LoadingView` / spinners and the "saving…" states screen by screen). Then Refresh (light), then 3.3c.
 - Calendar backdrop (`_CalendarBackdrop` in `match_calendar_card.dart`): GEDFA logo as a one-colour watermark (its letters are white,
   so tint it with `color` + `BlendMode.srcIn`). `assets/images/gedfa_logo.png` is now committed.
 - **Plan agreed 9 Nov 2026 (deadline Thu 12 Nov, 12:30 pm; Isaac's prompts in that conversation):** next, in order:
