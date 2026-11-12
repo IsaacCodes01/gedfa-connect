@@ -142,6 +142,13 @@ class Routes {
   static String teamMatchSheet(String id, String teamId) =>
       '$teamFixtures/match/$id/sheet/$teamId';
 
+  /// The official team sheet as a PDF (3.3): the FA any time, the
+  /// appointed officials from the lock.
+  static String adminMatchPdf(String id) =>
+      '$adminFixtures/match/$id/official-sheet';
+  static String refereeMatchPdf(String id) =>
+      '$refereeMatches/match/$id/official-sheet';
+
   /// Team: the team sheet for one match (3.1a2), full screen.
   /// A team sheet; [check] opens it on the Check step ("View sheet").
   static String teamSheet(String fixtureId, {bool check = false}) =>

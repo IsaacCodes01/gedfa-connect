@@ -19,7 +19,7 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
    - test steps he can do himself in the app
 5. **Before every commit**, run (and show the result):
    - `flutter analyze` → must be **0 issues**
-   - `cd test/rules && npm test` → **all** rules tests pass (446 after 3.5c)
+   - `cd test/rules && npm test` → **all** rules tests pass (446 after 3.3)
    - `flutter test` → all Dart tests pass (layout smoke tests and the kit check)
 6. **Commit after each step** with a clear message, e.g.
    `feat(teams): change requests for name, short name, logo and competitions; 250 rules tests; docs v2.12`
@@ -88,7 +88,7 @@ Build one at a time, mockup first where it says so; details are in `docs/ROADMAP
 | ✓ | **3.2** Lock and visibility | The FA views any team sheet; the opponent from the lock | — | Done 11 Nov 2026 |
 | ✓ | **3.1e** Player suspensions | 3.1e1 suspend / lift, Suspended list, the club's rows and bell; 3.1e2 locked row on the sheet + moving a ban when a match is postponed; unique note icons | Approved | Done 11 Nov 2026. **Next: 3.5** |
 | ✓ | **3.5** Match officials + referee Home | ✓ **3.5a** the FA appoints (`fixtureOfficials`, notes to `person:<uid>`); **3.5b** referee Home, Matches, bell, Can't make it (RD1–RD3); **3.5c** officials see **both sheets from the lock, with player IDs** (MC1) | **Approved** (`3.5-match-officials.html`; MC1 in `3.6-match-day-check.html`) | Done 12 Nov 2026 (3.5a–c). **Next: 3.3**. Clubs see officials 24 h before |
-| 4 | **3.3** Official sheet as a PDF | Both teams' sheets with player IDs, kits, officials, captains' signature lines; `pdf` / `printing`; **no QR code** (Isaac) | MC4 approved | |
+| ✓ | **3.3** Official sheet as a PDF | Both teams' sheets with player IDs, kits, officials, captains' signature lines; `pdf` / `printing`; **no QR code** (Isaac) | MC4 approved | Done 12 Nov 2026. **Next: 3.6** |
 | 5 | **3.6** Player check | "Check players": the **commissioner only** checks each face (big photo, number, ID): Matches / Doesn't match (note) / Absent; a mismatch is **recorded** for the FA and the report, not struck off (MC2, MC5) | MC2, MC5 approved | Photos via a separate locked-down copy, Storage rules too |
 | 6 | **M1, M2** Sending and loading states | One shared look for "saving…" and loading everywhere | Yes, first | Part of the UI/UX refresh |
 | 7 | **Refresh (light)** | App icon (`flutter_launcher_icons`), splash (`flutter_native_splash`) + intro before "Get started" | Yes, first | Never mixed with feature work |
@@ -289,6 +289,12 @@ Build one at a time, mockup first where it says so; details are in `docs/ROADMAP
 - **Next conversation (Isaac, 12 Nov 2026): build 3.3**, the official team sheet as a PDF (mockup MC4 in `3.6-match-day-check.html`,
   approved): both teams' sheets with player IDs (`savedSheetPaper` / `SheetPlayer.code`), kits, the officials from `fixtureOfficials`,
   captains' signature lines; packages `pdf` / `printing`; **no QR code**. Before starting, check Isaac deployed the 3.5 rules to dev.
+- **3.3** done (12 Nov 2026, 446 rules tests, 358 Dart tests, no rules change): `team_sheets/domain/official_sheet.dart`
+  (`OfficialSheet.of` = what the paper says, pure and tested), `presentation/official_sheet_pdf.dart` (`officialSheetPdf`, `kitSvg`,
+  `OfficialSheetFonts` = Noto Sans from `assets/fonts/`, so it prints offline), `official_sheet_screen.dart` (`PdfPreview`, Print,
+  Share / Download on the web; `Routes.adminMatchPdf` any time, DRAFT before the lock; `Routes.refereeMatchPdf` from the lock).
+  `_OfficialSheetCard` on Match details. To look at a PDF: `OFFICIAL_SHEET_OUT=file.pdf flutter test test/official_sheet_test.dart`.
+  Next: **3.6** player check (MC2, MC5). Possible 3.3b: a team prints its own sheet (MC4 hint), if Isaac wants it.
 - Calendar backdrop (`_CalendarBackdrop` in `match_calendar_card.dart`): GEDFA logo as a one-colour watermark (its letters are white,
   so tint it with `color` + `BlendMode.srcIn`). `assets/images/gedfa_logo.png` is now committed.
 - **Plan agreed 9 Nov 2026 (deadline Thu 12 Nov, 12:30 pm; Isaac's prompts in that conversation):** next, in order:

@@ -9,6 +9,7 @@ import 'package:gedfa_connect/features/auth/domain/app_user.dart';
 import 'package:gedfa_connect/features/fixtures/data/fixture_repository.dart';
 import 'package:gedfa_connect/features/fixtures/domain/fixture.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/match_details_screen.dart';
+import 'package:gedfa_connect/features/team_sheets/presentation/official_sheet_screen.dart';
 import 'package:gedfa_connect/features/league/data/league_settings_repository.dart';
 import 'package:gedfa_connect/features/league/domain/league_settings.dart';
 import 'package:gedfa_connect/features/notifications/data/notifications_repository.dart';
@@ -256,6 +257,8 @@ void main() {
     expect(find.text('Kwame Addo (you)'), findsOneWidget);
     expect(find.text('Esi Owusu'), findsOneWidget);
     expect(find.textContaining('They open to you at'), findsOneWidget);
+    // 3.3: no official sheet before the lock
+    expect(find.text('Official team sheet'), findsNothing);
     await tester.tap(find.text("Can't make it"));
     await tester.pumpAndSettle();
     expect(find.text("Can't make it?"), findsOneWidget);
@@ -284,6 +287,31 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('CB · GE26-0104'), findsOneWidget);
     expect(tester.takeException(), isNull);
+    // 3.3 (MC4): the official sheet as a PDF, from the lock
+    expect(find.text('Official team sheet'), findsOneWidget);
+    expect(find.text('Open PDF'), findsOneWidget);
+
+    // The FA too, once a team has saved
+    await pump(
+      tester,
+      const MatchDetailsScreen(fixtureId: 'live', isFa: true),
+      const Size(360, 3200),
+      Brightness.light,
+    );
+    expect(find.text('Open PDF'), findsOneWidget);
+  });
+
+  testWidgets('3.3: the PDF waits for the lock for an official', (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      const OfficialSheetScreen(fixtureId: 'm1', isFa: false),
+      const Size(360, 800),
+      Brightness.light,
+    );
+    expect(find.text('Not yet'), findsOneWidget);
+    expect(find.text('Print'), findsNothing);
   });
 
   testWidgets("RD3 after telling the FA, and the FA's view of it", (

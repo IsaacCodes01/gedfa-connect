@@ -885,8 +885,52 @@ class _Sheets extends ConsumerWidget {
       );
     }
 
-    return DashboardCard(
+    final card = DashboardCard(
       child: Column(children: [row(f.home), row(f.away)]),
+    );
+    // The FA prints the official sheet once a team has saved (3.3)
+    final anySaved =
+        isFa &&
+        [f.home, f.away].any(
+          (side) => ref.watch(teamSheetProvider((f.id, side.id))).value != null,
+        );
+    if (!anySaved) return card;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        card,
+        const SizedBox(height: 8),
+        _OfficialSheetCard(route: Routes.adminMatchPdf(f.id), locked: locked),
+      ],
+    );
+  }
+}
+
+/// Official team sheet (3.3, MC4): opens the PDF to print or share.
+class _OfficialSheetCard extends StatelessWidget {
+  const _OfficialSheetCard({required this.route, required this.locked});
+
+  final String route;
+
+  /// Before the lock the FA's paper says DRAFT.
+  final bool locked;
+
+  @override
+  Widget build(BuildContext context) {
+    return DashboardCard(
+      onTap: () => context.open(route),
+      child: _Line(
+        icon: Icons.picture_as_pdf_outlined,
+        title: 'Official team sheet',
+        detail: locked
+            ? 'Both teams with player IDs, kits and officials · print or share'
+            : 'A draft until the lock: the teams can still change',
+        trailing: FilledButton.tonal(
+          style: _Sheets._compact,
+          onPressed: () => context.open(route),
+          child: const Text('Open PDF'),
+        ),
+      ),
     );
   }
 }
@@ -968,6 +1012,8 @@ class _OfficialSheetsState extends ConsumerState<_OfficialSheets> {
             style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
           ),
         ),
+        const SizedBox(height: 10),
+        _OfficialSheetCard(route: Routes.refereeMatchPdf(f.id), locked: true),
       ],
     );
   }
