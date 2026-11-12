@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.39, matches the rules after step 3.5b, the referee's area and Can't make it (12 Nov 2026)
+**Status:** v2.40, matches the rules after step 3.5c, officials read both team sheets from the lock (12 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -492,7 +492,7 @@ A team's sheet for one match. Saved again and again (each save replaces it) unti
 - **Lookups:** a sheet save is near the rules' limit of 10 (`exists()` and `get()` of one document count as 2; a U17 match reads 3 age lists), so the user is read with one `get` (`isSheetTeamAdmin`) and, in a U17 match, the U17 list too (a U17 sheet always has U17 players: 1 U13 + 5 U15 is fewer than 7). `settings/league` keeps `exists()` + `get()`: it may be missing (= the defaults; it is only made when an official first changes a setting).
 - **Roles (rules, 3.1b):** the captain and the goalkeeper are in `starters`; the vice-captain (if any) is in `starters` + `bench` and isn't the captain; `numbers` has exactly the picked players, every value in 1–99 (checked against a list, the rules have no loops), all different; `officials` has 2 to 7, `[0]` the team manager, `[1]` the head coach.
 - **App only:** injured or unavailable players (Profiles) are picked with a warning.
-- **Read:** the team and the FA any time; **the other team of the match from the lock** (`now + 1 h >= kickoffAt`, rule `isOpponentAfterLock`, 3.2); the match officials come with 3.5. A team may look for its sheet before making it, and **list its own sheets** (`where teamId ==` its team, 3.1c: the sheet lines on Home and Fixtures, Needs you, "Use last sheet"); never another team's.
+- **Read:** the team and the FA any time; **the other team of the match from the lock** (`now + 1 h >= kickoffAt`, rule `isOpponentAfterLock`, 3.2); **the appointed officials** (`fixtureOfficials.officialIds`) **from the lock** too (3.5c, rule `isOfficialAfterLock`, MC1: both sheets with player IDs). A team may look for its sheet before making it, and **list its own sheets** (`where teamId ==` its team, 3.1c: the sheet lines on Home and Fixtures, Needs you, "Use last sheet"); never another team's.
 
 ### 2.4a Player ID (`playerCode`)
 
@@ -979,6 +979,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 12 Nov 2026 | v2.40 (3.5c): `teamSheets` read by the match's appointed officials from the lock (1 h before kick-off). 446 rules tests. |
 | 12 Nov 2026 | v2.39 (3.5b): `fixtureOfficials.cantMake` (the official's own line; the FA keeps or clears it), FA note kind `cantMakeIt` (written by the official, with `targetId` = the match). 445 rules tests. |
 | 12 Nov 2026 | v2.38 (3.5a): `fixtureOfficials/{fixtureId}` (FA only; read by the FA, the officials, the clubs from 24 h before), notification audience `person:<uid>` with kinds `appointed` / `appointmentRemoved`. Section 7: Isaac's answers on match officials. 441 rules tests. |
 | 11 Nov 2026 | v2.37 (3.1e3): Isaac: a suspended player can't play in any competition until it is served or lifted; only the matches of the competition where it was given count. Other matches in that period carry the player in `fixtures.banned` (FA's sync, no new fields or rules). 432 rules tests. |

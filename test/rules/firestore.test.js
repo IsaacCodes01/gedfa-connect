@@ -4597,6 +4597,30 @@ describe('Team sheets (3.1a2)', () => {
     await assertFails(read(dbAs('admin2')));
   });
 
+  it('3.5c (MC1): the appointed officials read both sheets from the lock, not before; other referees never', async () => {
+    await save(dbAs('admin1'));
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, `${D}/users/ref2`), { role: 'referee', name: 'Esi Owusu' });
+      await setDoc(doc(db, `${D}/fixtureOfficials/f1`), {
+        fixtureId: 'f1', season: '2026-27',
+        officials: { referee: { uid: 'ref1', name: 'Ebo Quaye' }, commissioner: { uid: 'off1', name: 'Ama Boateng' } },
+        officialIds: ['ref1', 'off1'], updatedBy: 'fa1', updatedAt: Timestamp.now(),
+      });
+    });
+    const read = (db) => getDoc(doc(db, `${D}/teamSheets/f1_royal`));
+    // 3 days before: not yet
+    await assertFails(read(dbAs('ref1')));
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), `${D}/fixtures/f1`),
+        { kickoffAt: Timestamp.fromMillis(Date.now() + 50 * 60000) });
+    });
+    await assertSucceeds(read(dbAs('ref1')));
+    await assertFails(read(dbAs('ref2')));
+    // A referee of another match (no officials there): never
+    await assertFails(getDoc(doc(dbAs('ref1'), `${D}/teamSheets/fj_royal`)));
+  });
+
   // ----- 3.1c: a team lists its own sheets -----
 
   it('3.1c: a team lists its own sheets, never another team\'s', async () => {

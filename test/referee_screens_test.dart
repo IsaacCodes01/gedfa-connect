@@ -16,6 +16,8 @@ import 'package:gedfa_connect/features/officials/data/officials_repository.dart'
 import 'package:gedfa_connect/features/officials/domain/match_officials.dart';
 import 'package:gedfa_connect/features/officials/presentation/referee_home_screen.dart';
 import 'package:gedfa_connect/features/officials/presentation/referee_matches_screen.dart';
+import 'package:gedfa_connect/features/team_sheets/data/team_sheet_repository.dart';
+import 'package:gedfa_connect/features/team_sheets/domain/team_sheet.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/teams/domain/kit.dart';
 import 'package:gedfa_connect/features/teams/domain/kit_slot.dart';
@@ -65,7 +67,32 @@ void main() {
     match('m2', const Duration(days: 9), 'NYA', 'OJO'),
     match('m0', const Duration(days: -7), 'KWA', 'GST'),
     match('x', const Duration(days: 3), 'APC', 'AFY'),
+    // In 30 minutes: the sheets are locked (3.5c)
+    match('live', const Duration(minutes: 30), 'RUF', 'AST'),
   ];
+
+  TeamSheet sheet(String teamId, String prefix) => TeamSheet(
+    fixtureId: 'live',
+    teamId: teamId,
+    category: Competition.division,
+    starters: [for (var i = 1; i <= 11; i++) '$prefix$i'],
+    bench: ['${prefix}12'],
+    captainId: '${prefix}4',
+    goalkeeperId: '${prefix}1',
+    numbers: {for (var i = 1; i <= 12; i++) '$prefix$i': i},
+    players: {
+      for (var i = 1; i <= 12; i++)
+        '$prefix$i': SheetPlayer(
+          id: '$prefix$i',
+          name: '$teamId player $i',
+          position: 'CB',
+          usual: i,
+          code:
+              'GE26-${prefix == 'h' ? '00' : '01'}${i.toString().padLeft(2, '0')}',
+        ),
+    },
+    savedAt: DateTime(2026, 11, 12, 10),
+  );
   const me = AppointedOfficial(uid: 'r1', name: 'Kwame Addo');
   final mine = {
     'm1': const MatchOfficials(
@@ -167,6 +194,15 @@ void main() {
             ),
           ),
           unreadCountProvider.overrideWithValue(1),
+          teamSheetProvider.overrideWith(
+            (ref, key) => Stream.value(
+              key.$1 != 'live'
+                  ? null
+                  : key.$2 == 'ruf'
+                  ? sheet('ruf', 'h')
+                  : sheet('ast', 'a'),
+            ),
+          ),
           myNotificationsProvider.overrideWith((ref) => Stream.value([])),
           readMarkProvider.overrideWith(
             (ref) => Stream.value(const ReadMark()),
@@ -223,6 +259,31 @@ void main() {
     await tester.tap(find.text("Can't make it"));
     await tester.pumpAndSettle();
     expect(find.text("Can't make it?"), findsOneWidget);
+  });
+
+  testWidgets('3.5c (MC1): from the lock, both sheets with player IDs', (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      const MatchDetailsScreen(fixtureId: 'live', isOfficial: true),
+      const Size(360, 3200),
+      Brightness.light,
+      officials: {
+        ...mine,
+        'live': const MatchOfficials(
+          fixtureId: 'live',
+          places: {OfficialPlace.referee: me},
+        ),
+      },
+    );
+    // The home sheet open, with IDs; the away one a tap away
+    expect(find.text('CB · GE26-0004'), findsOneWidget);
+    expect(find.text('Open'), findsOneWidget);
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    expect(find.text('CB · GE26-0104'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets("RD3 after telling the FA, and the FA's view of it", (

@@ -9,6 +9,7 @@ import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
 import 'package:gedfa_connect/features/fixtures/data/fixture_repository.dart';
+import 'package:gedfa_connect/features/fixtures/domain/fixture.dart';
 import 'package:gedfa_connect/features/team_sheets/data/team_sheet_repository.dart';
 import 'package:gedfa_connect/features/team_sheets/domain/sheet_roles.dart';
 import 'package:gedfa_connect/features/team_sheets/domain/team_sheet.dart';
@@ -54,17 +55,6 @@ class TeamSheetViewScreen extends ConsumerWidget {
                   'has saved it.',
       );
     } else {
-      SheetPlayer line(String id) =>
-          s.players[id] ??
-          // Saved before 3.2, without copies: the shirt number only
-          SheetPlayer(
-            id: id,
-            name: 'Player (saved before names were copied)',
-            position: '',
-            usual: s.numbers[id] ?? 0,
-          );
-      final opponent = f.opponentOf(teamId).name;
-      final kickoff = f.kickoffAt;
       final due = f.sheetDueAt;
       final savedAt = s.savedAt;
       final locked = due == null || !DateTime.now().isBefore(due);
@@ -76,28 +66,7 @@ class TeamSheetViewScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                SheetPaper(
-                  title: side.name,
-                  subtitle: [
-                    'v $opponent',
-                    f.competitionLabel,
-                    if (kickoff != null)
-                      '${formatShortDate(kickoff)}, ${formatTime(kickoff)}',
-                    f.venue,
-                  ].join(' · '),
-                  kit: f.kitOf(teamId).kit,
-                  starters: [for (final id in s.starters) line(id)],
-                  bench: [for (final id in s.bench) line(id)],
-                  maxBench: 7,
-                  numbers: s.numbers,
-                  roles: SheetRoles(
-                    captainId: s.captainId,
-                    viceCaptainId: s.viceCaptainId,
-                    goalkeeperId: s.goalkeeperId,
-                  ),
-                  officials: s.officials,
-                  matchGroup: f.ageGroup,
-                ),
+                savedSheetPaper(f, s),
                 const SizedBox(height: 10),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -179,4 +148,44 @@ class _Note extends StatelessWidget {
       child: Text(text, style: const TextStyle(fontSize: 12.5)),
     );
   }
+}
+
+/// A saved sheet drawn as paper (MS5): the read-only view (3.2) and the
+/// officials' Match details from the lock (3.5c, [showIds]: MC1). Drawn
+/// from the copies on the sheet, so nobody reads the club's player files.
+Widget savedSheetPaper(Fixture f, TeamSheet s, {bool showIds = false}) {
+  SheetPlayer line(String id) =>
+      s.players[id] ??
+      // Saved before 3.2, without copies: the shirt number only
+      SheetPlayer(
+        id: id,
+        name: 'Player (saved before names were copied)',
+        position: '',
+        usual: s.numbers[id] ?? 0,
+      );
+  final side = f.home.id == s.teamId ? f.home : f.away;
+  final kickoff = f.kickoffAt;
+  return SheetPaper(
+    title: side.name,
+    subtitle: [
+      'v ${f.opponentOf(s.teamId).name}',
+      f.competitionLabel,
+      if (kickoff != null)
+        '${formatShortDate(kickoff)}, ${formatTime(kickoff)}',
+      f.venue,
+    ].join(' · '),
+    kit: f.kitOf(s.teamId).kit,
+    starters: [for (final id in s.starters) line(id)],
+    bench: [for (final id in s.bench) line(id)],
+    maxBench: 7,
+    numbers: s.numbers,
+    roles: SheetRoles(
+      captainId: s.captainId,
+      viceCaptainId: s.viceCaptainId,
+      goalkeeperId: s.goalkeeperId,
+    ),
+    officials: s.officials,
+    matchGroup: f.ageGroup,
+    showIds: showIds,
+  );
 }

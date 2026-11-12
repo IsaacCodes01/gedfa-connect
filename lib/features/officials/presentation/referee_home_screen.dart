@@ -95,8 +95,7 @@ class RefereeHomeScreen extends ConsumerWidget {
                   ),
                   subtitle: Text(
                     'You: ${a.place.label} · ${formatTime(a.match.kickoffAt!)}'
-                    ' · team sheets open at '
-                    '${formatTime(a.match.sheetDueAt!)}',
+                    '${now.isBefore(a.match.sheetDueAt!) ? ' · team sheets open at ${formatTime(a.match.sheetDueAt!)}' : ' · Team sheets are open'}',
                   ),
                   trailing: const Icon(Icons.chevron_right_rounded),
                   onTap: () => context.open(Routes.refereeMatch(a.match.id)),

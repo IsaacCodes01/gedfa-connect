@@ -17,6 +17,7 @@ import 'package:gedfa_connect/features/fixtures/presentation/widgets/fixture_act
 import 'package:gedfa_connect/features/fixtures/presentation/widgets/fixture_row.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/widgets/renamed_pill.dart';
 import 'package:gedfa_connect/features/team_sheets/data/team_sheet_repository.dart';
+import 'package:gedfa_connect/features/team_sheets/presentation/team_sheet_view_screen.dart';
 import 'package:gedfa_connect/features/officials/presentation/widgets/officials_card.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/kit_thumb.dart';
@@ -171,17 +172,7 @@ class _DetailsState extends ConsumerState<_Details> {
                     ),
                     if (widget.isOfficial)
                       // Officials see both sheets from the lock (3.5c)
-                      DashboardCard(
-                        child: _Line(
-                          icon: Icons.lock_clock_outlined,
-                          title: 'Both team sheets',
-                          detail: f.sheetDueAt == null
-                              ? 'They open to you 1 hour before kick-off.'
-                              : 'They open to you at '
-                                    '${formatTime(f.sheetDueAt!)}, 1 hour '
-                                    'before kick-off.',
-                        ),
-                      )
+                      _OfficialSheets(fixture: f, now: now)
                     else
                       _Sheets(fixture: f, now: now, isFa: widget.isFa),
                     // The FA appoints; the clubs see them 24 h before (3.5a)
@@ -896,6 +887,88 @@ class _Sheets extends ConsumerWidget {
 
     return DashboardCard(
       child: Column(children: [row(f.home), row(f.away)]),
+    );
+  }
+}
+
+/// The match officials' team sheets (3.5c, MC1). Before the lock, when
+/// they open; from the lock, both teams' sheets with each player's ID (the
+/// home one open, the away one a tap away).
+class _OfficialSheets extends ConsumerStatefulWidget {
+  const _OfficialSheets({required this.fixture, required this.now});
+
+  final Fixture fixture;
+  final DateTime now;
+
+  @override
+  ConsumerState<_OfficialSheets> createState() => _OfficialSheetsState();
+}
+
+class _OfficialSheetsState extends ConsumerState<_OfficialSheets> {
+  late final _open = <String>{widget.fixture.home.id};
+
+  @override
+  Widget build(BuildContext context) {
+    final f = widget.fixture;
+    final due = f.sheetDueAt;
+    final locked = due != null && !due.isAfter(widget.now);
+    if (!locked) {
+      return DashboardCard(
+        child: _Line(
+          icon: Icons.lock_clock_outlined,
+          title: 'Both team sheets',
+          detail: due == null
+              ? 'They open to you 1 hour before kick-off.'
+              : 'They open to you at ${formatTime(due)}, 1 hour before '
+                    'kick-off, with player IDs.',
+        ),
+      );
+    }
+    final scheme = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final side in [f.home, f.away]) ...[
+          if (side != f.home) const SizedBox(height: 8),
+          switch (ref.watch(teamSheetProvider((f.id, side.id))).value) {
+            null => DashboardCard(
+              child: _Line(
+                leading: FixtureCrest(side: side),
+                title: side.name,
+                detail: 'No sheet saved',
+              ),
+            ),
+            final sheet when _open.contains(side.id) => GestureDetector(
+              onTap: () => setState(() => _open.remove(side.id)),
+              child: savedSheetPaper(f, sheet, showIds: true),
+            ),
+            final sheet => DashboardCard(
+              onTap: () => setState(() => _open.add(side.id)),
+              child: _Line(
+                leading: FixtureCrest(side: side),
+                title: side.name,
+                detail:
+                    '${f.isHome(side.id) ? 'Home' : 'Away'} · '
+                    '${sheet.playerCount} players · locked',
+                trailing: Text(
+                  'Open',
+                  style: TextStyle(
+                    color: scheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          },
+        ],
+        Padding(
+          padding: const EdgeInsets.fromLTRB(6, 8, 6, 0),
+          child: Text(
+            'Locked ${formatTime(due)}. Tap a sheet to close it.',
+            style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+          ),
+        ),
+      ],
     );
   }
 }

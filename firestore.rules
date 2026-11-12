@@ -2496,6 +2496,17 @@ service cloud.firestore {
           && request.time + duration.value(1, 'h') >= fixture.kickoffAt;
       }
 
+      // 3.5c (MC1): an official appointed to the match (fixtureOfficials),
+      // from the lock (1 hour before kick-off): both teams' sheets
+      function isOfficialAfterLock(sheet) {
+        let fixture = get(fixtureDoc(sheet.fixtureId)).data;
+        return exists(fixtureOfficialDoc(sheet.fixtureId))
+          && get(fixtureOfficialDoc(sheet.fixtureId)).data.get('officialIds', [])
+               .hasAny([request.auth.uid])
+          && fixture.get('kickoffAt', null) != null
+          && request.time + duration.value(1, 'h') >= fixture.kickoffAt;
+      }
+
       match /teamSheets/{sheetId} {
         // The team and the FA any time; the opponent from the lock (3.2);
         // the match officials come with 3.5. A sheet not made yet doesn't
@@ -2503,7 +2514,8 @@ service cloud.firestore {
         allow read: if isFaAdmin()
           || (resource == null && isTeamAdmin())
           || isTeamAdminOf(resource.data.teamId)
-          || (request.auth != null && isOpponentAfterLock(resource.data));
+          || (request.auth != null && isOpponentAfterLock(resource.data))
+          || (request.auth != null && isOfficialAfterLock(resource.data));
         allow create: if isValidTeamSheet(sheetId, request.resource.data);
         allow update: if isValidTeamSheet(sheetId, request.resource.data)
           && request.resource.data.teamId == resource.data.teamId;

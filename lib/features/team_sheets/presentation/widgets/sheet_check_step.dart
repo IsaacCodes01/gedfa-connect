@@ -26,6 +26,7 @@ class SheetPaper extends StatelessWidget {
     required this.roles,
     required this.officials,
     this.matchGroup,
+    this.showIds = false,
   });
 
   final String title;
@@ -45,6 +46,10 @@ class SheetPaper extends StatelessWidget {
   /// The match's age group (null in a Division match): a juvenile of
   /// another group gets a pill, "U15" (DJ4).
   final AgeGroup? matchGroup;
+
+  /// The match officials' view (3.5c, MC1): each player's ID ("GE26-0004")
+  /// beside the position, to check against the player's card.
+  final bool showIds;
 
   @override
   Widget build(BuildContext context) {
@@ -100,7 +105,12 @@ class SheetPaper extends StatelessWidget {
                 ],
               ),
             ),
-            Text(p.position, style: TextStyle(fontSize: 11.5, color: muted)),
+            Text(
+              showIds && p.code != null
+                  ? '${p.position} · ${p.code}'
+                  : p.position,
+              style: TextStyle(fontSize: 11.5, color: muted),
+            ),
           ],
         ),
       );
