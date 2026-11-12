@@ -40,6 +40,7 @@ import 'package:gedfa_connect/features/teams/presentation/steps/payment_step.dar
 import 'package:gedfa_connect/features/teams/presentation/steps/review_step.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/officials_editor.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
+import 'package:gedfa_connect/core/widgets/one_line.dart';
 
 /// The steps in order (2.13: officials before kits). The last one,
 /// Review & submit, is not counted in "Step 2 of 4".
@@ -1068,7 +1069,7 @@ class _BottomBar extends StatelessWidget {
                 Expanded(
                   child: OutlinedButton(
                     onPressed: busy ? null : onBack,
-                    child: Text(backLabel),
+                    child: OneLine(Text(backLabel)),
                   ),
                 ),
                 const SizedBox(width: 12),

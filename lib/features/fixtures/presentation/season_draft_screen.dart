@@ -16,6 +16,7 @@ import 'package:gedfa_connect/features/fixtures/data/season_maker.dart';
 import 'package:gedfa_connect/features/fixtures/domain/season_plan.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/widgets/fixture_row.dart';
 import 'package:go_router/go_router.dart';
+import 'package:gedfa_connect/core/widgets/one_line.dart';
 
 /// FA: the draft season (3.0b, mockup G2). The summary, anything to look
 /// at, then every matchday. Tap a match to swap home and away or change
@@ -531,7 +532,7 @@ class _EditMatchSheetState extends State<_EditMatchSheet> {
                   child: OutlinedButton.icon(
                     onPressed: _pickDate,
                     icon: const Icon(Icons.calendar_today_outlined),
-                    label: Text(formatShortDate(_m.kickoffAt)),
+                    label: OneLine(Text(formatShortDate(_m.kickoffAt))),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -539,7 +540,7 @@ class _EditMatchSheetState extends State<_EditMatchSheet> {
                   child: OutlinedButton.icon(
                     onPressed: _pickTime,
                     icon: const Icon(Icons.schedule_outlined),
-                    label: Text(formatTime(_m.kickoffAt)),
+                    label: OneLine(Text(formatTime(_m.kickoffAt))),
                   ),
                 ),
               ],

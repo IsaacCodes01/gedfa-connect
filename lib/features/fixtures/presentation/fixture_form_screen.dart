@@ -18,6 +18,7 @@ import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/teams/domain/kit_slot.dart';
 import 'package:gedfa_connect/features/teams/domain/team.dart';
+import 'package:gedfa_connect/core/widgets/one_line.dart';
 
 /// FA: "Add one match" (mockup F2) or, with [fixtureId], "Change a match"
 /// (E1). The competition is fixed once a match exists; everything else can
@@ -437,9 +438,9 @@ class _FormState extends ConsumerState<_Form> {
                   child: OutlinedButton.icon(
                     onPressed: _pickDate,
                     icon: const Icon(Icons.calendar_today_outlined),
-                    label: Text(
+                    label: OneLine(Text(
                       _date == null ? 'Date' : formatShortDate(_date!),
-                    ),
+                    )),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -447,7 +448,7 @@ class _FormState extends ConsumerState<_Form> {
                   child: OutlinedButton.icon(
                     onPressed: _pickTime,
                     icon: const Icon(Icons.schedule_outlined),
-                    label: Text(_time.format(context)),
+                    label: OneLine(Text(_time.format(context))),
                   ),
                 ),
               ],

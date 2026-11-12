@@ -4,7 +4,7 @@ import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/core/widgets/flag_stripe.dart';
 import 'package:go_router/go_router.dart';
 
-/// The blue app bar with the Ghana flag stripe underneath.
+/// The navy app bar with the Ghana flag stripe (4 px) underneath (R-c, N1).
 ///
 /// Only frequent actions go in [actions]. Log out and dark mode live on the
 /// Settings screen, not here.

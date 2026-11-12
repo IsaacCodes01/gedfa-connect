@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:gedfa_connect/core/widgets/one_line.dart';
 
 /// Pieces shared by the FA review screens (team requests and players):
 /// check lines, detail rows, the Reject / Approve bar and the reason sheet.
@@ -182,7 +183,7 @@ class ReviewActionsBar extends StatelessWidget {
                             side: BorderSide(color: scheme.error, width: 1.5),
                             minimumSize: const Size.fromHeight(50),
                           ),
-                          child: Text(rejectLabel),
+                          child: OneLine(Text(rejectLabel)),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -209,7 +210,7 @@ class ReviewActionsBar extends StatelessWidget {
                                   ),
                                 )
                               : const Icon(Icons.check_rounded),
-                          label: Text(approveLabel),
+                          label: OneLine(Text(approveLabel)),
                         ),
                       ),
                     ],
@@ -379,7 +380,7 @@ class _ReasonSheetState extends State<ReasonSheet> {
                       style: OutlinedButton.styleFrom(
                         minimumSize: const Size.fromHeight(50),
                       ),
-                      child: const Text('Cancel'),
+                      child: const OneLine(Text('Cancel')),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -395,7 +396,7 @@ class _ReasonSheetState extends State<ReasonSheet> {
                         foregroundColor: Colors.white,
                         minimumSize: const Size.fromHeight(50),
                       ),
-                      child: Text(widget.sendLabel),
+                      child: OneLine(Text(widget.sendLabel)),
                     ),
                   ),
                 ],

@@ -24,6 +24,7 @@ import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/teams/domain/team.dart';
 import 'package:gedfa_connect/features/teams/domain/team_change.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/team_logo.dart';
+import 'package:gedfa_connect/core/widgets/one_line.dart';
 
 /// FA › Teams › Changes › one team (2.10c, mockup C): everything the team
 /// asked for, one card each (newest first). Each change is approved or
@@ -571,7 +572,7 @@ class _ChangeCard extends ConsumerWidget {
                     side: BorderSide(color: scheme.error, width: 1.5),
                     minimumSize: const Size.fromHeight(46),
                   ),
-                  child: const Text('Reject'),
+                  child: const OneLine(Text('Reject')),
                 ),
               ),
               const SizedBox(width: 10),
@@ -596,7 +597,7 @@ class _ChangeCard extends ConsumerWidget {
                             color: Colors.white,
                           ),
                         )
-                      : Text(approveLabel, textAlign: TextAlign.center),
+                      : OneLine(Text(approveLabel)),
                 ),
               ),
             ],

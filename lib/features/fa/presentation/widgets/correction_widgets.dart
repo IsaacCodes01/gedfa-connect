@@ -8,6 +8,7 @@ import 'package:gedfa_connect/features/settings/presentation/widgets/settings_wi
 import 'package:gedfa_connect/features/teams/data/team_change_repository.dart';
 import 'package:gedfa_connect/features/teams/data/team_correction_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/team_correction.dart';
+import 'package:gedfa_connect/core/widgets/one_line.dart';
 
 // FA corrections (2.11a, mockups A1, A2b, A4).
 
@@ -162,7 +163,7 @@ class SheetButtons extends StatelessWidget {
             style: OutlinedButton.styleFrom(
               minimumSize: const Size.fromHeight(50),
             ),
-            child: Text(cancelLabel),
+            child: OneLine(Text(cancelLabel)),
           ),
         ),
         const SizedBox(width: 12),
@@ -179,7 +180,7 @@ class SheetButtons extends StatelessWidget {
                     height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2.5),
                   )
-                : Text(saveLabel),
+                : OneLine(Text(saveLabel)),
           ),
         ),
       ],

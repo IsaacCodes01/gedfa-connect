@@ -9,6 +9,7 @@ import 'package:gedfa_connect/features/dashboard/presentation/widgets/team_home_
 import 'package:gedfa_connect/features/notifications/domain/announcement.dart';
 import 'package:gedfa_connect/features/payments/domain/payment.dart';
 import 'package:gedfa_connect/features/players/domain/age_group.dart';
+import 'package:gedfa_connect/core/widgets/one_line.dart';
 
 /// The team's Home, second part (TDb, mockup td-team-dashboard TD1–TD4):
 /// Squad at a glance, Season fee and From GEDFA.
@@ -270,7 +271,7 @@ class TeamFeeCard extends StatelessWidget {
                   Expanded(
                     child: FilledButton.tonal(
                       onPressed: onHistory,
-                      child: const Text('History'),
+                      child: const OneLine(Text('History')),
                     ),
                   ),
                 ],

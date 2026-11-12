@@ -13,6 +13,7 @@ import 'package:gedfa_connect/features/players/domain/player.dart';
 import 'package:gedfa_connect/features/settings/presentation/widgets/settings_widgets.dart';
 import 'package:gedfa_connect/features/suspensions/data/player_suspension_repository.dart';
 import 'package:gedfa_connect/features/suspensions/domain/player_suspension.dart';
+import 'package:gedfa_connect/core/widgets/one_line.dart';
 
 /// The suspension red: background and ink, light and dark.
 (Color, Color) banColours(BuildContext context) =>
@@ -263,7 +264,7 @@ class _LiftBanSheetState extends State<_LiftBanSheet> {
                       style: OutlinedButton.styleFrom(
                         minimumSize: const Size.fromHeight(50),
                       ),
-                      child: const Text('Cancel'),
+                      child: const OneLine(Text('Cancel')),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -276,7 +277,7 @@ class _LiftBanSheetState extends State<_LiftBanSheet> {
                         foregroundColor: Colors.white,
                         minimumSize: const Size.fromHeight(50),
                       ),
-                      child: const Text('Lift suspension'),
+                      child: const OneLine(Text('Lift suspension')),
                     ),
                   ),
                 ],

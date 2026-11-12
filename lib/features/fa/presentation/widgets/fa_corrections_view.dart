@@ -13,6 +13,7 @@ import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/correction_request.dart';
 import 'package:gedfa_connect/features/teams/domain/team.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/team_logo.dart';
+import 'package:gedfa_connect/core/widgets/one_line.dart';
 
 /// FA › Teams › Changes, at the top: corrections the FA asked for
 /// (2.11b, mockup B4). Sent back first (the FA marks them Done or asks
@@ -184,7 +185,7 @@ class _CorrectionCardState extends ConsumerState<_CorrectionCard> {
                         style: OutlinedButton.styleFrom(
                           minimumSize: const Size.fromHeight(44),
                         ),
-                        child: const Text('Ask again'),
+                        child: const OneLine(Text('Ask again')),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -206,7 +207,7 @@ class _CorrectionCardState extends ConsumerState<_CorrectionCard> {
                                   color: Colors.white,
                                 ),
                               )
-                            : const Text('Done'),
+                            : const OneLine(Text('Done')),
                       ),
                     ),
                   ],

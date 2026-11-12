@@ -17,6 +17,7 @@ import 'package:gedfa_connect/features/players/domain/age_group.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:go_router/go_router.dart';
+import 'package:gedfa_connect/core/widgets/one_line.dart';
 
 /// FA: "Make the season" (3.0b, mockup G1). Pick the teams, home and away
 /// or once, the first matchday, match days, kick-off and weeks off; the
@@ -443,14 +444,14 @@ class _SavedDraftCard extends StatelessWidget {
               Expanded(
                 child: OutlinedButton(
                   onPressed: onStartAgain,
-                  child: const Text('Start again'),
+                  child: const OneLine(Text('Start again')),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: FilledButton(
                   onPressed: onContinue,
-                  child: const Text('Continue'),
+                  child: const OneLine(Text('Continue')),
                 ),
               ),
             ],

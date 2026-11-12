@@ -15,6 +15,7 @@ import 'package:gedfa_connect/features/players/domain/player_profile.dart';
 import 'package:gedfa_connect/features/players/domain/position.dart';
 import 'package:gedfa_connect/features/settings/presentation/widgets/settings_widgets.dart';
 import 'package:go_router/go_router.dart';
+import 'package:gedfa_connect/core/widgets/one_line.dart';
 
 /// Team admin: edit a player's profile. Everything is optional and saves
 /// straight away: no FA approval, and the registration is not touched.
@@ -331,11 +332,11 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
                           child: OutlinedButton.icon(
                             onPressed: _pickDate,
                             icon: const Icon(Icons.event_outlined),
-                            label: Text(
+                            label: OneLine(Text(
                               _expectedBack == null
                                   ? 'Pick a date'
                                   : formatDate(_expectedBack!),
-                            ),
+                            )),
                           ),
                         ),
                         if (_expectedBack != null)

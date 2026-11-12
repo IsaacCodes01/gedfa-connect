@@ -8,6 +8,7 @@ import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/fixtures/data/fixture_repository.dart';
 import 'package:gedfa_connect/features/fixtures/domain/fixture.dart';
 import 'package:go_router/go_router.dart';
+import 'package:gedfa_connect/core/widgets/one_line.dart';
 
 /// FA: what can be done with a match (tapping it in the Fixtures tab):
 /// change it, see its kits, postpone it or set its new date, cancel it.
@@ -261,9 +262,9 @@ class _PostponeSheetState extends ConsumerState<_PostponeSheet> {
                     child: OutlinedButton.icon(
                       onPressed: _pickDate,
                       icon: const Icon(Icons.calendar_today_outlined),
-                      label: Text(_date == null
+                      label: OneLine(Text(_date == null
                           ? 'New date'
-                          : formatShortDate(_date!)),
+                          : formatShortDate(_date!))),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -271,7 +272,7 @@ class _PostponeSheetState extends ConsumerState<_PostponeSheet> {
                     child: OutlinedButton.icon(
                       onPressed: _pickTime,
                       icon: const Icon(Icons.schedule_outlined),
-                      label: Text(_time.format(context)),
+                      label: OneLine(Text(_time.format(context))),
                     ),
                   ),
                 ],

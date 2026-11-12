@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:gedfa_connect/core/widgets/loading.dart';
+import 'package:gedfa_connect/core/widgets/one_line.dart';
 
 /// M2: the shared look for "the app is SAVING something you did".
 /// The words say the action: "Saving…", "Sending to GEDFA…", "Suspending…".
@@ -82,7 +83,8 @@ class BusyButton extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 Flexible(
-                  child: Text(busyLabel, overflow: TextOverflow.ellipsis),
+                  // One line, a little smaller when the button is narrow
+                  child: OneLine(Text(busyLabel)),
                 ),
               ],
             )
@@ -94,7 +96,7 @@ class BusyButton extends StatelessWidget {
                   Icon(icon, size: 20),
                   const SizedBox(width: 8),
                 ],
-                Flexible(child: Text(label, overflow: TextOverflow.ellipsis)),
+                Flexible(child: OneLine(Text(label))),
               ],
             ),
     );

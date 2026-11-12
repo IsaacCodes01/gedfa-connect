@@ -21,6 +21,7 @@ import 'package:gedfa_connect/features/players/presentation/widgets/player_photo
 import 'package:gedfa_connect/features/screening/data/screening_repository.dart';
 import 'package:gedfa_connect/features/screening/domain/screening_day.dart';
 import 'package:go_router/go_router.dart';
+import 'package:gedfa_connect/core/widgets/one_line.dart';
 
 /// The ghana green of the "Pass … and next" button (board J4)
 const _passGreen = Color(0xFF006B3F);
@@ -689,7 +690,7 @@ class _DecisionBar extends StatelessWidget {
                       style: OutlinedButton.styleFrom(
                         minimumSize: const Size.fromHeight(52),
                       ),
-                      child: const Text('Skip'),
+                      child: const OneLine(Text('Skip')),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -720,12 +721,15 @@ class _DecisionBar extends StatelessWidget {
                                 color: Colors.white,
                               ),
                             )
-                          : Text(
-                              switch (decision) {
-                                _Decision.pass => 'Pass in $passLabel and next',
-                                _Decision.fix => 'Send back and next',
-                                _Decision.out => 'Not eligible and next',
-                              },
+                          : OneLine(
+                              Text(
+                                switch (decision) {
+                                  _Decision.pass =>
+                                    'Pass in $passLabel and next',
+                                  _Decision.fix => 'Send back and next',
+                                  _Decision.out => 'Not eligible and next',
+                                },
+                              ),
                             ),
                     ),
                   ),

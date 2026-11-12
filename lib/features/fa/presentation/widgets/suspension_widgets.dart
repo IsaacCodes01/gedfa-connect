@@ -6,6 +6,7 @@ import 'package:gedfa_connect/features/fa/presentation/widgets/review_widgets.da
 import 'package:gedfa_connect/features/settings/presentation/widgets/settings_widgets.dart';
 import 'package:gedfa_connect/features/teams/data/suspension_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/suspension.dart';
+import 'package:gedfa_connect/core/widgets/one_line.dart';
 
 // Suspensions (2.11c, mockups C1–C5). Chairman only.
 
@@ -271,7 +272,7 @@ class _SuspendSheetState extends State<_SuspendSheet> {
                       style: OutlinedButton.styleFrom(
                         minimumSize: const Size.fromHeight(50),
                       ),
-                      child: const Text('Cancel'),
+                      child: const OneLine(Text('Cancel')),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -287,7 +288,7 @@ class _SuspendSheetState extends State<_SuspendSheet> {
                         foregroundColor: Colors.white,
                         minimumSize: const Size.fromHeight(50),
                       ),
-                      child: const Text('Suspend'),
+                      child: const OneLine(Text('Suspend')),
                     ),
                   ),
                 ],
@@ -437,7 +438,7 @@ class _LiftSheetState extends State<_LiftSheet> {
                       style: OutlinedButton.styleFrom(
                         minimumSize: const Size.fromHeight(50),
                       ),
-                      child: const Text('Cancel'),
+                      child: const OneLine(Text('Cancel')),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -450,7 +451,7 @@ class _LiftSheetState extends State<_LiftSheet> {
                         foregroundColor: Colors.white,
                         minimumSize: const Size.fromHeight(50),
                       ),
-                      child: const Text('Lift suspension'),
+                      child: const OneLine(Text('Lift suspension')),
                     ),
                   ),
                 ],

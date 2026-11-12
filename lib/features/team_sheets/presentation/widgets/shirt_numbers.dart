@@ -4,6 +4,7 @@ import 'package:gedfa_connect/features/dashboard/presentation/widgets/dashboard_
 import 'package:gedfa_connect/features/fixtures/presentation/widgets/fixture_row.dart';
 import 'package:gedfa_connect/features/players/domain/player.dart';
 import 'package:gedfa_connect/features/team_sheets/domain/sheet_roles.dart';
+import 'package:gedfa_connect/core/widgets/one_line.dart';
 
 /// Shirt numbers for this match (3.1b, mockup MS4b): every picked player
 /// with the number they wear today. A changed number shows "usual 17" and
@@ -483,7 +484,7 @@ class _ShirtPickerState extends State<_ShirtPicker> {
                       onPressed: widget.takenBy[usual] != null
                           ? null
                           : () => Navigator.pop(context, usual),
-                      child: Text('Back to $usual'),
+                      child: OneLine(Text('Back to $usual')),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -492,7 +493,7 @@ class _ShirtPickerState extends State<_ShirtPicker> {
                       onPressed: chosen == null || taken != null
                           ? null
                           : () => Navigator.pop(context, chosen),
-                      child: Text(chosen == null ? 'Wear …' : 'Wear $chosen'),
+                      child: OneLine(Text(chosen == null ? 'Wear …' : 'Wear $chosen')),
                     ),
                   ),
                 ],

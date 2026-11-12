@@ -5,6 +5,7 @@ import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/teams/domain/kit.dart';
 import 'package:gedfa_connect/features/teams/domain/kit_slot.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/kit_thumb.dart';
+import 'package:gedfa_connect/core/widgets/one_line.dart';
 
 /// The kits of one competition: home, away, goalkeeper (+ optional).
 typedef KitSet = Map<KitSlot, Kit?>;
@@ -245,7 +246,7 @@ class _KitCard extends StatelessWidget {
                   const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
             ),
             icon: const Icon(Icons.image_outlined, size: 18),
-            label: const Text('Upload photos'),
+            label: const OneLine(Text('Upload photos')),
           ),
         ),
         const SizedBox(width: 8),
@@ -264,7 +265,7 @@ class _KitCard extends StatelessWidget {
                   const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
             ),
             icon: const Icon(Icons.edit_outlined, size: 18),
-            label: const Text('Design kit'),
+            label: const OneLine(Text('Design kit')),
           ),
         ),
       ],

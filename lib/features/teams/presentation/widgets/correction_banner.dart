@@ -8,6 +8,7 @@ import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:gedfa_connect/features/teams/data/correction_request_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/correction_request.dart';
+import 'package:gedfa_connect/core/widgets/one_line.dart';
 
 /// Team › Squad: "The FA asked you to correct" (2.11b, mockup B3). Stays
 /// until the team taps "Send back to the FA"; then a short line says the
@@ -146,7 +147,7 @@ class _CorrectionBannerState extends ConsumerState<CorrectionBanner> {
                     side: BorderSide(color: ink.withValues(alpha: 0.6)),
                     minimumSize: const Size.fromHeight(44),
                   ),
-                  child: const Text('Team profile'),
+                  child: const OneLine(Text('Team profile')),
                 ),
               ),
               const SizedBox(width: 10),
@@ -167,7 +168,7 @@ class _CorrectionBannerState extends ConsumerState<CorrectionBanner> {
                           height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2.5),
                         )
-                      : const Text('Send back to the FA'),
+                      : const OneLine(Text('Send back to the FA')),
                 ),
               ),
             ],

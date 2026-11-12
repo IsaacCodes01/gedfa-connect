@@ -180,6 +180,10 @@ Written 12 Nov 2026 (after M1, M2). Tick each box as you go; write what went wro
 - [ ] R-a2 Web: refresh on a page inside your area (e.g. Teams) → ✅ after the start-up screen you are back on that page
 - [ ] R-a2 Slow connection (Chrome DevTools › Network › Slow 3G) → ✅ the logo keeps breathing, friendly lines change, the slow note after 8 s; then on as usual
 - [ ] R-a2 Log in, Sign up, Forgot password, Welcome: navy header, the logo without a box, the 4 px stripe; dark mode too
+- [ ] R-c Every page: the top bar is **navy** with the red-gold-green stripe under it (dark mode: a deeper navy); the phone's status bar matches
+- [ ] R-c Cards are white with round corners, a thin border and a soft shadow; a dialog (e.g. Remove a player) and a bottom sheet (a match's ⋯) have round corners; filter chips are pills, a picked one has a gold edge
+- [ ] R-c Buttons side by side on the smallest phone (320 px wide, or Chrome DevTools › iPhone SE): Match details / Kits on Home, Approve / Reject on the FA's reviews, the screening decision, Suspend / Lift, the correction banner → ✅ every label on **one line**, never words stacked; a long one a little smaller
+- [ ] R-c Web: moving between pages fades (no side slide); on the phone app it still slides
 - [ ] R-b A new phone / browser (Chrome: a guest or incognito window) → after the start-up screen, intro I1 "Your club" with Skip; → or swipe to I2 "Match day", then I3 "Stay in the game" with **Get started** (no Skip) → ✅ Log in
 - [ ] R-b Close and open the app again → ✅ straight to Log in, no intro
 - [ ] R-b On a fresh phone, Skip on I1 → ✅ Log in; the intro never comes back

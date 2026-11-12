@@ -13,6 +13,7 @@ import 'package:gedfa_connect/features/fa/presentation/widgets/review_widgets.da
 import 'package:gedfa_connect/features/payments/data/payment_repository.dart';
 import 'package:gedfa_connect/features/payments/domain/payment.dart';
 import 'package:gedfa_connect/features/payments/presentation/widgets/payment_row.dart';
+import 'package:gedfa_connect/core/widgets/one_line.dart';
 
 /// The FA's green.
 ({Color ink, Color bg, Color line}) _greens(BuildContext context) =>
@@ -536,7 +537,7 @@ class _PaymentBlockState extends ConsumerState<_PaymentBlock> {
                       fontSize: 13,
                     ),
                   ),
-                  child: const Text('Payment not found'),
+                  child: const OneLine(Text('Payment not found')),
                 ),
               ),
               if (widget.onRecordCash case final onRecordCash?) ...[

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
@@ -10,6 +11,11 @@ class AppColors {
   static const brandBlue = Color(0xFF1E88E5);
   static const deepBlue = Color(0xFF1259A8);
   static const heroDark = Color(0xFF0F2A4A);
+
+  /// The app bar (R-c, N1): solid navy, a shade deeper in dark mode. The
+  /// Ghana stripe sits under it (`GedfaAppBar`).
+  static const navy = heroDark;
+  static const darkNavy = Color(0xFF081A30);
   static const ghanaRed = Color(0xFFCE1126);
   static const ghanaGold = Color(0xFFFCD116);
   static const ghanaGreen = Color(0xFF006B3F);
@@ -105,6 +111,10 @@ class AppTheme {
     );
 
     final navActive = isDark ? AppColors.darkLink : AppColors.deepBlue;
+    final cardBorder = isDark ? AppColors.darkCardBorder : AppColors.cardBorder;
+    // Buttons: a little less space at the sides, so their words fit on
+    // one line when buttons share a row (with `OneLine`)
+    const buttonPadding = EdgeInsets.symmetric(horizontal: 18);
     final navPill = isDark ? AppColors.darkNavPill : AppColors.navPill;
 
     final base = ThemeData(
@@ -134,8 +144,9 @@ class AppTheme {
         titleLarge: textTheme.titleLarge
             ?.copyWith(fontSize: 20, fontWeight: FontWeight.w600),
       ),
+      // R-c (N1): solid navy, the Ghana stripe under it in GedfaAppBar
       appBarTheme: AppBarTheme(
-        backgroundColor: isDark ? AppColors.heroDark : AppColors.brandBlue,
+        backgroundColor: isDark ? AppColors.darkNavy : AppColors.navy,
         foregroundColor: Colors.white,
         elevation: 0,
         scrolledUnderElevation: 0,
@@ -161,6 +172,7 @@ class AppTheme {
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           minimumSize: const Size.fromHeight(52),
+          padding: buttonPadding,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
@@ -173,6 +185,7 @@ class AppTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           minimumSize: const Size.fromHeight(50),
+          padding: buttonPadding,
           foregroundColor: scheme.onSurface,
           side: BorderSide(color: scheme.outline, width: 1.5),
           shape: RoundedRectangleBorder(
@@ -192,6 +205,85 @@ class AppTheme {
             fontWeight: FontWeight.w500,
           ),
         ),
+      ),
+      // R-c (R5): white cards, a soft border and shadow, round corners
+      cardTheme: CardThemeData(
+        color: scheme.surface,
+        surfaceTintColor: Colors.transparent,
+        elevation: isDark ? 0 : 1.5,
+        shadowColor: const Color(0x2E0F1B2D),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: cardBorder),
+        ),
+      ),
+      // Dialogs: round, the page's surface, Poppins titles
+      dialogTheme: DialogThemeData(
+        backgroundColor: scheme.surface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        titleTextStyle: GoogleFonts.poppins(
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          color: scheme.onSurface,
+        ),
+        contentTextStyle: GoogleFonts.poppins(
+          fontSize: 14,
+          height: 1.5,
+          color: scheme.onSurfaceVariant,
+        ),
+      ),
+      // Bottom sheets (a match's ⋯, pickers): round top corners
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: scheme.surface,
+        modalBackgroundColor: scheme.surface,
+        surfaceTintColor: Colors.transparent,
+        dragHandleColor: cardBorder,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+      ),
+      // Filter chips as pills; a picked one has a gold edge
+      chipTheme: ChipThemeData(
+        backgroundColor: scheme.surface,
+        selectedColor: navPill,
+        checkmarkColor: navActive,
+        shape: const StadiumBorder(),
+        side: WidgetStateBorderSide.resolveWith(
+          (states) => BorderSide(
+            color: states.contains(WidgetState.selected)
+                ? AppColors.ghanaGold
+                : scheme.outline,
+            width: 1.5,
+          ),
+        ),
+        labelStyle: GoogleFonts.poppins(
+          fontSize: 12.5,
+          fontWeight: FontWeight.w500,
+          color: scheme.onSurface,
+        ),
+        secondaryLabelStyle: GoogleFonts.poppins(
+          fontSize: 12.5,
+          fontWeight: FontWeight.w600,
+          color: navActive,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      ),
+      // Snack bars: dark, rounded, floating, a gold action
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: isDark ? AppColors.darkInk : AppColors.ink,
+        contentTextStyle: GoogleFonts.poppins(
+          fontSize: 13,
+          color: isDark ? AppColors.ink : Colors.white,
+        ),
+        actionTextColor: isDark ? AppColors.deepBlue : AppColors.ghanaGold,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
+        insetPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
       ),
       // "Add player" and other main actions: filled deep blue, white text
       floatingActionButtonTheme: FloatingActionButtonThemeData(
@@ -246,15 +338,49 @@ class AppTheme {
           color: scheme.onSurfaceVariant,
         ),
       ),
-      pageTransitionsTheme: const PageTransitionsTheme(
-        builders: {
-          TargetPlatform.android: CupertinoPageTransitionsBuilder(),
-          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-          TargetPlatform.windows: CupertinoPageTransitionsBuilder(),
-          TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
-          TargetPlatform.linux: CupertinoPageTransitionsBuilder(),
-        },
-      ),
+      // Phones slide; the web (laptops, and phones in a browser) fades,
+      // which feels less like a phone on a big screen (R-c)
+      pageTransitionsTheme: kIsWeb
+          ? const PageTransitionsTheme(
+              builders: {
+                TargetPlatform.android: _FadePageTransitionsBuilder(),
+                TargetPlatform.iOS: _FadePageTransitionsBuilder(),
+                TargetPlatform.windows: _FadePageTransitionsBuilder(),
+                TargetPlatform.macOS: _FadePageTransitionsBuilder(),
+                TargetPlatform.linux: _FadePageTransitionsBuilder(),
+              },
+            )
+          : const PageTransitionsTheme(
+              builders: {
+                TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+                TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+                TargetPlatform.windows: CupertinoPageTransitionsBuilder(),
+                TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+                TargetPlatform.linux: CupertinoPageTransitionsBuilder(),
+              },
+            ),
+    );
+  }
+}
+
+/// A quick fade between pages on the web (R-c).
+class _FadePageTransitionsBuilder extends PageTransitionsBuilder {
+  const _FadePageTransitionsBuilder();
+
+  @override
+  Duration get transitionDuration => const Duration(milliseconds: 220);
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    return FadeTransition(
+      opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+      child: child,
     );
   }
 }

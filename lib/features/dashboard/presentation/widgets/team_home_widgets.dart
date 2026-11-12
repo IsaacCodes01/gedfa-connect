@@ -9,6 +9,7 @@ import 'package:gedfa_connect/features/fixtures/presentation/widgets/renamed_pil
 import 'package:gedfa_connect/features/players/domain/age_group.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/kit_preview.dart';
+import 'package:gedfa_connect/core/widgets/one_line.dart';
 
 /// The team's Home (TDa, mockup td-team-dashboard TD1–TD3): its cards.
 
@@ -430,14 +431,14 @@ class _HomeNextMatchCardState extends State<HomeNextMatchCard> {
               Expanded(
                 child: FilledButton.tonal(
                   onPressed: widget.onDetails,
-                  child: const Text('Match details'),
+                  child: const OneLine(Text('Match details')),
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: FilledButton.tonal(
                   onPressed: widget.onKits,
-                  child: const Text('Kits'),
+                  child: const OneLine(Text('Kits')),
                 ),
               ),
             ],

@@ -19,6 +19,7 @@ import 'package:gedfa_connect/features/team_sheets/domain/team_sheet.dart';
 import 'package:gedfa_connect/features/team_sheets/presentation/official_sheet_pdf.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:printing/printing.dart';
+import 'package:gedfa_connect/core/widgets/one_line.dart';
 
 /// Who opened the PDF: what they may read decides what it shows.
 enum SheetViewer {
@@ -292,7 +293,7 @@ class _OfficialSheetScreenState extends ConsumerState<OfficialSheetScreen> {
                                 ),
                               ),
                         icon: const Icon(Icons.print_outlined),
-                        label: const Text('Print'),
+                        label: const OneLine(Text('Print')),
                       ),
                     ),
                     const SizedBox(width: 10),

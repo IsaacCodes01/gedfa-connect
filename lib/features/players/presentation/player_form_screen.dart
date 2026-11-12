@@ -25,6 +25,7 @@ import 'package:gedfa_connect/features/players/presentation/widgets/player_photo
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/teams/domain/team.dart';
+import 'package:gedfa_connect/core/widgets/one_line.dart';
 
 
 /// Youngest allowed age for the Division side.
@@ -979,7 +980,7 @@ class _BottomBar extends StatelessWidget {
                   Expanded(
                     child: OutlinedButton(
                       onPressed: busy ? null : onCancel,
-                      child: const Text('Cancel'),
+                      child: const OneLine(Text('Cancel')),
                     ),
                   ),
                   const SizedBox(width: 12),

@@ -9,6 +9,7 @@ import 'package:gedfa_connect/app/theme.dart';
 import 'package:gedfa_connect/core/widgets/flag_stripe.dart';
 import 'package:gedfa_connect/features/onboarding/data/intro_seen.dart';
 import 'package:gedfa_connect/features/onboarding/domain/intro_pages.dart';
+import 'package:gedfa_connect/core/widgets/one_line.dart';
 
 /// R-b: the three intro screens, shown once per phone before Log in.
 /// Skip (screens 1–2) and Get started (screen 3) both remember it and go to
@@ -506,7 +507,7 @@ class _Controls extends StatelessWidget {
                     onPressed: onStart,
                     iconAlignment: IconAlignment.end,
                     icon: const Icon(Icons.arrow_forward_rounded),
-                    label: const Text('Get started'),
+                    label: const OneLine(Text('Get started')),
                   ),
                 )
               else ...[
