@@ -7,6 +7,7 @@ import 'package:gedfa_connect/features/auth/data/auth_error_messages.dart';
 import 'package:gedfa_connect/features/auth/data/auth_repository.dart';
 import 'package:go_router/go_router.dart';
 import 'package:gedfa_connect/app/routes.dart';
+import 'package:gedfa_connect/app/startup_gate.dart';
 import 'package:gedfa_connect/features/auth/presentation/widgets/auth_widgets.dart';
 import 'package:gedfa_connect/features/auth/presentation/widgets/google_popup_guard.dart';
 
@@ -26,6 +27,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _isLoading = false;
   bool _isGoogleLoading = false;
   AutovalidateMode _autovalidateMode = AutovalidateMode.disabled;
+
+  /// RU1: arriving from the start-up screen (the logo glided up), the card
+  /// slides up. Asked once.
+  late final bool _slideCardIn = ref
+      .read(startupGateProvider.notifier)
+      .takeGlide();
 
   bool get _isBusy => _isLoading || _isGoogleLoading;
 
@@ -142,14 +149,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final scheme = Theme.of(context).colorScheme;
 
     return AuthScaffold(
-      heroHeight: 260,
-      hero: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: Image.asset(
-          'assets/images/gedfa_logo.jpg',
-          width: 240,
-          semanticLabel: 'GEDFA, Gomoa East District Football Association',
-        ),
+      heroHeight: AuthScaffold.loginHeroHeight,
+      slideCardIn: _slideCardIn,
+      // The see-through logo on the navy header, where the start-up
+      // screen's logo glides to (RU1)
+      hero: Image.asset(
+        'assets/images/gedfa_logo.png',
+        width: AuthScaffold.loginLogoWidth,
+        semanticLabel: 'GEDFA, Gomoa East District Football Association',
       ),
       card: Form(
         key: _formKey,

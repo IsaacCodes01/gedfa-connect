@@ -82,13 +82,10 @@ class WelcomeScreen extends ConsumerWidget {
     if (request == null) {
       return AuthScaffold(
         heroHeight: 250,
-        hero: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Image.asset(
-            'assets/images/gedfa_logo.jpg',
-            width: 200,
-            semanticLabel: 'GEDFA, Gomoa East District Football Association',
-          ),
+        hero: Image.asset(
+          'assets/images/gedfa_logo.png',
+          width: 200,
+          semanticLabel: 'GEDFA, Gomoa East District Football Association',
         ),
         onRefresh: refresh,
         footer: footer,

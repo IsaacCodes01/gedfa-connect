@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.48, matches the rules after step 3.6c (M1, M2 and Refresh R-a, R-b changed no Firestore data, 12 Nov 2026)
+**Status:** v2.49, matches the rules after step 3.6c (M1, M2 and Refresh R-a, R-a2, R-b changed no Firestore data, 12 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -1019,6 +1019,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 12 Nov 2026 | v2.49 (Refresh R-a2): no data or rules change; the start-up animation and the navy Log in header only. 463 rules tests. |
 | 12 Nov 2026 | v2.48 (Refresh R-b): no Firestore or rules change. On the device only (shared preferences): `introSeen` (true after Skip / Get started, or once anyone signs in on that phone or browser). 463 rules tests. |
 | 12 Nov 2026 | v2.47 (Refresh R-a): no data or rules change; app icon, the name Gedfa Connect and the splash only. 463 rules tests. |
 | 12 Nov 2026 | v2.46 (M1, M2): no data or rules change; shared loading and sending looks only. 463 rules tests. |

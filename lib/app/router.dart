@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:gedfa_connect/app/app_shell.dart';
 import 'package:gedfa_connect/app/routes.dart';
+import 'package:gedfa_connect/app/startup_gate.dart';
 import 'package:gedfa_connect/app/startup_screen.dart';
 import 'package:gedfa_connect/core/constants/user_role.dart';
 import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
@@ -87,6 +88,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   ref.listen(authStateProvider, (_, _) => refresh.value++);
   ref.listen(appUserProvider, (_, _) => refresh.value++);
   ref.listen(introSeenProvider, (_, _) => refresh.value++);
+  ref.listen(startupGateProvider, (_, _) => refresh.value++);
   // Someone signed in on this phone is past the intro: don't show it to
   // them after they log out (people who had the app before R-b).
   ref.listen(authStateProvider, (_, next) {
@@ -108,11 +110,19 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: Routes.intro,
-        builder: (_, _) => const IntroScreen(),
+        pageBuilder: (_, state) => fadeInPage(state, const IntroScreen()),
       ),
       GoRoute(
         path: Routes.login,
-        builder: (_, _) => const LoginScreen(),
+        // From the start-up screen the logo glides into Log in's header
+        // first (RU1), so Log in itself appears without a transition.
+        pageBuilder: (_, state) => fadeInPage(
+          state,
+          const LoginScreen(),
+          duration: ref.read(startupGateProvider.notifier).glideToLogin
+              ? Duration.zero
+              : const Duration(milliseconds: 300),
+        ),
         routes: [
           GoRoute(
             path: 'signup',
@@ -143,11 +153,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       // FA admin area: a shell with tabs (Home, Teams, Players, Fixtures,
       // More).
       StatefulShellRoute.indexedStack(
-        builder: (_, state, navigationShell) => AppShell(
-          navigationShell: navigationShell,
-          destinations: adminDestinations,
-          openedFromHome: Routes.isFromHome(state.uri) ||
-              Routes.backOf(state.uri) != null,
+        pageBuilder: (_, state, navigationShell) => fadeInPage(
+          state,
+          AppShell(
+            navigationShell: navigationShell,
+            destinations: adminDestinations,
+            openedFromHome: Routes.isFromHome(state.uri) ||
+                Routes.backOf(state.uri) != null,
+          ),
         ),
         branches: [
           // Tab 0: Home (the dashboard, 2.12)
@@ -525,11 +538,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Team admin area: a shell with tabs (Home, Squad, Fixtures,
       // Profiles, More).
       StatefulShellRoute.indexedStack(
-        builder: (_, state, navigationShell) => AppShell(
-          navigationShell: navigationShell,
-          destinations: teamDestinations,
-          // Opened from a note with back= (3.0f2)
-          openedFromHome: Routes.backOf(state.uri) != null,
+        pageBuilder: (_, state, navigationShell) => fadeInPage(
+          state,
+          AppShell(
+            navigationShell: navigationShell,
+            destinations: teamDestinations,
+            // Opened from a note with back= (3.0f2)
+            openedFromHome: Routes.backOf(state.uri) != null,
+          ),
         ),
         branches: [
           // Tab 0: Home (TDa)
@@ -737,10 +753,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       // Referee area (3.5b, RD1–RD3): Home, Matches, More
       StatefulShellRoute.indexedStack(
-        builder: (_, state, navigationShell) => AppShell(
-          navigationShell: navigationShell,
-          destinations: refereeDestinations,
-          openedFromHome: Routes.backOf(state.uri) != null,
+        pageBuilder: (_, state, navigationShell) => fadeInPage(
+          state,
+          AppShell(
+            navigationShell: navigationShell,
+            destinations: refereeDestinations,
+            openedFromHome: Routes.backOf(state.uri) != null,
+          ),
         ),
         branches: [
           // Tab 0: Home (RD1), and the bell
@@ -853,6 +872,25 @@ List<RouteBase> _moreChildren() => [
       ),
     ];
 
+/// R-a2: the intro, Log in and each area's tabs fade in (from the start-up
+/// screen, Log in or registration) instead of sliding.
+Page<void> fadeInPage(
+  GoRouterState state,
+  Widget child, {
+  Duration duration = const Duration(milliseconds: 450),
+}) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: duration,
+    reverseTransitionDuration: duration,
+    transitionsBuilder: (_, animation, _, child) => FadeTransition(
+      opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+      child: child,
+    ),
+  );
+}
+
 /// Where a signed-out user may be: the intro until it has been seen on this
 /// phone, then Log in (and its Sign up / Forgot password pages). Null =
 /// stay.
@@ -866,6 +904,15 @@ String? _redirect(Ref ref, String location) {
 
   final auth = ref.read(authStateProvider);
   final appUser = ref.read(appUserProvider);
+
+  // 0. The start-up screen until its gate opens (R-a2: at least 2.5 s, and
+  //    the next screen's fonts and pictures loaded). A page asked for when
+  //    the app opened (web refresh, link) is remembered for step 6.
+  final gate = ref.read(startupGateProvider.notifier);
+  if (!ref.read(startupGateProvider)) {
+    if (location != Routes.startup) gate.rememberWanted(location);
+    return goTo(Routes.startup);
+  }
 
   // 1. Still finding out who is signed in
   if (!auth.hasValue) return goTo(Routes.startup);
@@ -895,6 +942,9 @@ String? _redirect(Ref ref, String location) {
     null => (Routes.welcome, Routes.welcome),
   };
 
-  // 6. Stay inside your area, or go to its landing screen
-  return location.startsWith(area) ? null : landing;
+  // 6. Stay inside your area, or go to its landing screen (or to the page
+  //    asked for when the app opened, if it is in your area)
+  if (location.startsWith(area)) return null;
+  final wanted = gate.takeWanted();
+  return wanted != null && wanted.startsWith(area) ? wanted : landing;
 }

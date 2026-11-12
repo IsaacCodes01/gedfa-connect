@@ -16,6 +16,7 @@ class AuthScaffold extends StatelessWidget {
     this.showBack = false,
     this.footer,
     this.onRefresh,
+    this.slideCardIn = false,
   });
 
   final Widget hero;
@@ -26,8 +27,25 @@ class AuthScaffold extends StatelessWidget {
   final Widget? footer;
   final Future<void> Function()? onRefresh;
 
+  /// RU1: arriving from the start-up screen, the card slides up from the
+  /// bottom (the logo has already glided into the header).
+  final bool slideCardIn;
+
   static const _overlap = 56.0;
-  static const _stripeHeight = 5.0;
+  static const _heroTop = 56.0;
+
+  /// The Ghana stripe under the navy header (4 px, Isaac, 12 Nov 2026).
+  static const stripeHeight = 4.0;
+
+  /// Log in's header height and logo width: the start-up screen glides its
+  /// logo to exactly this place (RU1).
+  static const loginHeroHeight = 260.0;
+  static const loginLogoWidth = 220.0;
+
+  /// Where the middle of the hero sits, from the top of the screen (under
+  /// the status bar of [topPadding]).
+  static double heroCenterY(double topPadding, double heroHeight) =>
+      topPadding + _heroTop + (heroHeight - _heroTop - _overlap - 12) / 2;
 
   Widget _withRefresh(Widget list) {
     final refresh = onRefresh;
@@ -58,12 +76,9 @@ class AuthScaffold extends StatelessWidget {
                         height: top + heroHeight,
                         child: Stack(
                           children: [
-                            Positioned.fill(
-                              child: ColoredBox(
-                                color: isDark
-                                    ? AppColors.heroDark
-                                    : AppColors.brandBlue,
-                              ),
+                            // Navy in light and dark (N1), the splash colour
+                            const Positioned.fill(
+                              child: ColoredBox(color: AppColors.heroDark),
                             ),
                             const Positioned.fill(
                               child: CustomPaint(painter: PitchLinesPainter()),
@@ -71,7 +86,7 @@ class AuthScaffold extends StatelessWidget {
                             Positioned(
                               left: 24,
                               right: 24,
-                              top: top + 56,
+                              top: top + _heroTop,
                               bottom: _overlap + 12,
                               child: Align(
                                 alignment: heroAlignment,
@@ -92,15 +107,17 @@ class AuthScaffold extends StatelessWidget {
                           ],
                         ),
                       ),
-                      const FlagStripe(height: _stripeHeight),
+                      const FlagStripe(height: stripeHeight),
                     ],
                   ),
                   // Top layer: the card, pushed down so it overlaps the header
                   Padding(
                     padding: EdgeInsets.only(
-                      top: top + heroHeight + _stripeHeight - _overlap,
+                      top: top + heroHeight + stripeHeight - _overlap,
                     ),
-                    child: ResponsiveCenter(
+                    child: _SlideUp(
+                      enabled: slideCardIn,
+                      child: ResponsiveCenter(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Container(
@@ -124,18 +141,49 @@ class AuthScaffold extends StatelessWidget {
                         ),
                       ),
                     ),
+                    ),
                   ),
                 ],
               ),
               if (footer != null)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                  child: footer,
+                _SlideUp(
+                  enabled: slideCardIn,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                    child: footer,
+                  ),
                 ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+/// RU1: slides its child up from below the screen and fades it in, once.
+class _SlideUp extends StatelessWidget {
+  const _SlideUp({required this.enabled, required this.child});
+
+  final bool enabled;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!enabled || MediaQuery.disableAnimationsOf(context)) return child;
+    final height = MediaQuery.sizeOf(context).height;
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 1, end: 0),
+      duration: const Duration(milliseconds: 600),
+      curve: Curves.easeOutCubic,
+      builder: (_, t, child) => Opacity(
+        opacity: (1 - t).clamp(0.0, 1.0),
+        child: Transform.translate(
+          offset: Offset(0, t * height * 0.7),
+          child: child,
+        ),
+      ),
+      child: child,
     );
   }
 }
