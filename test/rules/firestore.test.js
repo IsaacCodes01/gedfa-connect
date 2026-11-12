@@ -4953,3 +4953,120 @@ describe('Player suspensions (3.1e1)', () => {
     await assertFails(note(42));
   });
 });
+
+// ---------- Match officials (3.5a) ----------
+
+describe('Match officials (3.5a)', () => {
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, `${D}/users/ref2`), { role: 'referee', name: 'Esi Owusu' });
+      // f1 in 3 days; soon in 12 hours (the clubs may see its officials)
+      await setDoc(doc(db, `${D}/fixtures/f1`), fixtureData());
+      await setDoc(doc(db, `${D}/fixtures/soon`), fixtureData({
+        kickoffAt: Timestamp.fromMillis(Date.now() + 12 * 3600000),
+      }));
+    });
+  });
+
+  const ref = (db, id = 'f1') => doc(db, `${D}/fixtureOfficials/${id}`);
+  function officials(places, changes = {}) {
+    return {
+      fixtureId: 'f1', season: '2026-27', officials: places,
+      officialIds: Object.values(places).map((p) => p.uid),
+      updatedBy: 'fa1', updatedAt: serverTimestamp(), ...changes,
+    };
+  }
+  const REF1 = { uid: 'ref1', name: 'Ebo Quaye' };
+  const REF2 = { uid: 'ref2', name: 'Esi Owusu' };
+  const OFF1 = { uid: 'off1', name: 'Ama Boateng' };
+
+  /** The app's save: the officials and a note to each person told. */
+  function appoint(db, data, told = []) {
+    const batch = writeBatch(db);
+    batch.set(ref(db, data.fixtureId), data);
+    for (const uid of told) {
+      batch.set(doc(db, `${D}/notifications/person-${uid}_appointed_all_2026-11-12`), {
+        audience: `person:${uid}`, kind: 'appointed', teamId: '', teamName: '',
+        names: arrayUnion('You are the referee — Royal Unique FC v Gomoa Stars, Sat 14 Nov.'),
+        count: increment(1), day: '2026-11-12', updatedAt: serverTimestamp(), targetId: data.fixtureId,
+      }, { merge: true });
+    }
+    return batch.commit();
+  }
+  async function seedAppointed() {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const data = officials({ referee: REF1, commissioner: OFF1 });
+      await setDoc(ref(context.firestore()), { ...data, updatedAt: Timestamp.now() });
+      await setDoc(ref(context.firestore(), 'soon'), { ...data, fixtureId: 'soon', updatedAt: Timestamp.now() });
+    });
+  }
+
+  it('the FA appoints a referee and a commissioner (an FA official), and tells them', async () => {
+    await assertSucceeds(appoint(dbAs('fa1'), officials({ referee: REF1, commissioner: OFF1 }), ['ref1', 'off1']));
+  });
+
+  it('all five places; a referee may be the commissioner', async () => {
+    await assertSucceeds(appoint(dbAs('fa1'), officials({ referee: REF1, assistant1: REF2, commissioner: OFF1 })));
+    await assertSucceeds(appoint(dbAs('off1'), officials({ referee: REF2, commissioner: REF1 }, { updatedBy: 'off1' })));
+  });
+
+  it('only referees referee, assist or are 4th official', async () => {
+    await assertFails(appoint(dbAs('fa1'), officials({ referee: OFF1 })));
+    await assertFails(appoint(dbAs('fa1'), officials({ fourth: { uid: 'admin1', name: 'A team admin' } })));
+    await assertFails(appoint(dbAs('fa1'), officials({ commissioner: { uid: 'admin1', name: 'A team admin' } })));
+  });
+
+  it('one place each, the list of IDs exact, known places only', async () => {
+    await assertFails(appoint(dbAs('fa1'), officials({ referee: REF1, assistant1: REF1 })));
+    await assertFails(appoint(dbAs('fa1'), officials({ referee: REF1 }, { officialIds: ['ref2'] })));
+    await assertFails(appoint(dbAs('fa1'), officials({ referee: REF1 }, { officialIds: ['ref1', 'ref2'] })));
+    await assertFails(appoint(dbAs('fa1'), officials({ linesman: REF1 })));
+    await assertFails(appoint(dbAs('fa1'), officials({ referee: { uid: 'ref1' } })));
+  });
+
+  it('the right match and season, signed by the FA official at server time', async () => {
+    await assertFails(appoint(dbAs('fa1'), officials({ referee: REF1 }, { season: '2025-26' })));
+    await assertFails(setDoc(ref(dbAs('fa1'), 'soon'), officials({ referee: REF1 })));
+    await assertFails(appoint(dbAs('fa1'), officials({ referee: REF1 }, { updatedBy: 'off1' })));
+  });
+
+  it('a team admin or a referee cannot appoint', async () => {
+    await assertFails(appoint(dbAs('admin1'), officials({ referee: REF1 }, { updatedBy: 'admin1' })));
+    await assertFails(appoint(dbAs('ref1'), officials({ referee: REF1 }, { updatedBy: 'ref1' })));
+  });
+
+  it('the FA and the appointed officials read it; another referee does not', async () => {
+    await seedAppointed();
+    await assertSucceeds(getDoc(ref(dbAs('fa1'))));
+    await assertSucceeds(getDoc(ref(dbAs('ref1'))));
+    await assertSucceeds(getDoc(ref(dbAs('off1'))));
+    await assertSucceeds(getDocs(query(collection(dbAs('ref1'), `${D}/fixtureOfficials`), where('officialIds', 'array-contains', 'ref1'))));
+    await assertFails(getDoc(ref(dbAs('ref2'))));
+    await assertFails(getDocs(query(collection(dbAs('ref2'), `${D}/fixtureOfficials`), where('officialIds', 'array-contains', 'ref1'))));
+  });
+
+  it('the clubs read it from 24 hours before kick-off, not before; other people never', async () => {
+    await seedAppointed();
+    await assertFails(getDoc(ref(dbAs('admin1'))));
+    await assertSucceeds(getDoc(ref(dbAs('admin1'), 'soon')));
+    await assertSucceeds(getDoc(ref(dbAs('admin2'), 'soon')));
+    await assertFails(getDoc(ref(dbAs('newbie'), 'soon')));
+  });
+
+  it('a person reads their own notes; nobody else does; only the FA writes them', async () => {
+    await assertSucceeds(appoint(dbAs('fa1'), officials({ referee: REF1 }), ['ref1']));
+    const note = (db) => doc(db, `${D}/notifications/person-ref1_appointed_all_2026-11-12`);
+    await assertSucceeds(getDoc(note(dbAs('ref1'))));
+    await assertSucceeds(getDocs(query(collection(dbAs('ref1'), `${D}/notifications`), where('audience', '==', 'person:ref1'))));
+    await assertFails(getDoc(note(dbAs('ref2'))));
+    await assertFails(setDoc(doc(dbAs('admin1'), `${D}/notifications/person-ref2_appointed_all_2026-11-12`), {
+      audience: 'person:ref2', kind: 'appointed', teamId: '', teamName: '', names: ['x'], count: 1,
+      day: '2026-11-12', updatedAt: serverTimestamp(),
+    }));
+    await assertFails(setDoc(doc(dbAs('fa1'), `${D}/notifications/person-ref2_teamApproved_all_2026-11-12`), {
+      audience: 'person:ref2', kind: 'teamApproved', teamId: '', teamName: '', names: ['x'], count: 1,
+      day: '2026-11-12', updatedAt: serverTimestamp(),
+    }));
+  });
+});

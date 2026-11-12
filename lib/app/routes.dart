@@ -8,6 +8,7 @@ class Routes {
   static const verifyEmail = '/verify-email';
   static const welcome = '/welcome';
   static const registerTeam = '/welcome/register';
+
   /// The FA's area. [admin] itself is the Teams tab.
   static const admin = '/admin';
 
@@ -25,9 +26,9 @@ class Routes {
   /// `back=` the page it came from, and its ← goes there (3.0f2).
   static String withBack(String route, String back) {
     final uri = Uri.parse(route);
-    return uri.replace(
-      queryParameters: {...uri.queryParameters, 'back': back},
-    ).toString();
+    return uri
+        .replace(queryParameters: {...uri.queryParameters, 'back': back})
+        .toString();
   }
 
   static String? backOf(Uri uri) => uri.queryParameters['back'];
@@ -43,9 +44,7 @@ class Routes {
 
   /// The FA asks a team to correct something (2.11b); [item] ticks one
   static String adminAskCorrection(String teamId, {String? item}) =>
-      item == null
-          ? '/admin/ask/$teamId'
-          : '/admin/ask/$teamId?item=$item';
+      item == null ? '/admin/ask/$teamId' : '/admin/ask/$teamId?item=$item';
   static const adminNotifications = '/admin/notifications';
 
   /// One note's details (3.0f), for the FA and for teams.
@@ -60,8 +59,7 @@ class Routes {
   static String adminAnnouncement(String id) =>
       '/admin/more/announcements/view/$id';
   static const adminPlayers = '/admin/players';
-  static String adminTeamPlayers(String teamId) =>
-      '$adminPlayers/team/$teamId';
+  static String adminTeamPlayers(String teamId) => '$adminPlayers/team/$teamId';
 
   /// FA: Players with the Juvenile switch on, and one team's juvenile
   /// players by age group (2.14b, board J5).
@@ -93,8 +91,8 @@ class Routes {
   /// [childId]: "Screen player" from a child's page puts them first.
   static String adminScreeningDay(String dayId, {String? childId}) =>
       childId == null
-          ? '$adminScreening/day/$dayId'
-          : '$adminScreening/day/$dayId?child=$childId';
+      ? '$adminScreening/day/$dayId'
+      : '$adminScreening/day/$dayId?child=$childId';
 
   /// FA: registration switches, squad numbers, season and fee (2.13d).
   static const adminLeagueSettings = '/admin/more/league';
@@ -103,6 +101,7 @@ class Routes {
   static String adminInviteReady(String email) =>
       '$adminPeople/invited/${Uri.encodeComponent(email)}';
   static String adminMember(String uid) => '$adminPeople/member/$uid';
+
   /// FA: the Fixtures tab (3.0a), adding one match, changing one, and
   /// the kits of a match.
   static const adminFixtures = '/admin/fixtures';
@@ -111,6 +110,7 @@ class Routes {
   /// FA: "Make the season" (3.0b, G1) and its draft (G2).
   static const adminSeason = '/admin/fixtures/season';
   static const adminSeasonDraft = '/admin/fixtures/season/draft';
+
   /// FA: Competitions (3.0c1, C1): the leagues, cups and galas; and a new
   /// cup or gala (C2, C2b).
   static const adminCompetitions = '/admin/fixtures/competitions';
@@ -124,6 +124,15 @@ class Routes {
 
   /// Match details (F5, F6), for the FA and for teams.
   static String adminMatch(String id) => '$adminFixtures/match/$id';
+
+  /// FA: appoint officials for a whole matchday (3.5a, MO3).
+  static String adminAppointRound(
+    String competitionId,
+    int round, {
+    String? ageGroup,
+  }) =>
+      '$adminFixtures/officials?c=$competitionId&r=$round'
+      '${ageGroup == null ? '' : '&g=$ageGroup'}';
   static String teamMatch(String id) => '$teamFixtures/match/$id';
 
   /// One team's sheet, read only (3.2): the FA any time, the opponent from

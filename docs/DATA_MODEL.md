@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.37, matches the rules after step 3.1e3, a suspension blocks every competition (11 Nov 2026)
+**Status:** v2.38, matches the rules after step 3.5a, the FA appoints match officials (12 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -585,7 +585,7 @@ Readable and writable only by FA admins. Created with `next: 2` by the very firs
 
 | Field | Notes |
 | ----- | ----- |
-| `audience` | `fa` or `team:<teamId>` |
+| `audience` | `fa`, `team:<teamId>`, or `person:<uid>` (3.5a: a referee or FA official; FA writes only `appointed` / `appointmentRemoved`; read by that person) |
 | `kind` | `playersApproved`, `playersRejected`, `teamApproved`, `paymentConfirmed`, `paymentNotFound`, `feeReminder`, `changeApproved`, `changeRefused`, `teamCorrected`, `correctionAsked`, `correctionDone`, `teamSuspended`, `suspensionLifted`, `fixtureAdded`, `fixtureChanged`, `fixturePostponed`, `fixtureCancelled`, `playerSuspended`, `playerSuspensionLifted` (for teams, written by the FA); `teamRequest`, `playersSubmitted`, `playersResubmitted`, `juvenileSubmitted`, `inviteAccepted`, `paymentSent`, `teamUpdated`, `changeRequested`, `correctionSentBack` (for the FA) |
 | `teamId`, `teamName` | The team concerned (`teamRequest`: the club's uid) |
 | `names` | e.g. `Kojo Arthur (GE26-0011)`, `Yaw Boateng: Jersey number #10 → #14` |
@@ -707,6 +707,22 @@ One match. Made by the FA (one at a time in 3.0a; "Make the season" and cups fol
 - **Every competition (3.1e3, Isaac 11 Nov 2026):** until the last counted match is played, the player can't play **any** match they could be picked for: the Division (a juvenile named for it), their age group and the older ones (playing up). Only the counted matches (`fixtureIds`) count. Those other matches carry the player in `banned` too, kept right by the app's sync (`BanSync`, after every suspension, lift, postpone, cancel, new date, change and new match; 10 matches per batch; only what differs); a ban still short of matches takes new matches of its competition into `fixtureIds`. The app also works the blocking out from the suspensions, so a sheet is locked even before the marks follow.
 - **Team sheets (3.1e2):** a sheet may not pick a player in its match's `banned` for the team (rules, no extra lookup). On the sheet the row is locked ("Suspended · 2 matches left", a tap says why); a saved sheet with a player suspended since drops them (red note, Save again).
 - **Postponed or cancelled (3.1e2), one batch of its own just BEFORE the postpone or cancel** (a batch counts all its writes against the rules' 1000-expression limit; a postpone is already near it): the match's `banned` goes, each suspension that listed it gets the club's next scheduled match in that competition it doesn't list yet (`fixtureIds` changes alone, never longer than `matches`), and that match gets the mark. No next match: the list just gets shorter (still owed, "not in the calendar yet"). If the postpone then fails, a retry finds nothing left to move. A whole league postponed together keeps the order, so nothing moves.
+
+### 2.15d `fixtureOfficials/{fixtureId}` — match officials (3.5a)
+
+Who officiates a match (mockup `3.5-match-officials.html`, MO1–MO3). **Its own document, not part of the match**: everyone with a role reads matches, but the clubs may know the officials only **from 24 hours before kick-off** (Isaac, 11 Nov 2026).
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `fixtureId`, `season` | string | The match (the document ID) and its season |
+| `officials` | map | Place → `{ uid, name }`. Places: `referee`, `assistant1`, `assistant2`, `fourth`, `commissioner`. Only the referee is required (Isaac); an empty place is absent |
+| `officialIds` | array | The uids of the people in `officials`, exactly, all different (one place each); a referee lists their matches with `array-contains` |
+| `updatedBy`, `updatedAt` | | The FA official and server time |
+
+- **Write: FA only**, the whole document each time (rule `isValidMatchOfficials`, 8 lookups): the first four places only `referee` accounts; the commissioner a referee or an FA official (Isaac, 9 Nov 2026).
+- **Same batch:** a note to each person newly in a place or moved (`appointed`, "You are the referee — Royal Unique FC v Asebu Stars, Sat 14 Nov, 3:00 pm, Apam Park."), and to each person taken off (`appointmentRemoved`). Notes go to `person:<uid>`, one per person, kind and day.
+- **Read:** the FA; the appointed officials (`officialIds`); a team admin of either club from 24 h before kick-off (`get` only, rule `isClubOfMatchSoon`).
+- **The app:** Match details › Officials (MO1, the FA appoints: Appoint, ⋯ Change / Take off; referee colours that don't clash with the four kits), the picker (MO2: referees, plus FA officials for commissioner; "Also Assistant 2 · Nyanyano Park, 3:00 pm", gold when less than 3 hours apart, Isaac: allowed with a warning; someone already in this match can't be picked twice), and a whole matchday at once (MO3, from the matchday heading on FA › Fixtures).
 
 ### 2.15a `fixtureDrafts/{draftId}` — "Make the season" drafts (3.0b)
 
@@ -925,6 +941,8 @@ Feed rules: never include dates of birth; player photos only if agreed with GEDF
 
 **Decided by Isaac (11 Nov 2026), suspensions in every competition (3.1e3, mockup `3.1e3-all-competitions.html`; replaces "only in the competition where it was given"):** while suspended, a player **can't play in any competition** until the ban is served or lifted. Only the matches of the competition where it was given **count** towards the number (a Division red card for 2: the 2 Division matches count; a U17 match in between is blocked but doesn't count). A juvenile is blocked in the Division (if named for it), their age group and when playing up.
 
+**Answered by Isaac (12 Nov 2026), match officials (3.5, mockup `3.5-match-officials.html`, approved):** (1) the clubs see who the officials are **24 hours before** kick-off (not before); (2) only the **referee** is required, the other places may stay "Not appointed"; (3) officials don't confirm: they are told, and press **Can't make it** (with a reason) if they can't come (3.5b); (4) one person may have **two matches the same day**, with a warning when kick-offs are less than 3 hours apart.
+
 **Answered by Isaac (11 Nov 2026), match day (mockup `3.6-match-day-check.html`, MC1–MC5, approved):** from the lock the appointed officials see both sheets **with player IDs** (3.5) and the PDF shows them (3.3). The **face check** (3.6, "Check players": big photo, shirt number for the match, name, ID; Matches / Doesn't match with a note / Absent) is done by the **commissioner only**. The **other team sees the photos at the lock for Division players; juveniles without photos** (children's photos stay with the team, the FA and the officials). A player who **doesn't match** is **recorded** for the FA and the match report, not struck off the sheet by the commissioner. Photos can't go on the sheet itself (the other team reads it): a separate copy for the match, opened at the lock to the appointed officials and the FA (and the Division photos to the other team); Storage rules must allow the images too.
 
 **Answered by GEDFA via Isaac (10 Nov 2026), fees:** the **Juvenile affiliation fee is separate from the Division one**. A club pays one Juvenile fee whatever the number of age groups it enters; a club in both competitions pays the Division fee too. There is also a **referee fee**, for the Division and for the Juvenile league. Every fee (affiliation and referee) can be paid in instalments, like the affiliation fee today, and its amount is set in League settings. Planned as its own payments step (after JA): today `settings/league.fee` and `fees/{season}_{uid}` hold one affiliation fee per club.
@@ -960,6 +978,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 12 Nov 2026 | v2.38 (3.5a): `fixtureOfficials/{fixtureId}` (FA only; read by the FA, the officials, the clubs from 24 h before), notification audience `person:<uid>` with kinds `appointed` / `appointmentRemoved`. Section 7: Isaac's answers on match officials. 441 rules tests. |
 | 11 Nov 2026 | v2.37 (3.1e3): Isaac: a suspended player can't play in any competition until it is served or lifted; only the matches of the competition where it was given count. Other matches in that period carry the player in `fixtures.banned` (FA's sync, no new fields or rules). 432 rules tests. |
 | 11 Nov 2026 | v2.36 (3.1e2): team sheets refuse players in the match's `banned`; a suspension's `fixtureIds` may change alone (FA, never longer than `matches`, not once lifted) when its match is postponed or cancelled, in a batch of its own before the postpone. Every notification kind has its own icon (app only). 431 rules tests. |
 | 11 Nov 2026 | v2.35 (3.1e1): `playerSuspensions/{id}` (any FA official suspends an approved player for 1–10 matches with a reason; lifted early with why), `fixtures.banned` (team ID → suspended player IDs, FA only, alone, same batch), notification kinds `playerSuspended` / `playerSuspensionLifted` and the optional `targetId`. 426 rules tests. |

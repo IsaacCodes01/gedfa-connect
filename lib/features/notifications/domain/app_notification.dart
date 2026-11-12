@@ -25,6 +25,9 @@ enum NotificationKind {
   fixtureCancelled,
   playerSuspended, // the FA suspends a player for matches (3.1e1)
   playerSuspensionLifted,
+  // For one person: a referee or FA official (3.5a), written by the FA
+  appointed,
+  appointmentRemoved,
   // For the FA (written by teams, clubs, invited people)
   teamRequest,
   playersSubmitted,
@@ -176,6 +179,13 @@ class AppNotification {
             ? 'Suspension lifted: '
                 '${splitLine(names.firstOrNull ?? 'a player').$1}'
             : '$people suspensions lifted',
+        // "You are the referee"
+        NotificationKind.appointed => people == 1
+            ? splitLine(names.firstOrNull ?? 'You are appointed').$1
+            : '$people new appointments',
+        NotificationKind.appointmentRemoved => people == 1
+            ? 'Appointment taken off'
+            : '$people appointments taken off',
       };
 
   /// The short text in the bell's list ("Kojo Arthur, Nana Ofori and 2
@@ -201,12 +211,15 @@ class AppNotification {
       NotificationKind.suspensionLifted => false,
       // One player: the details are the text; several: one line each
       NotificationKind.playerSuspended ||
-      NotificationKind.playerSuspensionLifted => people > 1,
+      NotificationKind.playerSuspensionLifted ||
+      NotificationKind.appointed ||
+      NotificationKind.appointmentRemoved => people > 1,
       _ => true,
     };
   }
 
-  /// "From GEDFA" on a team's notes; on the FA's, the team that did it.
+  /// "From GEDFA" on a team's or a person's notes; on the FA's, the team
+  /// that did it.
   String get sender {
     if (audience != 'fa') return 'GEDFA';
     return switch (kind) {
@@ -295,6 +308,13 @@ class AppNotification {
           : names == null
               ? 'Open Squad to see when each one returns.'
               : '$names. Open Squad to see when each one returns.',
+      NotificationKind.appointed => people == 1
+          ? splitLine(this.names.firstOrNull ?? '').$2
+          : withNames('See your matches.'),
+      NotificationKind.appointmentRemoved => people == 1
+          ? '${splitLine(this.names.firstOrNull ?? '').$2} The FA took you '
+                'off this match.'
+          : withNames('The FA took you off these matches.'),
     };
   }
 

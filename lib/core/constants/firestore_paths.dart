@@ -42,6 +42,12 @@ class FirestorePaths {
   static String fixture(String id) => '$district/fixtures/$id';
   static String fixtureHistory(String id) => '$district/fixtures/$id/history';
 
+  /// Who officiates a match (3.5a): `fixtureOfficials/{fixtureId}`. Its
+  /// own document: the clubs may read it only from 24 hours before.
+  static const fixtureOfficials = '$district/fixtureOfficials';
+  static String fixtureOfficial(String fixtureId) =>
+      '$district/fixtureOfficials/$fixtureId';
+
   /// "Make the season" drafts the FA saved for later (3.0b), FA only.
   static String fixtureDraft(String id) => '$district/fixtureDrafts/$id';
 

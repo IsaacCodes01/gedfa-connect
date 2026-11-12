@@ -26,6 +26,12 @@ import 'package:gedfa_connect/features/players/domain/age_group.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/teams/domain/kit.dart';
+import 'package:gedfa_connect/core/constants/user_role.dart';
+import 'package:gedfa_connect/features/officials/data/officials_repository.dart';
+import 'package:gedfa_connect/features/officials/domain/match_officials.dart';
+import 'package:gedfa_connect/features/officials/presentation/appoint_round_screen.dart';
+import 'package:gedfa_connect/features/people/data/people_repository.dart';
+import 'package:gedfa_connect/features/people/domain/member.dart';
 import 'package:gedfa_connect/features/teams/domain/kit_slot.dart';
 import 'package:gedfa_connect/features/teams/domain/team.dart';
 import 'package:gedfa_connect/features/team_sheets/data/team_sheet_repository.dart';
@@ -33,16 +39,34 @@ import 'package:gedfa_connect/app/theme.dart';
 import 'package:gedfa_connect/features/team_sheets/domain/team_sheet.dart';
 
 KitChoice _kit(KitSlot slot, Color c) => KitChoice(
-      slot: slot,
-      kit: Kit(primary: c, shorts: Colors.white, socks: c),
-      raw: const {},
-    );
+  slot: slot,
+  kit: Kit(primary: c, shorts: Colors.white, socks: c),
+  raw: const {},
+);
 
 FixtureSide _side(String id, String name, String short, Color c) =>
     FixtureSide(id: id, name: name, shortName: short, colour: c);
 
-final _aps = _side('aps', 'Apam Stars Football Club', 'APS', const Color(0xFF7A1F2B));
+final _aps = _side(
+  'aps',
+  'Apam Stars Football Club',
+  'APS',
+  const Color(0xFF7A1F2B),
+);
 final _gry = _side('gry', 'Gomoa Royals', 'GRY', const Color(0xFF1259A8));
+
+final _officials = {
+  'm1': const MatchOfficials(
+    fixtureId: 'm1',
+    places: {
+      OfficialPlace.referee: AppointedOfficial(uid: 'r1', name: 'Kwame Addo'),
+      OfficialPlace.commissioner: AppointedOfficial(
+        uid: 'f1',
+        name: 'Kwesi Arthur',
+      ),
+    },
+  ),
+};
 
 Fixture _match(
   String id, {
@@ -52,40 +76,56 @@ Fixture _match(
   Competition category = Competition.division,
   AgeGroup? group,
   String? note,
-}) =>
-    Fixture(
-      id: id,
-      season: '2026-27',
-      competitionId: '2026-27_${category.name}-league',
-      category: category,
-      ageGroup: group,
-      round: round,
-      home: _aps,
-      away: _gry,
-      kits: MatchKits(
-        home: _kit(KitSlot.home, const Color(0xFF7A1F2B)),
-        away: _kit(KitSlot.away, Colors.white),
-        homeGk: _kit(KitSlot.goalkeeper, const Color(0xFFFFD100)),
-        awayGk: _kit(KitSlot.goalkeeper, const Color(0xFF009A44)),
-      ),
-      kickoffAt: status == FixtureStatus.postponed && note != null
-          ? null
-          : DateTime.now().add(from),
-      venue: 'Apam Park, Apam Junction',
-      status: status,
-      note: note,
-    );
+}) => Fixture(
+  id: id,
+  season: '2026-27',
+  competitionId: '2026-27_${category.name}-league',
+  category: category,
+  ageGroup: group,
+  round: round,
+  home: _aps,
+  away: _gry,
+  kits: MatchKits(
+    home: _kit(KitSlot.home, const Color(0xFF7A1F2B)),
+    away: _kit(KitSlot.away, Colors.white),
+    homeGk: _kit(KitSlot.goalkeeper, const Color(0xFFFFD100)),
+    awayGk: _kit(KitSlot.goalkeeper, const Color(0xFF009A44)),
+  ),
+  kickoffAt: status == FixtureStatus.postponed && note != null
+      ? null
+      : DateTime.now().add(from),
+  venue: 'Apam Park, Apam Junction',
+  status: status,
+  note: note,
+);
 
 /// 18 Division teams for the season screens, two of them sharing a ground.
 final _teams = [
   for (var i = 0; i < 18; i++)
     MatchTeam(
-      side: _side('t$i', 'Team number $i Football Club', 'T$i', const Color(0xFF1259A8)),
+      side: _side(
+        't$i',
+        'Team number $i Football Club',
+        'T$i',
+        const Color(0xFF1259A8),
+      ),
       rawKits: const {},
       kits: {
-        KitSlot.home: Kit(primary: i.isEven ? Colors.red : Colors.blue, shorts: Colors.white, socks: Colors.white),
-        KitSlot.away: const Kit(primary: Colors.white, shorts: Colors.black, socks: Colors.white),
-        KitSlot.goalkeeper: const Kit(primary: Color(0xFFFFD100), shorts: Colors.black, socks: Colors.black),
+        KitSlot.home: Kit(
+          primary: i.isEven ? Colors.red : Colors.blue,
+          shorts: Colors.white,
+          socks: Colors.white,
+        ),
+        KitSlot.away: const Kit(
+          primary: Colors.white,
+          shorts: Colors.black,
+          socks: Colors.white,
+        ),
+        KitSlot.goalkeeper: const Kit(
+          primary: Color(0xFFFFD100),
+          shorts: Colors.black,
+          socks: Colors.black,
+        ),
       },
       homeGround: i < 2 ? 'Apam Park' : 'Ground $i',
     ),
@@ -95,31 +135,31 @@ final _teams = [
 class _FakeMaker extends SeasonMaker {
   @override
   SeasonSession? build() => SeasonSession(
-        category: Competition.division,
-        group: null,
-        teams: _teams,
-        firstRound: 1,
-        settings: SeasonSettings(
-          firstDay: DateTime(2026, 11, 14),
-          homeAndAway: true,
-          sundayToo: true,
-          kickoffHour: 15,
-          kickoffMinute: 0,
-        ),
-        draft: planSeason(
-          teams: [
-            for (final t in _teams)
-              PlanTeam(id: t.side.id, name: t.side.name, ground: t.homeGround),
-          ],
-          settings: SeasonSettings(
-            firstDay: DateTime(2026, 11, 14),
-            homeAndAway: true,
-            sundayToo: true,
-            kickoffHour: 15,
-            kickoffMinute: 0,
-          ),
-        ),
-      );
+    category: Competition.division,
+    group: null,
+    teams: _teams,
+    firstRound: 1,
+    settings: SeasonSettings(
+      firstDay: DateTime(2026, 11, 14),
+      homeAndAway: true,
+      sundayToo: true,
+      kickoffHour: 15,
+      kickoffMinute: 0,
+    ),
+    draft: planSeason(
+      teams: [
+        for (final t in _teams)
+          PlanTeam(id: t.side.id, name: t.side.name, ground: t.homeGround),
+      ],
+      settings: SeasonSettings(
+        firstDay: DateTime(2026, 11, 14),
+        homeAndAway: true,
+        sundayToo: true,
+        kickoffHour: 15,
+        kickoffMinute: 0,
+      ),
+    ),
+  );
 }
 
 final _fixtures = [
@@ -199,7 +239,8 @@ Future<void> _pump(
         seasonFixturesProvider.overrideWith((ref) => Stream.value(_fixtures)),
         myTeamSheetsProvider.overrideWith((ref) => Stream.value(const {})),
         // The team's sheet for m1 is saved (3.1c: View and Change)
-        teamSheetProvider.overrideWith((ref, key) => Stream.value(
+        teamSheetProvider.overrideWith(
+          (ref, key) => Stream.value(
             key.$1 == 'm1' && key.$2 == 'aps'
                 ? TeamSheet(
                     fixtureId: 'm1',
@@ -208,12 +249,41 @@ Future<void> _pump(
                     starters: const ['a', 'b', 'c', 'd', 'e', 'f', 'g'],
                     savedAt: DateTime(2026, 11, 10, 16, 12),
                   )
-                : null)),
-        myFixturesProvider.overrideWith((ref) => Stream.value(_fixtures)),
-        appUserProvider.overrideWith(
-          (ref) => Stream.value(
-            const AppUser(uid: 'u', role: null, teamId: 'aps'),
+                : null,
           ),
+        ),
+        myFixturesProvider.overrideWith((ref) => Stream.value(_fixtures)),
+        // Officials (3.5a): m1 has its referee and commissioner
+        matchOfficialsProvider.overrideWith(
+          (ref, id) =>
+              Stream.value(_officials[id] ?? MatchOfficials(fixtureId: id)),
+        ),
+        seasonOfficialsProvider.overrideWith((ref) => Stream.value(_officials)),
+        membersProvider.overrideWith(
+          (ref) => Stream.value(const [
+            Member(
+              uid: 'r1',
+              role: UserRole.referee,
+              name: 'Kwame Addo',
+              email: 'a@x.com',
+            ),
+            Member(
+              uid: 'r2',
+              role: UserRole.referee,
+              name: 'Esi Owusu',
+              email: 'e@x.com',
+            ),
+            Member(
+              uid: 'f1',
+              role: UserRole.faAdmin,
+              name: 'Kwesi Arthur',
+              email: 'k@x.com',
+            ),
+          ]),
+        ),
+        appUserProvider.overrideWith(
+          (ref) =>
+              Stream.value(const AppUser(uid: 'u', role: null, teamId: 'aps')),
         ),
         myTeamProvider.overrideWith(
           (ref) => Stream.value(
@@ -270,10 +340,13 @@ Future<void> _pump(
       ],
       child: MaterialApp(
         // The app's own theme: its full-width buttons once broke a row
-        theme: brightness == Brightness.dark ? AppTheme.dark() : AppTheme.light(),
+        theme: brightness == Brightness.dark
+            ? AppTheme.dark()
+            : AppTheme.light(),
         builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(context)
-              .copyWith(textScaler: TextScaler.linear(textScale)),
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.linear(textScale)),
           child: child!,
         ),
         home: screen,
@@ -283,8 +356,12 @@ Future<void> _pump(
   for (var i = 0; i < 6; i++) {
     await tester.pump(const Duration(milliseconds: 100));
     final error = tester.takeException();
-    expect(error, isNull,
-        reason: 'frame $i: ${error is FlutterError ? error.toStringDeep() : error}');
+    expect(
+      error,
+      isNull,
+      reason:
+          'frame $i: ${error is FlutterError ? error.toStringDeep() : error}',
+    );
   }
 }
 
@@ -292,36 +369,68 @@ void main() {
   for (final brightness in Brightness.values) {
     for (final width in [360.0, 1280.0]) {
       testWidgets('FA Fixtures tab, $width wide, $brightness', (tester) async {
-        await _pump(tester, const FaFixturesScreen(), Size(width, 2400), brightness);
+        await _pump(
+          tester,
+          const FaFixturesScreen(),
+          Size(width, 2400),
+          brightness,
+        );
         expect(find.text('Matchday 4'), findsOneWidget);
         expect(find.text('Postponed'), findsWidgets);
       });
 
-      testWidgets('team Fixtures tab, $width wide, $brightness', (tester) async {
-        await _pump(tester, const TeamFixturesScreen(), Size(width, 2400), brightness);
+      testWidgets('team Fixtures tab, $width wide, $brightness', (
+        tester,
+      ) async {
+        await _pump(
+          tester,
+          const TeamFixturesScreen(),
+          Size(width, 2400),
+          brightness,
+        );
         expect(find.text('Next match'), findsOneWidget);
         expect(find.textContaining('Team sheet due'), findsOneWidget);
       });
 
-      testWidgets('team Fixtures tab, Calendar (TDc), $width wide, $brightness', (tester) async {
-        await _pump(tester, const TeamFixturesScreen(), Size(width, 2400), brightness);
-        await tester.tap(find.text('Calendar'));
-        await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull);
-        expect(find.byTooltip('Next month'), findsOneWidget);
-      });
+      testWidgets(
+        'team Fixtures tab, Calendar (TDc), $width wide, $brightness',
+        (tester) async {
+          await _pump(
+            tester,
+            const TeamFixturesScreen(),
+            Size(width, 2400),
+            brightness,
+          );
+          await tester.tap(find.text('Calendar'));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          expect(find.byTooltip('Next month'), findsOneWidget);
+        },
+      );
     }
   }
 
   for (final brightness in Brightness.values) {
     for (final width in [360.0, 1280.0]) {
-      testWidgets('Competitions (C1), $width wide, $brightness', (tester) async {
-        await _pump(tester, const CompetitionsScreen(), Size(width, 2400), brightness);
+      testWidgets('Competitions (C1), $width wide, $brightness', (
+        tester,
+      ) async {
+        await _pump(
+          tester,
+          const CompetitionsScreen(),
+          Size(width, 2400),
+          brightness,
+        );
         expect(find.text('Division League'), findsOneWidget);
         // m3 is played, m1 and m2 come next; m5 is cancelled
         expect(find.text('2 teams · matchday 4 of 4'), findsOneWidget);
         expect(find.text('GEDFA Cup 2026/27'), findsOneWidget);
-        expect(find.textContaining('Open · Division and U17 sides · 12 teams · Apam Park'), findsOneWidget);
+        expect(
+          find.textContaining(
+            'Open · Division and U17 sides · 12 teams · Apam Park',
+          ),
+          findsOneWidget,
+        );
         expect(find.text('New cup or Gala'), findsOneWidget);
         expect(find.text('Cups and Gala'), findsOneWidget);
         // The ⋯ on the Division League (C11)
@@ -332,50 +441,100 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 400));
         expect(find.text('Postpone the Division League?'), findsOneWidget);
-        expect(find.textContaining('weeks off included. All 2 clubs are told.'), findsOneWidget);
-        expect(find.textContaining('Pick the new date', findRichText: true), findsOneWidget);
+        expect(
+          find.textContaining('weeks off included. All 2 clubs are told.'),
+          findsOneWidget,
+        );
+        expect(
+          find.textContaining('Pick the new date', findRichText: true),
+          findsOneWidget,
+        );
         expect(find.text('Why (the clubs see it)'), findsOneWidget);
         expect(tester.takeException(), isNull);
       });
-      testWidgets('Competitions with a stopped postpone (C13, C14), $width wide, $brightness', (tester) async {
-        final job = PostponeJob(
-          competitionId: '2026-27_division-league',
-          season: '2026-27',
-          category: Competition.division,
-          name: 'Division League',
-          days: 14,
-          reason: "The FA's congress",
-          moves: [
-            for (var i = 0; i < 306; i++)
-              PostponeMove(id: 'x$i', from: DateTime(2026, 12, 5, 15), to: DateTime(2026, 12, 19, 15)),
-          ],
-          done: {for (var i = 0; i < 42; i++) 'x$i'},
-          byName: 'Kofi Mensah',
-          startedAt: DateTime(2026, 11, 9, 10, 42),
+      testWidgets(
+        'Competitions with a stopped postpone (C13, C14), $width wide, $brightness',
+        (tester) async {
+          final job = PostponeJob(
+            competitionId: '2026-27_division-league',
+            season: '2026-27',
+            category: Competition.division,
+            name: 'Division League',
+            days: 14,
+            reason: "The FA's congress",
+            moves: [
+              for (var i = 0; i < 306; i++)
+                PostponeMove(
+                  id: 'x$i',
+                  from: DateTime(2026, 12, 5, 15),
+                  to: DateTime(2026, 12, 19, 15),
+                ),
+            ],
+            done: {for (var i = 0; i < 42; i++) 'x$i'},
+            byName: 'Kofi Mensah',
+            startedAt: DateTime(2026, 11, 9, 10, 42),
+          );
+          await _pump(
+            tester,
+            const CompetitionsScreen(),
+            Size(width, 2400),
+            brightness,
+            jobs: {job.competitionId: job},
+          );
+          expect(
+            find.text('Division League: postponing stopped'),
+            findsOneWidget,
+          );
+          expect(
+            find.textContaining('42 of 306 matches moved 2 weeks later.'),
+            findsOneWidget,
+          );
+          expect(
+            find.text(
+              "Started by Kofi Mensah · Mon 9 Nov, 10:42 am · \"The FA's congress\"",
+            ),
+            findsOneWidget,
+          );
+          expect(find.text('Finish'), findsOneWidget);
+          expect(
+            find.text('2 teams · postponing: 42 of 306 moved'),
+            findsOneWidget,
+          );
+          await tester.tap(find.byTooltip('More').first);
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 400));
+          expect(
+            find.text('Finish the postpone that stopped first'),
+            findsOneWidget,
+          );
+          expect(tester.takeException(), isNull);
+        },
+      );
+      testWidgets('New cup (C2), 18 teams, $width wide, $brightness', (
+        tester,
+      ) async {
+        await _pump(
+          tester,
+          const CupFormScreen(),
+          Size(width, 3000),
+          brightness,
         );
-        await _pump(tester, const CompetitionsScreen(), Size(width, 2400), brightness,
-            jobs: {job.competitionId: job});
-        expect(find.text('Division League: postponing stopped'), findsOneWidget);
-        expect(find.textContaining('42 of 306 matches moved 2 weeks later.'), findsOneWidget);
-        expect(find.text("Started by Kofi Mensah · Mon 9 Nov, 10:42 am · \"The FA's congress\""), findsOneWidget);
-        expect(find.text('Finish'), findsOneWidget);
-        expect(find.text('2 teams · postponing: 42 of 306 moved'), findsOneWidget);
-        await tester.tap(find.byTooltip('More').first);
-        await tester.pump();
-        await tester.pump(const Duration(milliseconds: 400));
-        expect(find.text('Finish the postpone that stopped first'), findsOneWidget);
-        expect(tester.takeException(), isNull);
-      });
-      testWidgets('New cup (C2), 18 teams, $width wide, $brightness', (tester) async {
-        await _pump(tester, const CupFormScreen(), Size(width, 3000), brightness);
         expect(find.text('18 teams'), findsOneWidget);
         expect(find.text('Knockout with a first round'), findsOneWidget);
         expect(find.text('Groups, then knockout'), findsOneWidget);
-        expect(find.text('Quarter-finals'), findsOneWidget); // bracket fixed from
+        expect(
+          find.text('Quarter-finals'),
+          findsOneWidget,
+        ); // bracket fixed from
         expect(find.text('Save and go to the first draw'), findsOneWidget);
       });
       testWidgets('New gala (C2b), $width wide, $brightness', (tester) async {
-        await _pump(tester, const CupFormScreen(), Size(width, 3000), brightness);
+        await _pump(
+          tester,
+          const CupFormScreen(),
+          Size(width, 3000),
+          brightness,
+        );
         await tester.tap(find.text('Gala'));
         await tester.pump(const Duration(milliseconds: 300));
         expect(find.text('New Gala'), findsOneWidget);
@@ -389,30 +548,58 @@ void main() {
   }
   for (final brightness in Brightness.values) {
     for (final width in [360.0, 1280.0]) {
-      testWidgets("A cup's page (C7, C8), $width wide, $brightness", (tester) async {
-        await _pump(tester, const CupScreen(cupId: 'c1'), Size(width, 2400), brightness);
+      testWidgets("A cup's page (C7, C8), $width wide, $brightness", (
+        tester,
+      ) async {
+        await _pump(
+          tester,
+          const CupScreen(cupId: 'c1'),
+          Size(width, 2400),
+          brightness,
+        );
         expect(find.text('Cup · 18 teams · not drawn yet'), findsOneWidget);
         expect(find.text('Ready for the first draw'), findsOneWidget);
         expect(find.text('First round · 2 matches · 14 byes'), findsOneWidget);
         expect(find.text('Knockout with a first round'), findsOneWidget);
         expect(find.text('Home and away; the final one match'), findsOneWidget);
-        expect(find.text('Bracket fixed from the quarter-finals · no seeding'), findsOneWidget);
-        expect(find.text('Each round: one match → home and away'), findsOneWidget);
+        expect(
+          find.text('Bracket fixed from the quarter-finals · no seeding'),
+          findsOneWidget,
+        );
+        expect(
+          find.text('Each round: one match → home and away'),
+          findsOneWidget,
+        );
         expect(find.text('Kofi Mensah · Sun 8 Nov, 5:40 pm'), findsOneWidget);
         await tester.tap(find.byTooltip('More'));
         await tester.pump(const Duration(milliseconds: 400));
         expect(find.text('Delete the cup'), findsOneWidget);
-        expect(find.text('Everything goes: matches and history'), findsOneWidget);
+        expect(
+          find.text('Everything goes: matches and history'),
+          findsOneWidget,
+        );
         // A cup's matches get dates at the draw (3.0c2)
-        expect(find.text('Once its matches have dates, after the draw'), findsOneWidget);
+        expect(
+          find.text('Once its matches have dates, after the draw'),
+          findsOneWidget,
+        );
         expect(tester.takeException(), isNull);
       });
-      testWidgets("A Gala's page (C7), $width wide, $brightness", (tester) async {
-        await _pump(tester, const CupScreen(cupId: 'g1'), Size(width, 2400), brightness);
+      testWidgets("A Gala's page (C7), $width wide, $brightness", (
+        tester,
+      ) async {
+        await _pump(
+          tester,
+          const CupScreen(cupId: 'g1'),
+          Size(width, 2400),
+          brightness,
+        );
         expect(find.text('Ready for the draw'), findsOneWidget);
         expect(find.text('First round · 4 matches · 4 byes'), findsOneWidget);
         expect(
-          find.text('Apam Park · Sat 29 Aug – Sun 30 Aug · first kick-off 9:00 am · every 90 min'),
+          find.text(
+            'Apam Park · Sat 29 Aug – Sun 30 Aug · first kick-off 9:00 am · every 90 min',
+          ),
           findsOneWidget,
         );
         expect(find.text('Level at full time'), findsOneWidget);
@@ -423,21 +610,41 @@ void main() {
         await tester.tap(find.text('Postpone'));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 400));
-        expect(find.textContaining('The clubs in the Gala are told.'), findsOneWidget);
+        expect(
+          find.textContaining('The clubs in the Gala are told.'),
+          findsOneWidget,
+        );
         expect(find.text('Starts'), findsOneWidget);
-        expect(find.textContaining('Pick the new date', findRichText: true), findsOneWidget);
+        expect(
+          find.textContaining('Pick the new date', findRichText: true),
+          findsOneWidget,
+        );
         expect(tester.takeException(), isNull);
       });
-      testWidgets('Change the cup (C8), filled in, $width wide, $brightness', (tester) async {
-        await _pump(tester, const CupFormScreen(cupId: 'c1'), Size(width, 3000), brightness);
+      testWidgets('Change the cup (C8), filled in, $width wide, $brightness', (
+        tester,
+      ) async {
+        await _pump(
+          tester,
+          const CupFormScreen(cupId: 'c1'),
+          Size(width, 3000),
+          brightness,
+        );
         expect(find.text('Change the cup'), findsOneWidget);
         expect(find.text('GEDFA Cup 2026/27'), findsWidgets);
         expect(find.text('18 teams'), findsOneWidget);
         expect(find.text('Quarter-finals'), findsOneWidget);
         expect(find.text('Save changes'), findsOneWidget);
       });
-      testWidgets('Change the Gala (C8), filled in, $width wide, $brightness', (tester) async {
-        await _pump(tester, const CupFormScreen(cupId: 'g1'), Size(width, 3000), brightness);
+      testWidgets('Change the Gala (C8), filled in, $width wide, $brightness', (
+        tester,
+      ) async {
+        await _pump(
+          tester,
+          const CupFormScreen(cupId: 'g1'),
+          Size(width, 3000),
+          brightness,
+        );
         expect(find.text('Change the Gala'), findsOneWidget);
         expect(find.text('Apam Park'), findsOneWidget);
         // 12 of the 18 Division teams and 18 U17 sides
@@ -448,24 +655,44 @@ void main() {
     }
   }
   testWidgets("A cup's page with large text on a small phone", (tester) async {
-    await _pump(tester, const CupScreen(cupId: 'g1'), const Size(320, 2400), Brightness.light,
-        textScale: 1.3);
+    await _pump(
+      tester,
+      const CupScreen(cupId: 'g1'),
+      const Size(320, 2400),
+      Brightness.light,
+      textScale: 1.3,
+    );
     expect(find.text('Go to the draw'), findsOneWidget);
   });
   testWidgets('New cup (C2) with large text on a small phone', (tester) async {
-    await _pump(tester, const CupFormScreen(), const Size(320, 3600), Brightness.light,
-        textScale: 1.3);
+    await _pump(
+      tester,
+      const CupFormScreen(),
+      const Size(320, 3600),
+      Brightness.light,
+      textScale: 1.3,
+    );
     expect(find.text('Save and go to the first draw'), findsOneWidget);
   });
   for (final width in [360.0, 1280.0]) {
     testWidgets('Make the season (G1), $width wide', (tester) async {
-      await _pump(tester, const SeasonSetupScreen(), Size(width, 2400), Brightness.light);
+      await _pump(
+        tester,
+        const SeasonSetupScreen(),
+        Size(width, 2400),
+        Brightness.light,
+      );
       expect(find.text('Make the draft'), findsOneWidget);
       expect(find.text('All 18 Division teams'), findsOneWidget);
     });
 
     testWidgets('Draft season (G2), 18 teams, $width wide', (tester) async {
-      await _pump(tester, const SeasonDraftScreen(), Size(width, 2400), Brightness.dark);
+      await _pump(
+        tester,
+        const SeasonDraftScreen(),
+        Size(width, 2400),
+        Brightness.dark,
+      );
       expect(find.text('34'), findsOneWidget); // matchdays
       expect(find.text('306'), findsOneWidget); // matches
       expect(find.text('Publish and tell all teams'), findsOneWidget);
@@ -480,37 +707,123 @@ void main() {
   ]) {
     for (final width in [360.0, 1280.0]) {
       testWidgets('Match details, $what, $width wide', (tester) async {
-        await _pump(tester, MatchDetailsScreen(fixtureId: id, isFa: true),
-            Size(width, 2400), Brightness.light);
+        await _pump(
+          tester,
+          MatchDetailsScreen(fixtureId: id, isFa: true),
+          Size(width, 2400),
+          Brightness.light,
+        );
         expect(find.text('Match info'), findsOneWidget);
         expect(find.text('Directions'), findsOneWidget);
       });
     }
   }
 
-  testWidgets("the FA's Match details: View on a saved sheet (3.2)", (tester) async {
-    await _pump(tester, const MatchDetailsScreen(fixtureId: 'm1', isFa: true),
-        const Size(360, 3000), Brightness.light);
+  testWidgets("the FA's Match details: View on a saved sheet (3.2)", (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      const MatchDetailsScreen(fixtureId: 'm1', isFa: true),
+      const Size(360, 3000),
+      Brightness.light,
+    );
     expect(find.text('View'), findsOneWidget);
   });
 
-  testWidgets("a team's Match details: View and Change on its saved sheet", (tester) async {
-    await _pump(tester, const MatchDetailsScreen(fixtureId: 'm1'),
-        const Size(360, 3000), Brightness.light);
+  testWidgets("3.5a (MO1, MO2): the FA's officials, and the picker", (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      const MatchDetailsScreen(fixtureId: 'm1', isFa: true),
+      const Size(360, 3000),
+      Brightness.dark,
+    );
+    expect(find.text('Kwame Addo'), findsOneWidget);
+    expect(find.text('2 of 5'), findsOneWidget);
+    expect(find.text('Appoint'), findsNWidgets(3));
+    await tester.tap(find.text('Appoint').first);
+    await tester.pumpAndSettle();
+    // Assistant 1: referees only, the referee of this match can't be picked
+    expect(find.text('Esi Owusu'), findsOneWidget);
+    expect(find.textContaining('Referee of this match'), findsOneWidget);
+    expect(find.text('Kwesi Arthur'), findsOneWidget); // the commissioner row
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets("3.5a: a club sees the officials only from 24 hours before", (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      const MatchDetailsScreen(fixtureId: 'm1'),
+      const Size(360, 3000),
+      Brightness.light,
+    );
+    expect(find.textContaining('(24 hours before kick-off)'), findsOneWidget);
+    expect(find.text('Kwame Addo'), findsNothing);
+  });
+
+  for (final width in [360.0, 1280.0]) {
+    testWidgets('3.5a (MO3): a matchday at once, $width wide', (tester) async {
+      await _pump(
+        tester,
+        const AppointRoundScreen(
+          competitionId: '2026-27_division-league',
+          round: 4,
+        ),
+        Size(width, 1400),
+        Brightness.light,
+      );
+      expect(find.text('Appoint officials'), findsOneWidget);
+      expect(find.text('2 of 5'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets("a team's Match details: View and Change on its saved sheet", (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      const MatchDetailsScreen(fixtureId: 'm1'),
+      const Size(360, 3000),
+      Brightness.light,
+    );
     expect(find.text('View'), findsOneWidget);
     expect(find.text('Change'), findsOneWidget);
   });
 
-  testWidgets('Match details with large text (130%) on a small phone', (tester) async {
-    await _pump(tester, const MatchDetailsScreen(fixtureId: 'm1'),
-        const Size(320, 3000), Brightness.dark, textScale: 1.3);
+  testWidgets('Match details with large text (130%) on a small phone', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      const MatchDetailsScreen(fixtureId: 'm1'),
+      const Size(320, 3000),
+      Brightness.dark,
+      textScale: 1.3,
+    );
     expect(find.text('What changed'), findsOneWidget);
   });
 
-  testWidgets('both tabs with large text (130%) on a small phone', (tester) async {
-    await _pump(tester, const TeamFixturesScreen(), const Size(320, 3000),
-        Brightness.light, textScale: 1.3);
-    await _pump(tester, const FaFixturesScreen(), const Size(320, 3000),
-        Brightness.light, textScale: 1.3);
+  testWidgets('both tabs with large text (130%) on a small phone', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      const TeamFixturesScreen(),
+      const Size(320, 3000),
+      Brightness.light,
+      textScale: 1.3,
+    );
+    await _pump(
+      tester,
+      const FaFixturesScreen(),
+      const Size(320, 3000),
+      Brightness.light,
+      textScale: 1.3,
+    );
   });
 }

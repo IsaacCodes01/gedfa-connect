@@ -483,7 +483,8 @@ service cloud.firestore {
                            'teamSuspended', 'suspensionLifted',
                            'fixtureAdded', 'fixtureChanged', 'fixturePostponed',
                            'fixtureCancelled', 'divisionJuveniles',
-                           'playerSuspended', 'playerSuspensionLifted']
+                           'playerSuspended', 'playerSuspensionLifted',
+                           'appointed', 'appointmentRemoved']
           // What the note's button opens (3.1e1: a player)
           && isOptionalText(data, 'targetId', 60)
           && data.teamId is string
@@ -508,6 +509,9 @@ service cloud.firestore {
 
       match /notifications/{notificationId} {
         allow get, list: if (resource.data.audience == 'fa' && isFaAdmin())
+          // One person's notes (3.5a: a referee or an FA official appointed)
+          || (request.auth != null
+              && resource.data.audience == 'person:' + request.auth.uid)
           || (isTeamAdmin()
               && resource.data.audience
                    == 'team:' + get(userDoc(request.auth.uid)).data.get('teamId', ''));
@@ -516,6 +520,9 @@ service cloud.firestore {
           && ((request.resource.data.audience == 'fa'
                 && canNotifyFa(request.resource.data))
               || (request.resource.data.audience == 'team:' + request.resource.data.teamId
+                && isFaAdmin())
+              || (request.resource.data.audience.matches('person:[A-Za-z0-9_-]+')
+                && request.resource.data.kind in ['appointed', 'appointmentRemoved']
                 && isFaAdmin()));
       }
 
@@ -1422,6 +1429,64 @@ service cloud.firestore {
             && request.resource.data.at == request.time
             && existsAfter(fixtureDoc(fixtureId));
         }
+      }
+
+      // ---------- fixtureOfficials/{fixtureId} (3.5a) ----------
+      // Who officiates a match: referee, assistant1, assistant2, fourth,
+      // commissioner, each { uid, name }, and officialIds (their uids).
+      // Only the FA writes it. Referees fill the first four places; the
+      // commissioner is a referee or an FA official (Isaac, 9 Nov 2026).
+      // Read by the FA, the appointed officials, and the two clubs from
+      // 24 hours before kick-off (Isaac, 11 Nov 2026).
+
+      function isOfficialPlace(officials, ids, place, roles) {
+        return officials.get(place, null) == null
+          || (officials[place] is map
+              && officials[place].keys().hasOnly(['uid', 'name'])
+              && officials[place].keys().hasAll(['uid', 'name'])
+              && isText(officials[place].name, 1, 80)
+              && officials[place].uid is string
+              && ids.hasAny([officials[place].uid])
+              && get(userDoc(officials[place].uid)).data.get('role', '') in roles);
+      }
+
+      function isValidMatchOfficials(fixtureId, data) {
+        let officials = data.get('officials', null);
+        let ids = data.get('officialIds', null);
+        return data.keys().hasOnly(['fixtureId', 'season', 'officials', 'officialIds',
+                                    'updatedBy', 'updatedAt'])
+          && data.fixtureId == fixtureId
+          && data.season == get(fixtureDoc(fixtureId)).data.season
+          && officials is map
+          && officials.keys().hasOnly(['referee', 'assistant1', 'assistant2',
+                                       'fourth', 'commissioner'])
+          && ids is list
+          && ids.size() == officials.size()
+          && ids.toSet().size() == ids.size()
+          && isOfficialPlace(officials, ids, 'referee', ['referee'])
+          && isOfficialPlace(officials, ids, 'assistant1', ['referee'])
+          && isOfficialPlace(officials, ids, 'assistant2', ['referee'])
+          && isOfficialPlace(officials, ids, 'fourth', ['referee'])
+          && isOfficialPlace(officials, ids, 'commissioner', ['referee', 'faAdmin'])
+          && data.updatedBy == request.auth.uid
+          && data.updatedAt == request.time;
+      }
+
+      // A team admin of one of the match's clubs, from 24 hours before
+      function isClubOfMatchSoon(fixtureId) {
+        let fixture = get(fixtureDoc(fixtureId)).data;
+        return isTeamAdmin()
+          && fixture.teamIds.hasAny([get(userDoc(request.auth.uid)).data.get('teamId', '')])
+          && fixture.get('kickoffAt', null) != null
+          && request.time + duration.value(24, 'h') >= fixture.kickoffAt;
+      }
+
+      match /fixtureOfficials/{fixtureId} {
+        allow get, list: if isFaAdmin()
+          || (request.auth != null && request.auth.uid in resource.data.officialIds);
+        allow get: if isClubOfMatchSoon(fixtureId);
+        allow create, update: if isFaAdmin()
+          && isValidMatchOfficials(fixtureId, request.resource.data);
       }
 
       // ---------- fixtureDrafts/{draftId} (3.0b) ----------

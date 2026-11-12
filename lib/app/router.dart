@@ -38,6 +38,7 @@ import 'package:gedfa_connect/features/fixtures/presentation/season_draft_screen
 import 'package:gedfa_connect/features/fixtures/presentation/season_setup_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/team_fixtures_screen.dart';
 import 'package:gedfa_connect/features/players/domain/age_group.dart';
+import 'package:gedfa_connect/features/officials/presentation/appoint_round_screen.dart';
 import 'package:gedfa_connect/features/suspensions/presentation/suspend_player_screen.dart';
 import 'package:gedfa_connect/features/suspensions/presentation/suspended_players_screen.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
@@ -285,6 +286,18 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: Routes.adminFixtures,
                 builder: (_, _) => const FaFixturesScreen(),
                 routes: [
+                  // Appoint a matchday's officials (3.5a, MO3)
+                  GoRoute(
+                    path: 'officials',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (_, state) => AppointRoundScreen(
+                      competitionId: state.uri.queryParameters['c'] ?? '',
+                      round:
+                          int.tryParse(state.uri.queryParameters['r'] ?? '') ??
+                          1,
+                      ageGroup: state.uri.queryParameters['g'],
+                    ),
+                  ),
                   // Competitions (3.0c1, C1), then a new cup or gala (C2)
                   GoRoute(
                     path: 'competitions',

@@ -4,6 +4,7 @@ import 'package:gedfa_connect/app/routes.dart';
 import 'package:gedfa_connect/core/errors/app_error_messages.dart';
 import 'package:gedfa_connect/core/layout/responsive.dart';
 import 'package:gedfa_connect/core/utils/date_format.dart';
+import 'package:gedfa_connect/core/widgets/back_to_home.dart';
 import 'package:gedfa_connect/core/widgets/gedfa_app_bar.dart';
 import 'package:gedfa_connect/core/widgets/notification_bell.dart';
 import 'package:gedfa_connect/core/widgets/state_views.dart';
@@ -208,7 +209,18 @@ class _FaFixturesScreenState extends ConsumerState<FaFixturesScreen> {
       for (final round in rounds) ...[
         DashboardSectionTitle(
           title: 'Matchday $round',
-          trailing: _dates(byRound[round]!),
+          // MO3 (3.5a): the matchday's officials in one go
+          trailing: '${_dates(byRound[round]!)} · Officials',
+          onTap: () {
+            final first = byRound[round]!.first;
+            context.open(
+              Routes.adminAppointRound(
+                first.competitionId,
+                round,
+                ageGroup: first.ageGroup?.label,
+              ),
+            );
+          },
         ),
         FixtureListCard(
           children: [

@@ -91,6 +91,28 @@ class NotificationWriter {
     tx.set(e.ref, e.data, SetOptions(merge: true));
   }
 
+  /// For one person's bell (3.5a: a referee or an FA official appointed
+  /// to a match), written by the FA. One note per person, kind and day:
+  /// "You are the referee — Royal Unique FC v Asebu Stars, …".
+  void forPersonInBatch(
+    WriteBatch batch, {
+    required NotificationKind kind,
+    required String uid,
+    required String line,
+    String? targetId,
+  }) {
+    final e = _entry(
+      audience: 'person:$uid',
+      kind: kind,
+      teamId: '',
+      teamName: '',
+      name: line,
+      groupKey: 'all',
+      targetId: targetId,
+    );
+    batch.set(e.ref, e.data, SetOptions(merge: true));
+  }
+
   /// For the FA's bell (written by teams, clubs and invited people).
   /// Team requests from every club are grouped into one a day:
   /// "3 new team requests: Afransi Stars, Royal Unique FC and Golden Unity".

@@ -17,6 +17,7 @@ import 'package:gedfa_connect/features/fixtures/presentation/widgets/fixture_act
 import 'package:gedfa_connect/features/fixtures/presentation/widgets/fixture_row.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/widgets/renamed_pill.dart';
 import 'package:gedfa_connect/features/team_sheets/data/team_sheet_repository.dart';
+import 'package:gedfa_connect/features/officials/presentation/widgets/officials_card.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
 import 'package:gedfa_connect/features/teams/presentation/widgets/kit_thumb.dart';
 import 'package:gedfa_connect/app/routes.dart';
@@ -159,16 +160,8 @@ class _DetailsState extends ConsumerState<_Details> {
                               '${formatTime(f.sheetDueAt!)}',
                     ),
                     _Sheets(fixture: f, now: now, isFa: widget.isFa),
-                    const DashboardSectionTitle(
-                      title: 'Officials',
-                      trailing: 'Phase 4',
-                    ),
-                    const _Line(
-                      icon: Icons.sports_outlined,
-                      title: 'Referee and assistants',
-                      detail: 'Appointed by the FA (comes with referee '
-                          'appointments)',
-                    ),
+                    // The FA appoints; the clubs see them 24 h before (3.5a)
+                    OfficialsSection(fixture: f, isFa: widget.isFa),
                   ],
                 ),
               ),

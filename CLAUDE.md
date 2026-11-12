@@ -19,7 +19,7 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
    - test steps he can do himself in the app
 5. **Before every commit**, run (and show the result):
    - `flutter analyze` → must be **0 issues**
-   - `cd test/rules && npm test` → **all** rules tests pass (432 after 3.1e3)
+   - `cd test/rules && npm test` → **all** rules tests pass (441 after 3.5a)
    - `flutter test` → all Dart tests pass (layout smoke tests and the kit check)
 6. **Commit after each step** with a clear message, e.g.
    `feat(teams): change requests for name, short name, logo and competitions; 250 rules tests; docs v2.12`
@@ -87,7 +87,7 @@ Build one at a time, mockup first where it says so; details are in `docs/ROADMAP
 |---|------|------------|--------|-------|
 | ✓ | **3.2** Lock and visibility | The FA views any team sheet; the opponent from the lock | — | Done 11 Nov 2026 |
 | ✓ | **3.1e** Player suspensions | 3.1e1 suspend / lift, Suspended list, the club's rows and bell; 3.1e2 locked row on the sheet + moving a ban when a match is postponed; unique note icons | Approved | Done 11 Nov 2026. **Next: 3.5** |
-| 3 | **3.5** Match officials + referee Home | The FA appoints referee, 2 assistants, 4th official, commissioner (FA admin or referee) per fixture (`officials` map, bell notes); referee dashboard RD1; officials see **both sheets from the lock, with player IDs** (MC1) | MC1 approved (`3.6-match-day-check.html`); RD1 first | Referees' accounts exist (invites). The other team sees **Division photos** at the lock, juveniles without (MC3) |
+| 3 | **3.5** Match officials + referee Home | ✓ **3.5a** the FA appoints (`fixtureOfficials`, notes to `person:<uid>`); **3.5b** referee Home, Matches, bell, Can't make it (RD1–RD3); **3.5c** officials see **both sheets from the lock, with player IDs** (MC1) | **Approved** (`3.5-match-officials.html`; MC1 in `3.6-match-day-check.html`) | 3.5a done 12 Nov 2026; **build 3.5b next**. Clubs see officials 24 h before |
 | 4 | **3.3** Official sheet as a PDF | Both teams' sheets with player IDs, kits, officials, captains' signature lines; `pdf` / `printing`; **no QR code** (Isaac) | MC4 approved | |
 | 5 | **3.6** Player check | "Check players": the **commissioner only** checks each face (big photo, number, ID): Matches / Doesn't match (note) / Absent; a mismatch is **recorded** for the FA and the report, not struck off (MC2, MC5) | MC2, MC5 approved | Photos via a separate locked-down copy, Storage rules too |
 | 6 | **M1, M2** Sending and loading states | One shared look for "saving…" and loading everywhere | Yes, first | Part of the UI/UX refresh |
@@ -267,6 +267,13 @@ Build one at a time, mockup first where it says so; details are in `docs/ROADMAP
   `ban_mover.dart`, called after suspend, lift and every `FixtureRepository` write (add, publish, change, postpone, new date, cancel,
   league postpone). It sets whole `banned.{team}` lists (rule `isBanningMatch`). The sheet also computes the blocking from
   `myBansProvider`, so it is right even if a sync failed. 432 rules tests, 326 Dart tests. **Next: 3.5.**
+- **3.5a** done (12 Nov 2026, 441 rules tests, 336 Dart tests): `fixtureOfficials/{fixtureId}` (its own doc so clubs read it only from
+  24 h before; rules `isValidMatchOfficials`, `isOfficialPlace`, `isClubOfMatchSoon`); `features/officials/`: `domain/match_officials.dart`
+  (`OfficialPlace`, `MatchOfficials.withPlace`, `busyElsewhere`, `refereeColoursFor`), `data/officials_repository.dart` (`save` + notes,
+  `seasonOfficialsProvider`, `matchOfficialsProvider`), `widgets/officials_card.dart` (`OfficialsSection` on Match details, picker),
+  `appoint_round_screen.dart` (MO3, `Routes.adminAppointRound`, from the matchday heading). Notes `NotificationWriter.forPersonInBatch`
+  (audience `person:<uid>`, kinds `appointed` / `appointmentRemoved`; their targets point at `Routes.referee` until 3.5b). Rules changed:
+  Isaac deploys to dev. **Next: 3.5b** (referee tabs Home · Matches · More, their bell reads `person:<uid>`, Can't make it).
 - Calendar backdrop (`_CalendarBackdrop` in `match_calendar_card.dart`): GEDFA logo as a one-colour watermark (its letters are white,
   so tint it with `color` + `BlendMode.srcIn`). `assets/images/gedfa_logo.png` is now committed.
 - **Plan agreed 9 Nov 2026 (deadline Thu 12 Nov, 12:30 pm; Isaac's prompts in that conversation):** next, in order:

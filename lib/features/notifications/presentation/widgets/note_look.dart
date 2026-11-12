@@ -46,6 +46,8 @@ IconData noteKindIcon(NotificationKind kind) => switch (kind) {
   NotificationKind.fixtureCancelled => Icons.event_busy_rounded,
   NotificationKind.playerSuspended => Icons.block_rounded,
   NotificationKind.playerSuspensionLifted => Icons.lock_open_rounded,
+  NotificationKind.appointed => Icons.sports_rounded,
+  NotificationKind.appointmentRemoved => Icons.person_remove_rounded,
   NotificationKind.teamRequest => Icons.shield_rounded,
   NotificationKind.playersSubmitted => Icons.person_add_alt_1_rounded,
   NotificationKind.playersResubmitted => Icons.restart_alt_rounded,
@@ -218,6 +220,13 @@ const announcementIcon = Icons.campaign_rounded;
       ),
       _ => (NoteLook.ok, Routes.team, squad),
     },
+    // Appointments (3.5a); the referee's Matches tab comes in 3.5b
+    NotificationKind.appointed => (NoteLook.ref, Routes.referee, 'Open Home'),
+    NotificationKind.appointmentRemoved => (
+      NoteLook.no,
+      Routes.referee,
+      'Open Home',
+    ),
   };
   return (look: look, target: target, button: button);
 }
