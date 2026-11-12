@@ -1513,6 +1513,61 @@ service cloud.firestore {
           && isText(request.resource.data.cantMake[request.auth.uid].get('reason', ''), 3, 200);
       }
 
+      // ---------- playerChecks/{fixtureId} (3.6b) ----------
+      // The commissioner's face check (MC2): each player on a saved sheet
+      // gets Matches / Doesn't match (with a note) / Absent. Only the
+      // match's commissioner writes, one player per write (`changed`), from
+      // the lock (1 h before kick-off) until 2 h after kick-off (Isaac,
+      // 12 Nov 2026). A mismatch is recorded, not struck off the sheet.
+      function isCommissionerOf(fixtureId) {
+        return request.auth != null
+          && exists(fixtureOfficialDoc(fixtureId))
+          && get(fixtureOfficialDoc(fixtureId)).data.get('officials', {})
+               .get('commissioner', {}).get('uid', '') == request.auth.uid;
+      }
+
+      function isPlayerCheckTime(fixture) {
+        return fixture.get('kickoffAt', null) != null
+          && request.time + duration.value(1, 'h') >= fixture.kickoffAt
+          && request.time <= fixture.kickoffAt + duration.value(2, 'h');
+      }
+
+      function isValidPlayerCheck(fixtureId) {
+        let fixture = get(fixtureDoc(fixtureId)).data;
+        let data = request.resource.data;
+        let before = resource == null ? {} : resource.data.get('results', {});
+        let p = data.get('changed', '');
+        let entry = data.results[p];
+        let sheet = get(/databases/$(database)/documents/districts/$(districtId)/teamSheets/$(fixtureId + '_' + entry.teamId)).data;
+        return data.keys().hasOnly(['fixtureId', 'results', 'changed', 'by', 'byName', 'updatedAt'])
+          && data.fixtureId == fixtureId
+          && data.by == request.auth.uid
+          && isText(data.byName, 1, 80)
+          && data.updatedAt == request.time
+          && data.results is map
+          && data.results.diff(before).affectedKeys().hasOnly([p])
+          && entry.keys().hasOnly(['result', 'note', 'teamId', 'at'])
+          && entry.result in ['match', 'mismatch', 'absent']
+          && entry.at == request.time
+          && entry.teamId in [fixture.home.id, fixture.away.id]
+          && (p in sheet.get('starters', []) || p in sheet.get('bench', []))
+          // A mismatch says why (3 to 300 characters); a note is optional otherwise
+          && (entry.result == 'mismatch'
+                ? isText(entry.get('note', ''), 3, 300)
+                : (!('note' in entry) || isText(entry.note, 0, 300)))
+          && isPlayerCheckTime(fixture);
+      }
+
+      match /playerChecks/{fixtureId} {
+        // The FA and the match's appointed officials (MC5 comes in 3.6c)
+        allow get: if isFaAdmin()
+          || (request.auth != null
+              && exists(fixtureOfficialDoc(fixtureId))
+              && request.auth.uid in get(fixtureOfficialDoc(fixtureId)).data.get('officialIds', []));
+        allow create, update: if isCommissionerOf(fixtureId)
+          && isValidPlayerCheck(fixtureId);
+      }
+
       // ---------- fixtureDrafts/{draftId} (3.0b) ----------
       // "Make the season": a draft the FA saved for later. FA only; nobody
       // else sees it. Each match is checked when it is published.

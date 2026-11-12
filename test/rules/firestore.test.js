@@ -5220,3 +5220,96 @@ describe("Can't make it (3.5b)", () => {
     await assertFails(save({ ref2: { reason: 'Ill' } }));
   });
 });
+
+describe('Players check (3.6b)', () => {
+  const ref = (db) => doc(db, `${D}/playerChecks/f1`);
+  const MIN = 60000;
+
+  /** f1 kicks off in [minutes]; ref2 is its commissioner, ref1 its referee. */
+  async function seedMatch(minutes = 30) {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, `${D}/users/ref2`), { role: 'referee', name: 'Esi Owusu' });
+      await setDoc(doc(db, `${D}/fixtures/f1`),
+        fixtureData({ kickoffAt: Timestamp.fromMillis(Date.now() + minutes * MIN) }));
+      await setDoc(doc(db, `${D}/fixtureOfficials/f1`), {
+        fixtureId: 'f1', season: '2026-27',
+        officials: { referee: { uid: 'ref1', name: 'Ebo Quaye' }, commissioner: { uid: 'ref2', name: 'Esi Owusu' } },
+        officialIds: ['ref1', 'ref2'], updatedBy: 'fa1', updatedAt: Timestamp.now(),
+      });
+      await setDoc(doc(db, `${D}/teamSheets/f1_royal`), {
+        fixtureId: 'f1', teamId: 'royal', starters: ['p1'], bench: ['p3'], savedBy: 'admin1', savedAt: Timestamp.now(),
+      });
+    });
+  }
+
+  function check(db, { player = 'p1', result = 'match', note, teamId = 'royal', by = 'ref2', extra = {} } = {}) {
+    return setDoc(ref(db), {
+      fixtureId: 'f1',
+      results: { [player]: { result, teamId, at: serverTimestamp(), ...(note === undefined ? {} : { note }), ...extra } },
+      changed: player, by, byName: 'Esi Owusu', updatedAt: serverTimestamp(),
+    }, { merge: true });
+  }
+
+  it('the commissioner records Matches, Absent, and Doesn\'t match with a note', async () => {
+    await seedMatch();
+    const db = dbAs('ref2');
+    await assertSucceeds(check(db));
+    await assertSucceeds(check(db, { player: 'p3', result: 'absent' }));
+    await assertSucceeds(check(db, { player: 'p1', result: 'mismatch', note: 'Face different from the photo' }));
+  });
+
+  it("Doesn't match needs a note; the entry holds nothing else", async () => {
+    await seedMatch();
+    const db = dbAs('ref2');
+    await assertFails(check(db, { result: 'mismatch' }));
+    await assertFails(check(db, { result: 'mismatch', note: 'no' }));
+    await assertFails(check(db, { result: 'struck' }));
+    await assertFails(check(db, { extra: { photoUrl: 'x' } }));
+  });
+
+  it('only the commissioner: not the referee, the FA or a club', async () => {
+    await seedMatch();
+    await assertFails(check(dbAs('ref1'), { by: 'ref1' }));
+    await assertFails(check(dbAs('fa1'), { by: 'fa1' }));
+    await assertFails(check(dbAs('admin1'), { by: 'admin1' }));
+    await assertFails(check(dbAs('ref2'), { by: 'ref1' }));
+  });
+
+  it('only a player on that team\'s saved sheet, one per write', async () => {
+    await seedMatch();
+    const db = dbAs('ref2');
+    await assertFails(check(db, { player: 'p2' }));
+    await assertFails(check(db, { teamId: 'stars' }));
+    await assertFails(setDoc(ref(db), {
+      fixtureId: 'f1',
+      results: {
+        p1: { result: 'match', teamId: 'royal', at: serverTimestamp() },
+        p3: { result: 'match', teamId: 'royal', at: serverTimestamp() },
+      },
+      changed: 'p1', by: 'ref2', byName: 'Esi Owusu', updatedAt: serverTimestamp(),
+    }));
+  });
+
+  it('only from the lock until 2 hours after kick-off', async () => {
+    await seedMatch(90); // 1 h 30 before: not yet
+    await assertFails(check(dbAs('ref2')));
+    await seedMatch(-150); // 2 h 30 after: closed
+    await assertFails(check(dbAs('ref2')));
+    await seedMatch(-100); // 1 h 40 after: still open
+    await assertSucceeds(check(dbAs('ref2')));
+  });
+
+  it('read by the FA and the match officials, not by clubs or other referees', async () => {
+    await seedMatch();
+    await assertSucceeds(check(dbAs('ref2')));
+    await assertSucceeds(getDoc(ref(dbAs('fa1'))));
+    await assertSucceeds(getDoc(ref(dbAs('ref1'))));
+    await assertSucceeds(getDoc(ref(dbAs('ref2'))));
+    await assertFails(getDoc(ref(dbAs('admin1'))));
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `${D}/users/ref3`), { role: 'referee', name: 'Yaw Mensah' });
+    });
+    await assertFails(getDoc(ref(dbAs('ref3'))));
+  });
+});

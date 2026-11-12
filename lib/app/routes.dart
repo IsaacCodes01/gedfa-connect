@@ -149,6 +149,13 @@ class Routes {
   static String refereeMatchPdf(String id) =>
       '$refereeMatches/match/$id/official-sheet';
 
+  /// The commissioner's players check (3.6b, MC2): from the referee's
+  /// area, or the FA's when an FA official is the commissioner.
+  static String refereeMatchCheck(String id) =>
+      '$refereeMatches/match/$id/check';
+  static String adminMatchCheck(String id) =>
+      '$adminFixtures/match/$id/check';
+
   /// Team: its own sheet as a PDF (3.3b), once saved.
   static String teamMatchPdf(String id) =>
       '$teamFixtures/match/$id/official-sheet';

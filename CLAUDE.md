@@ -19,7 +19,7 @@ and `docs/DATA_MODEL.md` (every collection, field and rule) before changing anyt
    - test steps he can do himself in the app
 5. **Before every commit**, run (and show the result):
    - `flutter analyze` → must be **0 issues**
-   - `cd test/rules && npm test` → **all** rules tests pass (452 after 3.6a)
+   - `cd test/rules && npm test` → **all** rules tests pass (458 after 3.6b)
    - `flutter test` → all Dart tests pass (layout smoke tests and the kit check)
 6. **Commit after each step** with a clear message, e.g.
    `feat(teams): change requests for name, short name, logo and competitions; 250 rules tests; docs v2.12`
@@ -89,7 +89,7 @@ Build one at a time, mockup first where it says so; details are in `docs/ROADMAP
 | ✓ | **3.1e** Player suspensions | 3.1e1 suspend / lift, Suspended list, the club's rows and bell; 3.1e2 locked row on the sheet + moving a ban when a match is postponed; unique note icons | Approved | Done 11 Nov 2026. **Next: 3.5** |
 | ✓ | **3.5** Match officials + referee Home | ✓ **3.5a** the FA appoints (`fixtureOfficials`, notes to `person:<uid>`); **3.5b** referee Home, Matches, bell, Can't make it (RD1–RD3); **3.5c** officials see **both sheets from the lock, with player IDs** (MC1) | **Approved** (`3.5-match-officials.html`; MC1 in `3.6-match-day-check.html`) | Done 12 Nov 2026 (3.5a–c). **Next: 3.3**. Clubs see officials 24 h before |
 | ✓ | **3.3** Official sheet as a PDF | Both teams' sheets with player IDs, kits, officials, captains' signature lines; `pdf` / `printing`; **no QR code** (Isaac) | MC4 approved | Done 12 Nov 2026 (3.3, 3.3b team copy + photo kits). Web: `web/index.html` gives older Safari pdf.js legacy; if the preview fails the screen offers Open the PDF. Deploy after `flutter clean` (a stale build left out the printing web plugin). **Next: 3.6** |
-| 5 | **3.6** Player check (✓ 3.6a photos; next **3.6b**) | "Check players": the **commissioner only** checks each face (big photo, number, ID): Matches / Doesn't match (note) / Absent; a mismatch is **recorded** for the FA and the report, not struck off (MC2, MC5) | MC2, MC5 approved | Photos via a separate locked-down copy, Storage rules too |
+| 5 | **3.6** Player check (✓ 3.6a photos, ✓ 3.6b Check players; next **3.6c**) | "Check players": the **commissioner only** checks each face (big photo, number, ID): Matches / Doesn't match (note) / Absent; a mismatch is **recorded** for the FA and the report, not struck off (MC2, MC5) | MC2, MC5 approved | Photos via a separate locked-down copy, Storage rules too |
 | 6 | **M1, M2** Sending and loading states | One shared look for "saving…" and loading everywhere | Yes, first | Part of the UI/UX refresh |
 | 7 | **Refresh (light)** | App icon (`flutter_launcher_icons`), splash (`flutter_native_splash`) + intro before "Get started" | Yes, first | Never mixed with feature work |
 | 7b | **3.3c** PDF preview on old iPhones | iPhone 8 (iOS 16): the preview page is blank (pdf.js legacy runs, draws nothing; likely OffscreenCanvas). Print / Download work. Fix: pdf.js without OffscreenCanvas, or on old Safari skip the preview and show "Your sheet is ready" + Open the PDF (`_PreviewUnavailable`) | — | Isaac, 12 Nov 2026: after Refresh (light), before Phase 4 |
@@ -303,6 +303,12 @@ Build one at a time, mockup first where it says so; details are in `docs/ROADMAP
   `repairPlayerPhotos` (the Squad lists Repair runs both); rule `isPlayerPhotoCopy` (only the player's own links); read by FA and
   referees. Isaac: check from the lock to 2 h after kick-off; MC3 later. Rules changed: Isaac deploys to dev, then presses Repair.
   **Next: 3.6b** Check players (MC2) for the commissioner, `playerChecks/{fixtureId}`; then 3.6c the FA's view (MC5) + note.
+- **3.6b** done (12 Nov 2026, 458 rules tests, 376 Dart tests): `features/player_checks/` (`domain/player_check.dart`: `CheckResult`,
+  `PlayerCheck`, `MatchPlayerChecks.entryWrite` (one player, `changed`; an old note is deleted), `CheckWindow` (lock to kick-off + 2 h),
+  `CheckLine.forSheet` (shirt order), `nextUnchecked`; `data/player_check_repository.dart`, `playerChecksProvider`;
+  `presentation/check_players_screen.dart` (MC2, `_NoteDialog` owns its controller), `Routes.refereeMatchCheck` / `adminMatchCheck`;
+  `_PlayersCheckCard` on Match details (commissioner only). Rules `isCommissionerOf`, `isValidPlayerCheck`. Rules changed: Isaac deploys
+  to dev. **Next: 3.6c** the FA's view (MC5) on Match details + a bell note to the FA when a player doesn't match.
 - Calendar backdrop (`_CalendarBackdrop` in `match_calendar_card.dart`): GEDFA logo as a one-colour watermark (its letters are white,
   so tint it with `color` + `BlendMode.srcIn`). `assets/images/gedfa_logo.png` is now committed.
 - **Plan agreed 9 Nov 2026 (deadline Thu 12 Nov, 12:30 pm; Isaac's prompts in that conversation):** next, in order:

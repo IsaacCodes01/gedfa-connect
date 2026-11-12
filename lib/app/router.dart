@@ -31,6 +31,7 @@ import 'package:gedfa_connect/features/fixtures/presentation/fa_fixtures_screen.
 import 'package:gedfa_connect/features/fixtures/presentation/fixture_form_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/fixture_kits_screen.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/match_details_screen.dart';
+import 'package:gedfa_connect/features/player_checks/presentation/check_players_screen.dart';
 import 'package:gedfa_connect/features/team_sheets/presentation/official_sheet_screen.dart';
 import 'package:gedfa_connect/features/team_sheets/presentation/team_sheet_view_screen.dart';
 import 'package:gedfa_connect/features/team_sheets/presentation/team_sheet_screen.dart';
@@ -393,6 +394,15 @@ final routerProvider = Provider<GoRouter>((ref) {
                     builder: (_, state) => OfficialSheetScreen(
                       fixtureId: state.pathParameters['id']!,
                       viewer: SheetViewer.fa,
+                    ),
+                  ),
+                  // An FA official who is the commissioner (3.6b)
+                  GoRoute(
+                    path: 'match/:id/check',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (_, state) => CheckPlayersScreen(
+                      fixtureId: state.pathParameters['id']!,
+                      isFa: true,
                     ),
                   ),
                   GoRoute(
@@ -760,6 +770,14 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: Routes.refereeMatches,
                 builder: (_, _) => const RefereeMatchesScreen(),
                 routes: [
+                  // The commissioner's players check (3.6b, MC2)
+                  GoRoute(
+                    path: 'match/:id/check',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (_, state) => CheckPlayersScreen(
+                      fixtureId: state.pathParameters['id']!,
+                    ),
+                  ),
                   // The official team sheet as a PDF (3.3), from the lock
                   GoRoute(
                     path: 'match/:id/official-sheet',

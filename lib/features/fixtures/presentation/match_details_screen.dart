@@ -17,6 +17,11 @@ import 'package:gedfa_connect/features/fixtures/presentation/widgets/fixture_act
 import 'package:gedfa_connect/features/fixtures/presentation/widgets/fixture_row.dart';
 import 'package:gedfa_connect/features/fixtures/presentation/widgets/renamed_pill.dart';
 import 'package:gedfa_connect/features/team_sheets/data/team_sheet_repository.dart';
+import 'package:gedfa_connect/features/auth/data/app_user_repository.dart';
+import 'package:gedfa_connect/features/officials/data/officials_repository.dart';
+import 'package:gedfa_connect/features/officials/domain/match_officials.dart';
+import 'package:gedfa_connect/features/player_checks/data/player_check_repository.dart';
+import 'package:gedfa_connect/features/player_checks/domain/player_check.dart';
 import 'package:gedfa_connect/features/team_sheets/presentation/team_sheet_view_screen.dart';
 import 'package:gedfa_connect/features/officials/presentation/widgets/officials_card.dart';
 import 'package:gedfa_connect/features/teams/data/team_repository.dart';
@@ -175,6 +180,13 @@ class _DetailsState extends ConsumerState<_Details> {
                       _OfficialSheets(fixture: f, now: now)
                     else
                       _Sheets(fixture: f, now: now, isFa: widget.isFa),
+                    // The commissioner's players check (3.6b, MC2)
+                    if (widget.isOfficial || widget.isFa)
+                      _PlayersCheckCard(
+                        fixture: f,
+                        now: now,
+                        isFa: widget.isFa,
+                      ),
                     // The FA appoints; the clubs see them 24 h before (3.5a)
                     OfficialsSection(
                       fixture: f,
@@ -1039,6 +1051,63 @@ class _OfficialSheetsState extends ConsumerState<_OfficialSheets> {
         const SizedBox(height: 10),
         _OfficialSheetCard(route: Routes.refereeMatchPdf(f.id), locked: true),
       ],
+    );
+  }
+}
+
+/// Players check (3.6b, MC1): only for the match's commissioner. Before
+/// the lock, when it opens; then how many are checked and Check players;
+/// after 2 h past kick-off, closed, to look at.
+class _PlayersCheckCard extends ConsumerWidget {
+  const _PlayersCheckCard({
+    required this.fixture,
+    required this.now,
+    required this.isFa,
+  });
+
+  final Fixture fixture;
+  final DateTime now;
+  final bool isFa;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final f = fixture;
+    final me = ref.watch(appUserProvider).value;
+    final officials = ref.watch(matchOfficialsProvider(f.id)).value;
+    final commissioner = officials?[OfficialPlace.commissioner];
+    if (me == null || commissioner == null || commissioner.uid != me.uid) {
+      return const SizedBox.shrink();
+    }
+    final opens = CheckWindow.opensAt(f);
+    final started = opens != null && !now.isBefore(opens);
+    final open = CheckWindow.isOpen(f, now);
+    final checked = started
+        ? ref.watch(playerChecksProvider(f.id)).value?.results.length ?? 0
+        : 0;
+    final route = isFa ? Routes.adminMatchCheck(f.id) : Routes.refereeMatchCheck(f.id);
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: DashboardCard(
+        onTap: started ? () => context.open(route) : null,
+        child: _Line(
+          icon: Icons.how_to_reg_outlined,
+          title: 'Players check · you are the commissioner',
+          detail: !started
+              ? opens == null
+                    ? 'Opens 1 hour before kick-off.'
+                    : 'Opens at ${formatTime(opens)}, when the sheets lock.'
+              : open
+              ? '$checked checked · each face against the registered photo'
+              : 'Closed · $checked checked',
+          trailing: !started
+              ? null
+              : FilledButton.tonal(
+                  style: _Sheets._compact,
+                  onPressed: () => context.open(route),
+                  child: Text(open ? 'Check players' : 'View'),
+                ),
+        ),
+      ),
     );
   }
 }

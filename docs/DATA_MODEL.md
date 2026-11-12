@@ -1,6 +1,6 @@
 # GEDFA Connect — Data Model
 
-**Status:** v2.43, matches the rules after step 3.6a, player photos for the face check (12 Nov 2026)
+**Status:** v2.44, matches the rules after step 3.6b, the commissioner's players check (12 Nov 2026)
 **Owner:** Isaac Otabil
 **Applies to:** the Flutter app *and* the React website. Both use the same Firebase project, this model and the same security rules.
 
@@ -801,6 +801,24 @@ A cup or a gala of one season. Made by the FA (C2, C2b); read by everyone with a
 - **`cups/{cupId}/history/{lineId}`** (3.0c1b): one line per change, `{ text (3–200), by, byName (1–80), at }`, written in the same batch as the cup ("Cup made", "Each round: one match → home and away", "Teams: Ojobi Stars left out"). Read by everyone with a role; created only by the FA, with the cup there after the batch; never changed; deleted with the cup. The lines come from `cupChanges` (`cup_changes.dart`).
 - **A gala's timetable** (`GalaPlan`): kick-offs every `gapMinutes` from the first kick-off, no later than 4:30 pm (before dark). A round starts 2 slots after the last kick-off of the round before, so every club has a free slot to rest. The form warns when the matches don't fit in the days.
 
+### 2.15e `playerChecks/{fixtureId}` — the commissioner's players check (3.6b)
+
+The face check of one match (mockup MC2): each player on a saved sheet gets **Matches**, **Doesn't match** (with a note) or **Absent**. A mismatch is **recorded** for the FA and the match report, not struck off the sheet (Isaac, 11 Nov 2026).
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `fixtureId` | string | Same as the document ID |
+| `results` | map | Player ID → `{ result, teamId, at, note? }`; `result` is `match` / `mismatch` / `absent`; `note` 3–300 characters, **required** for `mismatch`, optional otherwise |
+| `changed` | string | The one player of the last write |
+| `by` | string | The commissioner's uid |
+| `byName` | string | Their name (1–80) |
+| `updatedAt` | timestamp | Server time |
+
+- **Written only by the match's commissioner** (`fixtureOfficials.officials.commissioner.uid`), **one player per write** (`changed`; the other players' entries stay as they are), and the player must be on that team's saved sheet (`teamSheets/{fixtureId}_{teamId}`, starters or bench).
+- **When:** from the lock (1 h before kick-off) until **2 h after kick-off** (Isaac, 12 Nov 2026). A result may be changed in that time.
+- **Read:** the FA and the match's appointed officials. Not the clubs.
+- Photos come from `playerPhotos` (3.6a). The FA's view and a note to the FA on a mismatch: 3.6c.
+
 ## 3. Who can do what (summary)
 
 The security rules enforce this table. Screens hiding a button is **not** security.
@@ -1000,6 +1018,7 @@ Still open:
 | 17 Oct 2026 | v1.2: competitions.`categories` (`division`, `juvenile`; one or both) on `teamRequests` and `teams`; one registration per club. Players gain `category`; juvenile age group derived from date of birth. Juvenile questions added for GEDFA.                                                                          |
 | 18 Oct 2026 | v1.3: players gain`playerCode` (player ID `GE26-0042`, set at FA approval, never changes) and `searchKeys` (name search). New `settings/playerCounter`. Photo change also needs re-approval. Squad size 30 per competition; jersey 1–99 confirmed.                                                                      |
 | 18 Oct 2026 | Positions: 23 (added CB, LFB, RFB, LM, RM, LWF, RWF); position → group table updated to match `position.dart` and the rules. |
+| 12 Nov 2026 | v2.44 (3.6b): new `playerChecks/{fixtureId}` (the commissioner only, one player per write, a player on the saved sheet, a note for Doesn't match, from the lock to 2 h after kick-off; read by the FA and the match officials). 458 rules tests. |
 | 12 Nov 2026 | v2.43 (3.6a): new `playerPhotos/{playerId}` (FA writes with the approval / pass / Repair, only the player's own links; read by the FA and referees). Section 7: Isaac's answers on the face check. 452 rules tests. |
 | 12 Nov 2026 | v2.42 (3.3b): no new data. A team prints its own sheet from what it already reads (its `teamSheets` doc; `fixtureOfficials` from 24 h before); kit photos are downloaded from their saved URLs. 446 rules tests. |
 | 12 Nov 2026 | v2.41 (3.3): no new data. The official sheet PDF is made in the app from what the FA and the officials can already read (`fixtures`, both `teamSheets` with their `players` copies and IDs, `fixtureOfficials`); nothing is stored. 446 rules tests. |

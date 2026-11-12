@@ -84,6 +84,11 @@ class FirestorePaths {
   static String playerPhoto(String playerId) =>
       '$district/playerPhotos/$playerId';
 
+  /// The commissioner's face check of one match (3.6b).
+  static const playerChecks = '$district/playerChecks';
+  static String playerCheck(String fixtureId) =>
+      '$district/playerChecks/$fixtureId';
+
   /// All team sheets (3.1c: a team lists its own).
   static const teamSheets = '$district/teamSheets';
 

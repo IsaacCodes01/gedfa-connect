@@ -22,7 +22,30 @@ import 'package:gedfa_connect/features/team_sheets/domain/team_sheet.dart';
 import 'package:gedfa_connect/features/teams/domain/competition.dart';
 import 'package:gedfa_connect/features/teams/domain/kit.dart';
 import 'package:gedfa_connect/features/teams/domain/kit_slot.dart';
+import 'package:gedfa_connect/features/player_checks/data/player_check_repository.dart';
+import 'package:gedfa_connect/features/player_checks/domain/player_check.dart';
+import 'package:gedfa_connect/features/player_checks/presentation/check_players_screen.dart';
+import 'package:gedfa_connect/features/players/data/player_photos.dart';
 import 'package:go_router/go_router.dart';
+
+/// Records the commissioner's saves instead of writing (3.6b).
+class _FakeChecks implements PlayerCheckRepository {
+  final saved = <(String, CheckResult, String?)>[];
+
+  @override
+  Future<void> record({
+    required String fixtureId,
+    required CheckLine line,
+    required CheckResult result,
+    String? note,
+    required String by,
+    required String byName,
+  }) async => saved.add((line.playerId, result, note));
+
+  @override
+  Stream<MatchPlayerChecks> watch(String fixtureId) =>
+      Stream.value(MatchPlayerChecks(fixtureId: fixtureId));
+}
 
 /// The referee's area (3.5b): Home (RD1), Matches (RD2), a match with
 /// Can't make it (RD3); and the pieces behind them.
@@ -161,6 +184,7 @@ void main() {
     Size size,
     Brightness b, {
     Map<String, MatchOfficials>? officials,
+    _FakeChecks? checks,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -210,6 +234,14 @@ void main() {
           ),
           pinnedAnnouncementProvider.overrideWithValue(null),
           myAudienceProvider.overrideWithValue('person:r1'),
+          // 3.6b: the check so far (none) and no registered photos
+          playerChecksProvider.overrideWith(
+            (ref, id) => Stream.value(MatchPlayerChecks(fixtureId: id)),
+          ),
+          playerPhotoProvider.overrideWith((ref, id) async => null),
+          playerCheckRepositoryProvider.overrideWithValue(
+            checks ?? _FakeChecks(),
+          ),
         ],
         child: MaterialApp.router(
           theme: b == Brightness.dark ? AppTheme.dark() : AppTheme.light(),
@@ -347,5 +379,131 @@ void main() {
       officials: told,
     );
     expect(find.text('Can\'t make it: "Family funeral"'), findsOneWidget);
+  });
+
+  group('3.6b players check (MC2)', () {
+    final asCommissioner = {
+      ...mine,
+      'live': const MatchOfficials(
+        fixtureId: 'live',
+        places: {OfficialPlace.commissioner: me},
+      ),
+    };
+
+    testWidgets('Match details: the commissioner gets Check players', (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        const MatchDetailsScreen(fixtureId: 'live', isOfficial: true),
+        const Size(360, 3600),
+        Brightness.light,
+        officials: asCommissioner,
+      );
+      expect(
+        find.text('Players check · you are the commissioner'),
+        findsOneWidget,
+      );
+      expect(find.text('Check players'), findsOneWidget);
+    });
+
+    testWidgets('the referee of the match gets no Check players', (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        const MatchDetailsScreen(fixtureId: 'live', isOfficial: true),
+        const Size(360, 3600),
+        Brightness.light,
+        officials: {
+          ...mine,
+          'live': const MatchOfficials(
+            fixtureId: 'live',
+            places: {OfficialPlace.referee: me},
+          ),
+        },
+      );
+      expect(find.text('Check players'), findsNothing);
+    });
+
+    for (final b in Brightness.values) {
+      for (final width in [360.0, 1280.0]) {
+        testWidgets('Check players, $width wide, ${b.name}', (tester) async {
+          final checks = _FakeChecks();
+          await pump(
+            tester,
+            const CheckPlayersScreen(fixtureId: 'live'),
+            Size(width, 900),
+            b,
+            officials: asCommissioner,
+            checks: checks,
+          );
+          expect(find.textContaining('0 of 12 checked'), findsOneWidget);
+          expect(find.text('ruf player 1'), findsOneWidget);
+          expect(find.text('No registered photo found'), findsOneWidget);
+
+          await tester.tap(find.text('Matches'));
+          await tester.pumpAndSettle();
+          expect(checks.saved.single.$1, 'h1');
+          expect(checks.saved.single.$2, CheckResult.match);
+          // On to the next player
+          expect(find.text('ruf player 2'), findsOneWidget);
+
+          await tester.tap(find.text("Doesn't match"));
+          await tester.pumpAndSettle();
+          expect(find.text("ruf player 2 doesn't match"), findsOneWidget);
+          await tester.enterText(find.byType(TextField), 'Looks older');
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Record'));
+          await tester.pumpAndSettle();
+          expect(checks.saved.last, (
+            'h2',
+            CheckResult.mismatch,
+            'Looks older',
+          ));
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
+
+    testWidgets('another official may look; only the commissioner records', (
+      tester,
+    ) async {
+      final checks = _FakeChecks();
+      await pump(
+        tester,
+        const CheckPlayersScreen(fixtureId: 'live'),
+        const Size(360, 900),
+        Brightness.light,
+        officials: {
+          ...mine,
+          'live': const MatchOfficials(
+            fixtureId: 'live',
+            places: {
+              OfficialPlace.referee: me,
+              OfficialPlace.commissioner: AppointedOfficial(
+                uid: 'f1',
+                name: 'Kwesi Arthur',
+              ),
+            },
+          ),
+        },
+        checks: checks,
+      );
+      expect(find.textContaining('Only the commissioner'), findsOneWidget);
+      await tester.tap(find.text('Matches'));
+      await tester.pumpAndSettle();
+      expect(checks.saved, isEmpty);
+    });
+
+    testWidgets('before the lock: not yet', (tester) async {
+      await pump(
+        tester,
+        const CheckPlayersScreen(fixtureId: 'm1'),
+        const Size(360, 800),
+        Brightness.light,
+      );
+      expect(find.text('Not yet'), findsOneWidget);
+    });
   });
 }
