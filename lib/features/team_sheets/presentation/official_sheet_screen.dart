@@ -98,12 +98,19 @@ class _OfficialSheetScreenState extends ConsumerState<OfficialSheetScreen> {
         OfficialSheetFonts.load(),
         loadKitPhotos(sheet),
       ).wait;
-      return officialSheetPdf(
-        sheet,
-        fonts: fonts,
-        photos: photos,
-        printedAt: now,
-      );
+      try {
+        return await officialSheetPdf(
+          sheet,
+          fonts: fonts,
+          photos: photos,
+          printedAt: now,
+        );
+      } catch (e, st) {
+        if (photos.isEmpty) rethrow;
+        // A kit photo the PDF can't use: the sheet without the photos
+        debugPrint('Team sheet PDF with kit photos failed: $e\n$st');
+        return officialSheetPdf(sheet, fonts: fonts, printedAt: now);
+      }
     }();
   }
 
@@ -219,7 +226,16 @@ class _OfficialSheetScreenState extends ConsumerState<OfficialSheetScreen> {
         maxPageWidth: 760,
         pdfFileName: _sheet!.fileName,
         loadingWidget: const LoadingView(),
-        onError: (_, e) => ErrorView(message: appErrorMessage(e)),
+        onError: (_, e) {
+          // The real reason too, in small print and in the console: a PDF
+          // that can't be made is a fault to report, not to retry
+          debugPrint('Team sheet PDF failed: $e');
+          final text = e.toString();
+          final details = text.length > 300 ? text.substring(0, 300) : text;
+          return ErrorView(
+            message: '${appErrorMessage(e)}\n\nDetails: $details',
+          );
+        },
       );
     }
 
